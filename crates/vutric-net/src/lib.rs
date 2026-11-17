@@ -267,6 +267,35 @@ pub fn new_identity() -> [u8; 32] {
     SecretKey::generate().to_bytes()
 }
 
+/// The device identity kept at `<data dir>/vutric/<file>` (`%LOCALAPPDATA%`, `$XDG_DATA_HOME` or
+/// `~/.local/share`), created on first use. Desktop tools only; phone apps keep it in app storage.
+pub fn identity_file(file: &str) -> Result<[u8; 32]> {
+    let dir = std::env::var_os("LOCALAPPDATA")
+        .or_else(|| std::env::var_os("XDG_DATA_HOME"))
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::Path::new(&h).join(".local/share")))
+        .context("no data directory")?
+        .join("vutric");
+    let path = dir.join(file);
+    if let Ok(bytes) = std::fs::read(&path)
+        && let Ok(key) = <[u8; 32]>::try_from(bytes.as_slice())
+    {
+        return Ok(key);
+    }
+    std::fs::create_dir_all(&dir)?;
+    let key = new_identity();
+    std::fs::write(&path, key)?;
+    Ok(key)
+}
+
+/// A fresh transfer id (16 random bytes).
+#[must_use]
+pub fn new_fling_id() -> vutric_core::FlingId {
+    let mut id = [0u8; 16];
+    id.copy_from_slice(&new_identity()[..16]);
+    vutric_core::FlingId(id)
+}
+
 /// Monotonic microseconds since `start`, the clock in `EffectStarted::receiver_micros`.
 #[must_use]
 pub fn micros_since(start: Instant) -> u64 {

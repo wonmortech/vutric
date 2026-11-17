@@ -11,8 +11,10 @@ from the owner. Platform order is fixed by [ADR-0003](decisions/0003-platform-or
 | 0.2 | **Network, any to any, offline** ([ADR-0005](decisions/0005-any-to-any-offline-first.md)): one LAN-only iroh peer (`crates/vutric-net`) on desktop and Android; mDNS discovery, QR pairing link, six-digit pairing check, 30 KB preview **in both directions**. | Preview one-way p50 < 40 ms, p95 < 80 ms on a home Wi-Fi with the router's internet unplugged, desktop → phone and phone → desktop; fallback to the link's IP:port when multicast is blocked. Phone ↔ phone and desktop ↔ desktop when two such devices are at hand. |
 | 0.3 | **Overlay on KDE Wayland** (layer-shell) and **GNOME 50** (helper extension). | Same as 0.1. Done in Phase 0 only as a feasibility check; the product work is Phase 2. |
 
-Status: 0.1 passed on Windows ([report](reports/phase-0.1-windows-overlay.md)). 0.2 in progress: `vutric-net` and the
-desktop CLI `apps/net-spike` work peer ↔ peer on one machine; the Android client is next.
+Status: 0.1 passed on Windows ([report](reports/phase-0.1-windows-overlay.md)). 0.2 in progress ([report](reports/phase-0.2-network.md)):
+`vutric-net`, the desktop CLI `apps/net-spike` and the phone app `apps/mobile-spike` (Android, plus an unsigned
+iPhone build for sideloading, pulled ahead of Phase 3 only to measure on the owner's iPhone); device runs on real
+Wi-Fi are next.
 
 ## Phase 1 — Windows + Android (MVP)
 

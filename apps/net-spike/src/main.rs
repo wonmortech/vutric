@@ -64,26 +64,6 @@ fn platform() -> Platform {
     }
 }
 
-/// The device identity, kept next to the user's app data so the pairing link stays the same between runs.
-fn identity() -> Result<[u8; 32]> {
-    let dir = std::env::var_os("LOCALAPPDATA")
-        .or_else(|| std::env::var_os("XDG_DATA_HOME"))
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::Path::new(&h).join(".local/share")))
-        .context("no data directory")?
-        .join("vutric");
-    let path = dir.join("net-spike.key");
-    if let Ok(bytes) = std::fs::read(&path)
-        && let Ok(key) = <[u8; 32]>::try_from(bytes.as_slice())
-    {
-        return Ok(key);
-    }
-    std::fs::create_dir_all(&dir)?;
-    let key = vutric_net::new_identity();
-    std::fs::write(&path, key)?;
-    Ok(key)
-}
-
 fn ms(d: Duration) -> f64 {
     d.as_secs_f64() * 1000.0
 }
@@ -168,7 +148,12 @@ async fn send(peer: &Peer, a: &Args) -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let a = parse()?;
-    let peer = Peer::bind(identity()?, &a.name, platform()).await?;
+    let peer = Peer::bind(
+        vutric_net::identity_file("net-spike.key")?,
+        &a.name,
+        platform(),
+    )
+    .await?;
     println!("{} ({:?}) id {}", a.name, platform(), peer.id());
     let result = match a.mode.as_str() {
         "listen" => listen(&peer, &a).await,
