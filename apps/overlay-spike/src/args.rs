@@ -15,6 +15,8 @@ pub struct Args {
     /// Wait for flings from a phone instead of playing scripted runs.
     pub listen: bool,
     pub name: String,
+    /// `--lan-only`: never use the internet (no relay, no lookup server).
+    pub lan_only: bool,
 }
 
 impl Args {
@@ -31,6 +33,7 @@ impl Args {
             name: std::env::var("COMPUTERNAME")
                 .or_else(|_| std::env::var("HOSTNAME"))
                 .unwrap_or_else(|_| "Desktop".into()),
+            lan_only: false,
         };
         while let Some(flag) = it.next() {
             let mut value = || it.next().with_context(|| format!("{flag} needs a value"));
@@ -43,6 +46,7 @@ impl Args {
                 "--image" => args.image = Some(value()?.into()),
                 "--listen" => args.listen = true,
                 "--name" => args.name = value()?,
+                "--lan-only" => args.lan_only = true,
                 "--zone" => {
                     args.zone = match value()?.as_str() {
                         "left" => SendZone::Left,
@@ -55,7 +59,7 @@ impl Args {
                     println!(
                         "vutric-overlay-spike [--runs N] [--interval SECS] [--zone left|right|top] \
                          [--image PATH] [--speed PX_PER_S] [--angle RAD] [--latency FRAMES] \
-                         [--listen [--name NAME]]"
+                         [--listen [--name NAME] [--lan-only]]"
                     );
                     std::process::exit(0);
                 }

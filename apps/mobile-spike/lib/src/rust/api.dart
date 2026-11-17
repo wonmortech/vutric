@@ -7,17 +7,26 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `as_initiator`, `bump`, `cancellable`, `drop_session`, `epoch`, `forget_on_error`, `keep`, `ms`, `now_epoch`, `open`, `peer_slot`, `peer`, `receiver_clock`, `report`, `retire`, `runtime`, `sent_of`, `session_slot`, `session`
+// These functions are ignored because they are not marked as `pub`: `as_initiator`, `bump`, `cancellable`, `drop_session`, `epoch`, `forget_on_error`, `keep`, `ms`, `now_epoch`, `open`, `peer_slot`, `peer`, `receiver_clock`, `report`, `retire`, `route_name`, `runtime`, `sent_of`, `session_slot`, `session`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Sent`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// 32 random bytes to keep forever as this device's identity.
 Future<Uint8List> newIdentity() => RustLib.instance.api.crateApiNewIdentity();
 
-/// Starts (or restarts, e.g. after a rename) this device's LAN-only peer; returns its pairing link for the QR
-/// code. Cancels whatever was running and closes the open session.
-Future<String> start({required String name, required List<int> identity}) =>
-    RustLib.instance.api.crateApiStart(name: name, identity: identity);
+/// Starts (or restarts, e.g. after a rename) this device's peer; returns its pairing link for the QR code.
+/// `lan_only` keeps it off the internet; otherwise it is reachable on this network first and, failing that,
+/// over the internet (direct through NAT where possible, else an encrypted relay). Cancels whatever was
+/// running and closes the open session.
+Future<String> start({
+  required String name,
+  required List<int> identity,
+  required bool lanOnly,
+}) => RustLib.instance.api.crateApiStart(
+  name: name,
+  identity: identity,
+  lanOnly: lanOnly,
+);
 
 /// Finds a peer over mDNS, then measures both directions. Cancelled by [`disconnect`].
 Future<RunReport> runDiscovered({required int runs}) =>
@@ -31,6 +40,10 @@ Future<RunReport> runLink({required String link, required int runs}) =>
 /// measures this phone → that peer. Cancelled by [`disconnect`].
 Future<RunReport> listen({required int runs}) =>
     RustLib.instance.api.crateApiListen(runs: runs);
+
+/// How the open session's packets travel right now (it can move from "relay" to "direct" a moment after
+/// connecting); "" when not connected.
+Future<String> currentRoute() => RustLib.instance.api.crateApiCurrentRoute();
 
 /// Opens the session with a pairing link (scanned or pasted). Cancelled by [`disconnect`].
 Future<Connected> connectLink({required String link}) =>
@@ -141,11 +154,16 @@ class Connected {
   final String checkCode;
   final double connectMs;
 
+  /// "direct" (same network, or through NAT), "relay" (encrypted, through the internet relay) or "" while
+  /// the path is still being chosen.
+  final String route;
+
   const Connected({
     required this.peerName,
     required this.peerPlatform,
     required this.checkCode,
     required this.connectMs,
+    required this.route,
   });
 
   @override
@@ -153,7 +171,8 @@ class Connected {
       peerName.hashCode ^
       peerPlatform.hashCode ^
       checkCode.hashCode ^
-      connectMs.hashCode;
+      connectMs.hashCode ^
+      route.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -163,7 +182,8 @@ class Connected {
           peerName == other.peerName &&
           peerPlatform == other.peerPlatform &&
           checkCode == other.checkCode &&
-          connectMs == other.connectMs;
+          connectMs == other.connectMs &&
+          route == other.route;
 }
 
 /// A photo ready to throw: an upright JPEG, longest side at most 512 px, small enough for one frame. Prepared

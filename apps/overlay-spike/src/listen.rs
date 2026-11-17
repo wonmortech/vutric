@@ -14,7 +14,7 @@ use qrcode::render::unicode::Dense1x2;
 use tokio::sync::oneshot;
 use vutric_core::message::FailReason;
 use vutric_core::{FlingId, Gesture, Message, Platform};
-use vutric_net::{Peer, Session, preview, probe};
+use vutric_net::{Peer, Reach, Route, Session, preview, probe};
 use winit::event_loop::EventLoopProxy;
 
 /// A fling handed from the network thread to the overlay thread.
@@ -28,7 +28,7 @@ pub struct Incoming {
 }
 
 /// Runs the LAN peer on its own thread and Tokio runtime; the overlay keeps the main thread.
-pub fn spawn(name: String, proxy: EventLoopProxy<Incoming>) -> Result<()> {
+pub fn spawn(name: String, lan_only: bool, proxy: EventLoopProxy<Incoming>) -> Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
@@ -37,24 +37,46 @@ pub fn spawn(name: String, proxy: EventLoopProxy<Incoming>) -> Result<()> {
     std::thread::Builder::new()
         .name("vutric-net".into())
         .spawn(move || {
-            if let Err(e) = rt.block_on(serve(&name, proxy)) {
+            if let Err(e) = rt.block_on(serve(&name, lan_only, proxy)) {
                 eprintln!("network stopped: {e:#}");
             }
         })?;
     Ok(())
 }
 
-async fn serve(name: &str, proxy: EventLoopProxy<Incoming>) -> Result<()> {
+async fn serve(name: &str, lan_only: bool, proxy: EventLoopProxy<Incoming>) -> Result<()> {
     let platform = if cfg!(windows) {
         Platform::Windows
     } else {
         Platform::Linux
     };
-    let peer = Peer::bind(vutric_net::identity_file("desktop.key")?, name, platform).await?;
+    let reach = if lan_only {
+        Reach::Lan
+    } else {
+        Reach::Anywhere
+    };
+    let peer = Peer::bind(
+        vutric_net::identity_file("desktop.key")?,
+        name,
+        platform,
+        reach,
+    )
+    .await?;
+    // With internet, wait briefly for a relay so the QR also works from another network.
+    let online = peer.wait_online(Duration::from_secs(3)).await;
     let link = peer.ticket().to_uri();
     let qr = QrCode::new(link.as_bytes())?;
     println!("{}", qr.render::<Dense1x2>().quiet_zone(true).build());
     println!("pairing link: {link}");
+    println!(
+        "{}",
+        match (reach, online) {
+            (Reach::Lan, _) => "local network only (--lan-only)",
+            (Reach::Anywhere, true) =>
+                "reachable on this network and over the internet (encrypted relay)",
+            (Reach::Anywhere, false) => "no internet right now: reachable on this network only",
+        }
+    );
     // From here on the network thread never writes to the console itself: a console frozen by a mouse
     // selection (Windows QuickEdit) would otherwise stall every connection.
     vutric_net::say("waiting for a phone; fling a photo from it (Ctrl+C to stop)".into());
@@ -69,8 +91,13 @@ async fn serve(name: &str, proxy: EventLoopProxy<Incoming>) -> Result<()> {
         let check = s
             .check_code()
             .unwrap_or_else(|e| format!("unavailable ({e})"));
+        let via = match s.route() {
+            (Route::Direct, Some(rtt)) => format!("direct, {:.1} ms", rtt.as_secs_f64() * 1000.0),
+            (Route::Relay, Some(rtt)) => format!("relay, {:.1} ms", rtt.as_secs_f64() * 1000.0),
+            _ => "path pending".into(),
+        };
         vutric_net::say(format!(
-            "connected: {} ({:?}), pairing check {check}",
+            "connected: {} ({:?}), {via}, pairing check {check}",
             s.remote_name, s.remote_platform
         ));
         let proxy = proxy.clone();

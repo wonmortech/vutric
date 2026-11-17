@@ -20,7 +20,7 @@ use tokio::runtime::Runtime;
 use tokio::sync::{Mutex as AsyncMutex, watch};
 use vutric_core::message::FailReason;
 use vutric_core::{FlingId, Message, PairingTicket, Platform};
-use vutric_net::{Peer, Session, preview, probe};
+use vutric_net::{Peer, Reach, Route, Session, preview, probe};
 
 #[cfg(target_os = "ios")]
 const PLATFORM: Platform = Platform::Ios;
@@ -92,9 +92,15 @@ pub fn new_identity() -> Vec<u8> {
     vutric_net::new_identity().to_vec()
 }
 
-/// Starts (or restarts, e.g. after a rename) this device's LAN-only peer; returns its pairing link for the QR
-/// code. Cancels whatever was running and closes the open session.
-pub fn start(name: String, identity: Vec<u8>) -> Result<String> {
+/// How long [`start`] waits for the internet relay before it hands out a link without one (the link still
+/// works on the same network; a later link carries the relay).
+const ONLINE_WAIT: Duration = Duration::from_millis(1500);
+
+/// Starts (or restarts, e.g. after a rename) this device's peer; returns its pairing link for the QR code.
+/// `lan_only` keeps it off the internet; otherwise it is reachable on this network first and, failing that,
+/// over the internet (direct through NAT where possible, else an encrypted relay). Cancels whatever was
+/// running and closes the open session.
+pub fn start(name: String, identity: Vec<u8>, lan_only: bool) -> Result<String> {
     static STARTING: Mutex<()> = Mutex::new(());
     let key: [u8; 32] = identity
         .as_slice()
@@ -108,7 +114,13 @@ pub fn start(name: String, identity: Vec<u8>) -> Result<String> {
         if let Some(old) = old {
             old.close().await;
         }
-        let p = Peer::bind(key, &name, PLATFORM).await?;
+        let reach = if lan_only {
+            Reach::Lan
+        } else {
+            Reach::Anywhere
+        };
+        let p = Peer::bind(key, &name, PLATFORM, reach).await?;
+        p.wait_online(ONLINE_WAIT).await;
         let link = p.ticket().to_uri();
         *peer_slot().lock().expect("peer lock") = Some(p);
         Ok(link)
@@ -208,7 +220,7 @@ pub fn run_link(link: String, runs: u32) -> Result<RunReport> {
     let at = now_epoch();
     runtime().block_on(cancellable(at, async {
         let t1 = Instant::now();
-        let s = p.connect(t.endpoint, &t.addrs).await?;
+        let s = p.connect_ticket(&t).await?;
         as_initiator(s, Duration::ZERO, t1.elapsed(), runs).await
     }))
 }
@@ -291,6 +303,27 @@ pub struct Connected {
     pub peer_platform: String,
     pub check_code: String,
     pub connect_ms: f64,
+    /// "direct" (same network, or through NAT), "relay" (encrypted, through the internet relay) or "" while
+    /// the path is still being chosen.
+    pub route: String,
+}
+
+fn route_name(s: &Session) -> String {
+    match s.route().0 {
+        Route::Direct => "direct".into(),
+        Route::Relay => "relay".into(),
+        Route::Unknown => String::new(),
+    }
+}
+
+/// How the open session's packets travel right now (it can move from "relay" to "direct" a moment after
+/// connecting); "" when not connected.
+#[must_use]
+pub fn current_route() -> String {
+    let Ok((_, s)) = session() else {
+        return String::new();
+    };
+    runtime().block_on(async { route_name(&*s.lock().await) })
 }
 
 /// Makes `s` the open session, unless the call that opened it was cancelled meanwhile (then `s` is closed).
@@ -300,6 +333,7 @@ fn keep(at: u64, s: Session, connect: Duration) -> Result<Connected> {
         peer_platform: format!("{:?}", s.remote_platform),
         check_code: s.check_code()?,
         connect_ms: ms(connect),
+        route: route_name(&s),
     };
     let mut slot = session_slot().lock().expect("session lock");
     if now_epoch() != at {
@@ -328,7 +362,7 @@ fn open(job: impl Future<Output = Result<Session>>) -> Result<Connected> {
 pub fn connect_link(link: String) -> Result<Connected> {
     let p = peer()?;
     let t = PairingTicket::parse(link.trim())?;
-    open(async move { p.connect(t.endpoint, &t.addrs).await })
+    open(async move { p.connect_ticket(&t).await })
 }
 
 /// Opens the session with the first device found over mDNS (not on iPhone: no multicast there). Cancelled by

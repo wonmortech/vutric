@@ -33,9 +33,14 @@ fn gesture() -> Gesture {
 
 async fn thrower(link: &str) -> (Peer, Session) {
     let ticket = PairingTicket::parse(link).expect("ticket");
-    let peer = Peer::bind(vutric_net::new_identity(), "Thrower", Platform::Windows)
-        .await
-        .expect("bind");
+    let peer = Peer::bind(
+        vutric_net::new_identity(),
+        "Thrower",
+        Platform::Windows,
+        vutric_net::Reach::Lan,
+    )
+    .await
+    .expect("bind");
     let s = peer
         .connect(ticket.endpoint, &ticket.addrs)
         .await
@@ -52,7 +57,7 @@ fn rt() -> tokio::runtime::Runtime {
 
 #[test]
 fn phone_api_end_to_end() {
-    let link = api::start("Test phone".into(), api::new_identity()).expect("start");
+    let link = api::start("Test phone".into(), api::new_identity(), true).expect("start");
 
     // 1. disconnect() cancels a phone that waits to be found, at once, and a later session still works.
     let (tx, rx) = mpsc::channel();
@@ -123,9 +128,14 @@ fn phone_api_end_to_end() {
     let (tx, rx) = mpsc::channel();
     let silent = std::thread::spawn(move || {
         rt().block_on(async {
-            let peer = Peer::bind(vutric_net::new_identity(), "Silent", Platform::Windows)
-                .await
-                .expect("bind");
+            let peer = Peer::bind(
+                vutric_net::new_identity(),
+                "Silent",
+                Platform::Windows,
+                vutric_net::Reach::Lan,
+            )
+            .await
+            .expect("bind");
             tx.send(peer.ticket().to_uri()).expect("link");
             let mut s = peer.accept().await.expect("accept");
             // Read everything, answer nothing, keep the connection up well past the thrower's timeout.

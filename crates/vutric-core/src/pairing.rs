@@ -1,7 +1,9 @@
 //! The one-time pairing payload shown as a QR code by the desktop.
 //!
-//! Format: `vutric://pair?v=1&id=<64 hex>&n=<percent-encoded name>&a=<ip:port>,<ip:port>`
-//! Address hints let the phone connect when multicast/mDNS is blocked on the network.
+//! Format: `vutric://pair?v=1&id=<64 hex>&n=<percent-encoded name>&a=<ip:port>,<ip:port>&r=<relay url>`
+//! Address hints let the phone connect when multicast/mDNS is blocked on the network. The optional relay URL
+//! (percent-encoded) lets it connect from another network at once; older links without it still parse, and
+//! older apps ignore it.
 
 use core::fmt::Write as _;
 use std::net::SocketAddr;
@@ -11,12 +13,15 @@ use crate::{EndpointId, Error, PROTOCOL_VERSION, Result};
 const PREFIX: &str = "vutric://pair?";
 const MAX_ADDRS: usize = 8;
 const MAX_NAME_CHARS: usize = 64;
+const MAX_RELAY_CHARS: usize = 200;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PairingTicket {
     pub endpoint: EndpointId,
     pub device_name: String,
     pub addrs: Vec<SocketAddr>,
+    /// The device's home relay (`https://…`) when it had one: lets a device on another network reach it.
+    pub relay: Option<String>,
 }
 
 impl PairingTicket {
@@ -29,6 +34,10 @@ impl PairingTicket {
             let addrs: Vec<String> = self.addrs.iter().map(ToString::to_string).collect();
             uri.push_str(&addrs.join(","));
         }
+        if let Some(relay) = &self.relay {
+            uri.push_str("&r=");
+            percent_encode(relay, &mut uri);
+        }
         uri
     }
 
@@ -37,6 +46,7 @@ impl PairingTicket {
             .strip_prefix(PREFIX)
             .ok_or(Error::InvalidTicket("not a vutric pairing link"))?;
         let (mut version, mut endpoint, mut name, mut addrs) = (None, None, None, Vec::new());
+        let mut relay = None;
         for pair in query.split('&') {
             let (key, value) = pair
                 .split_once('=')
@@ -45,6 +55,16 @@ impl PairingTicket {
                 "v" => version = value.parse::<u16>().ok(),
                 "id" => endpoint = Some(value.parse::<EndpointId>()?),
                 "n" => name = Some(percent_decode(value)?),
+                "r" => {
+                    let url = percent_decode(value)?;
+                    if url.len() > MAX_RELAY_CHARS
+                        || !url.starts_with("https://")
+                        || url.chars().any(|c| c.is_control() || c.is_whitespace())
+                    {
+                        return Err(Error::InvalidTicket("bad relay url"));
+                    }
+                    relay = Some(url);
+                }
                 "a" => {
                     for addr in value.split(',').filter(|s| !s.is_empty()) {
                         addrs.push(
@@ -74,6 +94,7 @@ impl PairingTicket {
             endpoint: endpoint.ok_or(Error::InvalidTicket("missing endpoint id"))?,
             device_name,
             addrs,
+            relay,
         })
     }
 }
@@ -119,6 +140,7 @@ mod tests {
                 "192.168.1.24:47110".parse().unwrap(),
                 "[fe80::1]:47110".parse().unwrap(),
             ],
+            relay: Some("https://euc1-1.relay.n0.iroh.link./".into()),
         }
     }
 
@@ -143,6 +165,14 @@ mod tests {
     fn strips_control_characters_from_name() {
         let uri = format!("{PREFIX}v=1&id={}&n=a%0Ab%1Bc", EndpointId([1; 32]));
         assert_eq!(PairingTicket::parse(&uri).unwrap().device_name, "abc");
+    }
+
+    #[test]
+    fn relay_is_optional_and_must_be_https() {
+        let old = format!("{PREFIX}v=1&id={}&n=x", EndpointId([1; 32]));
+        assert_eq!(PairingTicket::parse(&old).unwrap().relay, None);
+        let bad = format!("{old}&r=http%3A%2F%2Fevil.example%2F");
+        assert!(PairingTicket::parse(&bad).is_err());
     }
 
     #[test]

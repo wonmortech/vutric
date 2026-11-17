@@ -344,7 +344,13 @@ class _PeerBar extends StatelessWidget {
           const Icon(Icons.devices_outlined, color: signal),
           const SizedBox(width: 12),
           Expanded(
-            child: Text('${peer.peerName} (${peer.peerPlatform})', style: t.titleSmall?.copyWith(color: cobalt)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${peer.peerName} (${peer.peerPlatform})', style: t.titleSmall?.copyWith(color: cobalt)),
+                Text(routeLabel(peer.route), style: t.labelSmall),
+              ],
+            ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,

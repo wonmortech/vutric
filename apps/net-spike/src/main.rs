@@ -11,6 +11,10 @@
 //! vutric-net-spike fling --photo PATH [--count N]
 //!     Shows the pairing QR, waits for a phone to scan it (catch screen), then flings the photo to it.
 //! ```
+//! Every mode takes `--lan-only` (never use the internet). `send`/`fling` with `--ticket` also take
+//! `--via-internet`: ignore the link's LAN addresses and reach the peer by its key, relay and lookup server
+//! only, as a device on another network would.
+//!
 //! Both sides print the same six-digit pairing check and their own statistics; the first 3 probes per direction
 //! are warm-up (QUIC path validation) and are reported separately.
 
@@ -21,7 +25,7 @@ use anyhow::{Context as _, Result, bail};
 use qrcode::QrCode;
 use qrcode::render::unicode::Dense1x2;
 use vutric_core::{Gesture, PairingTicket, Platform};
-use vutric_net::{Peer, Session};
+use vutric_net::{Peer, Reach, Route, Session};
 use vutric_net::{preview, probe};
 
 struct Args {
@@ -32,6 +36,8 @@ struct Args {
     discover: bool,
     photo: Option<PathBuf>,
     count: u32,
+    lan_only: bool,
+    via_internet: bool,
 }
 
 fn parse() -> Result<Args> {
@@ -45,6 +51,8 @@ fn parse() -> Result<Args> {
         discover: false,
         photo: None,
         count: 1,
+        lan_only: false,
+        via_internet: false,
     };
     while let Some(flag) = it.next() {
         match flag.as_str() {
@@ -54,6 +62,8 @@ fn parse() -> Result<Args> {
             "--discover" => a.discover = true,
             "--photo" => a.photo = Some(it.next().context("--photo needs a path")?.into()),
             "--count" => a.count = it.next().context("--count needs a value")?.parse()?,
+            "--lan-only" => a.lan_only = true,
+            "--via-internet" => a.via_internet = true,
             other => bail!("unknown argument {other}"),
         }
     }
@@ -87,7 +97,27 @@ async fn send_run(s: &mut Session, runs: u32, label: &str) -> Result<()> {
     Ok(())
 }
 
+/// "direct, 0.4 ms" or "relay, 38.0 ms": how the session's packets travel now.
+fn via(s: &Session) -> String {
+    match s.route() {
+        (Route::Direct, Some(rtt)) => format!("direct, {:.1} ms", ms(rtt)),
+        (Route::Relay, Some(rtt)) => format!("relay, {:.1} ms", ms(rtt)),
+        _ => "path pending".into(),
+    }
+}
+
 async fn listen(peer: &Peer, a: &Args) -> Result<()> {
+    if peer.reach() == Reach::Anywhere {
+        let online = peer.wait_online(Duration::from_secs(3)).await;
+        println!(
+            "{}",
+            if online {
+                "reachable on this network and over the internet (encrypted relay)"
+            } else {
+                "no internet right now: reachable on this network only"
+            }
+        );
+    }
     let link = peer.ticket().to_uri();
     let qr = QrCode::new(link.as_bytes())?;
     println!("{}", qr.render::<Dense1x2>().quiet_zone(true).build());
@@ -95,9 +125,10 @@ async fn listen(peer: &Peer, a: &Args) -> Result<()> {
     println!("waiting for a peer (Ctrl+C to stop)...");
     let mut s = peer.accept().await?;
     println!(
-        "connected: {} ({:?}), pairing check {}",
+        "connected: {} ({:?}), {}, pairing check {}",
         s.remote_name,
         s.remote_platform,
+        via(&s),
         s.check_code()?
     );
     if let Some(path) = &a.photo {
@@ -120,14 +151,20 @@ async fn listen(peer: &Peer, a: &Args) -> Result<()> {
 
 async fn send(peer: &Peer, a: &Args) -> Result<()> {
     let t0 = Instant::now();
-    let (id, addrs) = if let Some(link) = &a.ticket {
-        let t = PairingTicket::parse(link)?;
+    let t1;
+    let mut s = if let Some(link) = &a.ticket {
+        let mut t = PairingTicket::parse(link)?;
         println!(
-            "pairing link for {} with {} address hint(s)",
+            "pairing link for {} with {} address hint(s), relay {}",
             t.device_name,
-            t.addrs.len()
+            t.addrs.len(),
+            t.relay.as_deref().unwrap_or("none")
         );
-        (t.endpoint, t.addrs)
+        if a.via_internet {
+            t.addrs.clear();
+        }
+        t1 = Instant::now();
+        peer.connect_ticket(&t).await?
     } else if a.discover {
         let n = peer.discover(Duration::from_secs(15)).await?;
         println!(
@@ -136,17 +173,17 @@ async fn send(peer: &Peer, a: &Args) -> Result<()> {
             ms(t0.elapsed()),
             n.addrs
         );
-        (n.id, n.addrs)
+        t1 = Instant::now();
+        peer.connect(n.id, &n.addrs).await?
     } else {
         bail!("send needs --ticket LINK or --discover");
     };
-    let t1 = Instant::now();
-    let mut s = peer.connect(id, &addrs).await?;
     println!(
-        "connected to {} ({:?}) in {:.0} ms, pairing check {}",
+        "connected to {} ({:?}) in {:.0} ms, {}, pairing check {}",
         s.remote_name,
         s.remote_platform,
         ms(t1.elapsed()),
+        via(&s),
         s.check_code()?
     );
     if let Some(path) = &a.photo {
@@ -205,6 +242,11 @@ async fn main() -> Result<()> {
         vutric_net::identity_file("net-spike.key")?,
         &a.name,
         platform(),
+        if a.lan_only {
+            Reach::Lan
+        } else {
+            Reach::Anywhere
+        },
     )
     .await?;
     println!("{} ({:?}) id {}", a.name, platform(), peer.id());

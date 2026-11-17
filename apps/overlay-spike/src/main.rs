@@ -43,7 +43,7 @@ fn main() -> Result<()> {
 
     let event_loop = EventLoop::<listen::Incoming>::with_user_event().build()?;
     if args.listen {
-        listen::spawn(args.name.clone(), event_loop.create_proxy())?;
+        listen::spawn(args.name.clone(), args.lan_only, event_loop.create_proxy())?;
     }
     let mut app = Spike::new(args, image);
     event_loop.run_app(&mut app)?;

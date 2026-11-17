@@ -1,5 +1,5 @@
-// Vutric spike 0.2 on Android and iOS: one LAN-only peer (Rust, vutric-net) and three ways to measure a 30 KB preview
-// in both directions. No internet is used (ADR-0005).
+// Vutric spike 0.2 on Android and iOS: one peer (Rust, vutric-net) and three ways to measure a 30 KB preview in both
+// directions. Same network first, the internet (direct or encrypted relay) when the devices are apart (ADR-0006).
 
 import 'dart:io';
 
@@ -127,7 +127,7 @@ class _SpikeHomeState extends State<SpikeHome> with WidgetsBindingObserver {
       // Android drops mDNS replies without a multicast lock; iOS has no such switch.
       if (Platform.isAndroid) await _multicast.invokeMethod('acquire');
       final name = _name.text.trim().isEmpty ? 'Telefon' : _name.text.trim();
-      final link = await vutric.start(name: name, identity: await _identity());
+      final link = await vutric.start(name: name, identity: await _identity(), lanOnly: false);
       if (!mounted) return;
       setState(() {
         _myLink = link;

@@ -29,6 +29,13 @@ const err = Color(0xFFA8321F);
 final hasMdns = !Platform.isIOS;
 
 /// A call that `disconnect()` cancelled on purpose (the page closed, or the user tapped cancel).
+/// How the session travels, for the line under the peer's name.
+String routeLabel(String route) => switch (route) {
+  'direct' => "to'g'ridan-to'g'ri",
+  'relay' => 'internet orqali (shifrlangan)',
+  _ => "yo'l tanlanmoqda…",
+};
+
 bool isCancelled(Object e) => '$e'.contains('vutric: cancelled');
 
 /// The Rust error, trimmed to its first line for the screen.

@@ -10,9 +10,14 @@ use vutric_net::{HANDSHAKE_TIMEOUT, Peer};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn stalled_client_does_not_block_a_real_one() {
-    let listener = Peer::bind(vutric_net::new_identity(), "Listener", Platform::Windows)
-        .await
-        .expect("bind listener");
+    let listener = Peer::bind(
+        vutric_net::new_identity(),
+        "Listener",
+        Platform::Windows,
+        vutric_net::Reach::Lan,
+    )
+    .await
+    .expect("bind listener");
     let ticket = PairingTicket::parse(&listener.ticket().to_uri()).expect("ticket");
     let mut target =
         EndpointAddr::new(iroh::PublicKey::from_bytes(&ticket.endpoint.0).expect("key"));
@@ -41,9 +46,14 @@ async fn stalled_client_does_not_block_a_real_one() {
     // Give the listener time to start (and stall on) the bad handshake first.
     tokio::time::sleep(Duration::from_millis(300)).await;
 
-    let real = Peer::bind(vutric_net::new_identity(), "Real", Platform::Android)
-        .await
-        .expect("bind real");
+    let real = Peer::bind(
+        vutric_net::new_identity(),
+        "Real",
+        Platform::Android,
+        vutric_net::Reach::Lan,
+    )
+    .await
+    .expect("bind real");
     let t0 = Instant::now();
     let _s = real
         .connect(ticket.endpoint, &ticket.addrs)

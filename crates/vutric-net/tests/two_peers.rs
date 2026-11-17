@@ -63,12 +63,22 @@ async fn probe(session: &mut Session, n: u8) -> Duration {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn both_directions_and_matching_check_code() {
-    let desktop = Peer::bind([1; 32], "Studio PC", Platform::Windows)
-        .await
-        .expect("bind desktop");
-    let phone = Peer::bind([2; 32], "Pixel 8", Platform::Android)
-        .await
-        .expect("bind phone");
+    let desktop = Peer::bind(
+        [1; 32],
+        "Studio PC",
+        Platform::Windows,
+        vutric_net::Reach::Lan,
+    )
+    .await
+    .expect("bind desktop");
+    let phone = Peer::bind(
+        [2; 32],
+        "Pixel 8",
+        Platform::Android,
+        vutric_net::Reach::Lan,
+    )
+    .await
+    .expect("bind phone");
 
     let ticket = desktop.ticket();
     assert!(!ticket.addrs.is_empty(), "ticket carries LAN address hints");

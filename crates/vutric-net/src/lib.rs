@@ -1,8 +1,11 @@
-//! Vutric transport (ADR-0005): every device is a peer, and the local network is enough.
+//! Vutric transport (ADR-0005, ADR-0006): every device is a peer; the local network comes first, the internet
+//! is the fallback.
 //!
-//! - [`Peer`] owns one iroh endpoint with relays and DNS lookups disabled, so nothing leaves the LAN.
-//!   Other peers are found through mDNS (the device name rides along as mDNS user data) or through the IP hints
-//!   of a [`PairingTicket`].
+//! - [`Peer`] owns one iroh endpoint. With [`Reach::Lan`] relays and lookup servers are off and nothing leaves
+//!   the LAN. With [`Reach::Anywhere`] the same LAN paths are tried first, and a device on another network is
+//!   reached by its key alone: a direct path by hole punching, else through an end-to-end encrypted relay.
+//!   Peers are found through mDNS (the device name rides along as mDNS user data, never to a public server),
+//!   the IP hints and relay of a [`PairingTicket`], or the n0 lookup server (by key, relay address only).
 //! - [`Session`] is one control stream to one peer: `Hello` both ways, then framed [`Message`]s in either
 //!   direction. "Sender" and "receiver" are per transfer, never per platform.
 //! - [`Session::check_code`] is the pairing check shown on both screens, derived from this connection's TLS
@@ -20,11 +23,15 @@ use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context as _, Result, anyhow, bail, ensure};
-use iroh::address_lookup::UserData;
+use iroh::address_lookup::{
+    AddressLookup, AddressLookupBuilder, AddressLookupBuilderError, DnsAddressLookup, EndpointData,
+    Error as LookupError, Item, PkarrPublisher, PkarrResolver, UserData,
+};
 use iroh::endpoint::{Connection, RecvStream, SendStream, presets};
-use iroh::{Endpoint, EndpointAddr, RelayMode, SecretKey};
+use iroh::{Endpoint, EndpointAddr, RelayMode, RelayUrl, SecretKey};
 use iroh_mdns_address_lookup::{DiscoveryEvent, MdnsAddressLookup};
 use n0_future::StreamExt as _;
+use n0_future::boxed::BoxStream;
 use vutric_core::frame::{self, Decoder};
 use vutric_core::{ALPN, EndpointId, Message, PROTOCOL_VERSION, PairingTicket, Platform};
 
@@ -57,10 +64,65 @@ pub const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(8);
 /// How long a closing side waits for the peer to take its last bytes before it closes anyway.
 const LINGER: Duration = Duration::from_secs(2);
 
-/// A device on the local network that can both send and receive.
+/// How far a [`Peer`] reaches.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reach {
+    /// The local network only: no relay, no lookup server, nothing leaves the LAN (the "local only" setting,
+    /// and tests).
+    Lan,
+    /// The local network first, then the internet: a direct path by hole punching, else an end-to-end
+    /// encrypted relay. The relay and the lookup server see keys and encrypted packets, never content or names.
+    Anywhere,
+}
+
+/// How a session's packets travel right now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Route {
+    /// Straight to the other device (same network, or a hole-punched internet path).
+    Direct,
+    /// Through a relay server (end-to-end encrypted); iroh keeps trying to upgrade to a direct path.
+    Relay,
+    /// No path yet.
+    Unknown,
+}
+
+/// Publishes through `B` without the device name: the name is for nearby devices (mDNS), not for a public
+/// lookup server.
+#[derive(Debug)]
+struct Nameless<B>(B);
+
+#[derive(Debug)]
+struct NamelessLookup<L>(L);
+
+impl<B: AddressLookupBuilder> AddressLookupBuilder for Nameless<B> {
+    fn into_address_lookup(
+        self,
+        endpoint: &Endpoint,
+    ) -> Result<impl AddressLookup, AddressLookupBuilderError> {
+        Ok(NamelessLookup(self.0.into_address_lookup(endpoint)?))
+    }
+}
+
+impl<L: AddressLookup> AddressLookup for NamelessLookup<L> {
+    fn publish(&self, data: &EndpointData) {
+        let mut data = data.clone();
+        data.set_user_data(None);
+        self.0.publish(&data);
+    }
+
+    fn resolve(
+        &self,
+        endpoint_id: iroh::EndpointId,
+    ) -> Option<BoxStream<std::result::Result<Item, LookupError>>> {
+        self.0.resolve(endpoint_id)
+    }
+}
+
+/// A device that can both send and receive.
 #[derive(Debug, Clone)]
 pub struct Peer {
     endpoint: Endpoint,
+    reach: Reach,
     /// `None` where the OS refused multicast (iOS without the multicast entitlement): link/QR pairing still works.
     mdns: Option<MdnsAddressLookup>,
     name: String,
@@ -76,15 +138,28 @@ pub struct Nearby {
 }
 
 impl Peer {
-    /// Binds a LAN-only endpoint. `secret` is the device's persistent identity (32 random bytes kept by the app).
-    pub async fn bind(secret: [u8; 32], name: &str, platform: Platform) -> Result<Self> {
+    /// Binds an endpoint. `secret` is the device's persistent identity (32 random bytes kept by the app).
+    pub async fn bind(
+        secret: [u8; 32],
+        name: &str,
+        platform: Platform,
+        reach: Reach,
+    ) -> Result<Self> {
         let user_data: UserData = clip(name, UserData::MAX_LENGTH)
             .parse()
             .map_err(|e| anyhow!("device name for mDNS: {e:?}"))?;
-        let endpoint = Endpoint::builder(presets::Minimal)
+        let builder = match reach {
+            Reach::Lan => Endpoint::builder(presets::Minimal).relay_mode(RelayMode::Disabled),
+            // presets::N0 minus its publisher, which would put the device name on a public server.
+            Reach::Anywhere => Endpoint::builder(presets::Minimal)
+                .relay_mode(RelayMode::Default)
+                .address_lookup(Nameless(PkarrPublisher::n0_dns()))
+                .address_lookup(PkarrResolver::n0_dns())
+                .address_lookup(DnsAddressLookup::n0_dns()),
+        };
+        let endpoint = builder
             .secret_key(SecretKey::from_bytes(&secret))
             .alpns(vec![ALPN.to_vec()])
-            .relay_mode(RelayMode::Disabled)
             .user_data_for_address_lookup(user_data)
             .bind()
             .await
@@ -109,6 +184,7 @@ impl Peer {
         };
         Ok(Self {
             endpoint,
+            reach,
             mdns,
             name: name.to_owned(),
             platform,
@@ -141,7 +217,27 @@ impl Peer {
             endpoint: self.id(),
             device_name: self.name.clone(),
             addrs,
+            relay: self
+                .endpoint
+                .addr()
+                .relay_urls()
+                .next()
+                .map(ToString::to_string),
         }
+    }
+
+    #[must_use]
+    pub fn reach(&self) -> Reach {
+        self.reach
+    }
+
+    /// [`Reach::Anywhere`]: waits up to `max` for a home relay, so the next [`Self::ticket`] carries it. Returns
+    /// whether we are online; without internet it returns `false` after `max` and the LAN still works.
+    pub async fn wait_online(&self, max: Duration) -> bool {
+        self.reach == Reach::Anywhere
+            && tokio::time::timeout(max, self.endpoint.online())
+                .await
+                .is_ok()
     }
 
     /// Whether this peer can find and be found over mDNS (false: pairing link only).
@@ -179,10 +275,30 @@ impl Peer {
 
     /// Opens a session to a peer by key; `addrs` are optional hints (ticket or mDNS), mDNS fills in the rest.
     pub async fn connect(&self, id: EndpointId, addrs: &[SocketAddr]) -> Result<Session> {
+        self.dial(id, addrs, None).await
+    }
+
+    /// Opens a session from a pairing link: its LAN hints first, its relay (and, with [`Reach::Anywhere`], the
+    /// lookup server) when the device is on another network.
+    pub async fn connect_ticket(&self, t: &PairingTicket) -> Result<Session> {
+        self.dial(t.endpoint, &t.addrs, t.relay.as_deref()).await
+    }
+
+    async fn dial(
+        &self,
+        id: EndpointId,
+        addrs: &[SocketAddr],
+        relay: Option<&str>,
+    ) -> Result<Session> {
         let key = iroh::PublicKey::from_bytes(&id.0).context("peer key")?;
         let mut target = EndpointAddr::new(key);
         for a in addrs {
             target = target.with_ip_addr(*a);
+        }
+        if self.reach == Reach::Anywhere
+            && let Some(url) = relay
+        {
+            target = target.with_relay_url(url.parse::<RelayUrl>().context("relay url")?);
         }
         tokio::time::timeout(HANDSHAKE_TIMEOUT, async {
             let conn = self
@@ -307,6 +423,21 @@ impl Session {
                 .ok_or_else(|| anyhow!("peer closed the control stream"))?;
             self.decoder.push(&self.buf[..n]);
         }
+    }
+
+    /// How this session's packets travel right now, and the round trip of that path.
+    #[must_use]
+    pub fn route(&self) -> (Route, Option<Duration>) {
+        let paths = self.conn.paths();
+        let Some(p) = paths.iter().find(iroh::endpoint::Path::is_selected) else {
+            return (Route::Unknown, None);
+        };
+        let route = if p.is_relay() {
+            Route::Relay
+        } else {
+            Route::Direct
+        };
+        (route, Some(p.rtt()))
     }
 
     /// Six digits both screens show while pairing (Bluetooth-style numeric comparison).

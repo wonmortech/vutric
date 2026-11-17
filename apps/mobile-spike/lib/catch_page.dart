@@ -167,9 +167,12 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
                       const Icon(Icons.south, color: signal),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          '${peer.peerName} (${peer.peerPlatform})',
-                          style: t.titleSmall?.copyWith(color: cobalt),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${peer.peerName} (${peer.peerPlatform})', style: t.titleSmall?.copyWith(color: cobalt)),
+                            Text(routeLabel(peer.route), style: t.labelSmall),
+                          ],
                         ),
                       ),
                       Column(
