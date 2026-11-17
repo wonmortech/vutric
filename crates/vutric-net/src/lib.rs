@@ -175,27 +175,31 @@ impl Peer {
         .map_err(|_| anyhow!("no answer from the device within {HANDSHAKE_TIMEOUT:?}"))?
     }
 
-    /// Waits for the next peer to connect to us. A connection that fails or stalls its handshake is logged and
-    /// skipped (bounded by [`HANDSHAKE_TIMEOUT`]), so one bad client cannot stop the listener.
+    /// Waits for the next peer to connect to us and returns the first one whose handshake completes.
+    /// Handshakes run side by side, each bounded by [`HANDSHAKE_TIMEOUT`]: a client that fails or stalls is
+    /// logged and dropped without delaying anyone else. Handshakes still running when one wins are dropped.
     pub async fn accept(&self) -> Result<Session> {
+        let mut pending = tokio::task::JoinSet::new();
         loop {
-            let incoming = self
-                .endpoint
-                .accept()
-                .await
-                .ok_or_else(|| anyhow!("endpoint closed"))?;
-            let opened = tokio::time::timeout(HANDSHAKE_TIMEOUT, async {
-                let conn = incoming.await.context("incoming connection")?;
-                let (send, recv) = conn.accept_bi().await.context("accept control stream")?;
-                Session::handshake(conn, send, recv, &self.name, self.platform).await
-            })
-            .await;
-            match opened {
-                Ok(Ok(s)) => return Ok(s),
-                Ok(Err(e)) => eprintln!("vutric-net: incoming connection dropped: {e:#}"),
-                Err(_) => {
-                    eprintln!("vutric-net: incoming connection stalled its handshake, dropped");
+            tokio::select! {
+                incoming = self.endpoint.accept() => {
+                    let incoming = incoming.ok_or_else(|| anyhow!("endpoint closed"))?;
+                    let (name, platform) = (self.name.clone(), self.platform);
+                    pending.spawn(async move {
+                        tokio::time::timeout(HANDSHAKE_TIMEOUT, async move {
+                            let conn = incoming.await.context("incoming connection")?;
+                            let (send, recv) = conn.accept_bi().await.context("accept control stream")?;
+                            Session::handshake(conn, send, recv, &name, platform).await
+                        })
+                        .await
+                    });
                 }
+                Some(done) = pending.join_next(), if !pending.is_empty() => match done {
+                    Ok(Ok(Ok(s))) => return Ok(s),
+                    Ok(Ok(Err(e))) => eprintln!("vutric-net: incoming connection dropped: {e:#}"),
+                    Ok(Err(_)) => eprintln!("vutric-net: incoming connection stalled its handshake, dropped"),
+                    Err(e) => eprintln!("vutric-net: handshake task failed: {e}"),
+                },
             }
         }
     }

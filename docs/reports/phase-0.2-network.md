@@ -71,8 +71,10 @@ disconnect and keep a retired session): epochs now move and are read under the s
 led to typed refusals (`probe::Refused`, not text matching), error messages without peer payloads, bidi
 controls stripped from device names, and local validation before a throw so a bad name never drops a session.
 
-Known small gaps, left for the real daemon: handshakes are accepted one at a time (a client that stalls for
-8 s delays the next one); a desktop GPU that needs over 2 s to start refuses the first fling it then plays;
+Handshakes now run side by side: a client that opens QUIC and then stalls no longer delays a real one
+(`crates/vutric-net/tests/stalled_client.rs`: the real client waited 7.8 s before, under 0.4 s now).
+
+Known small gaps, left for the real daemon: a desktop GPU that needs over 2 s to start refuses the first fling it then plays;
 leaving a phone screen and tapping connect within a few milliseconds can cancel that connect (tap again).
 
 **Open, by design for Phase 1:** a receiver accepts any device that reaches it, and the six-digit check is shown
