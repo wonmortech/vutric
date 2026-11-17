@@ -17,7 +17,8 @@ Future<Uint8List> newIdentity() => RustLib.instance.api.crateApiNewIdentity();
 /// Starts (or restarts, e.g. after a rename) this device's peer; returns its pairing link for the QR code.
 /// `lan_only` keeps it off the internet; otherwise it is reachable on this network first and, failing that,
 /// over the internet (direct through NAT where possible, else an encrypted relay). Cancels whatever was
-/// running and closes the open session.
+/// running and closes the open session. Returns at once: the link carries this network's addresses, and
+/// [`wait_online`] then [`current_link`] give the one that also carries the internet relay.
 Future<String> start({
   required String name,
   required List<int> identity,
@@ -27,6 +28,14 @@ Future<String> start({
   identity: identity,
   lanOnly: lanOnly,
 );
+
+/// Waits up to `max_ms` for the internet relay (about 3 s on a good line). True: devices on other networks
+/// can reach this one too. False at once in LAN-only mode.
+Future<bool> waitOnline({required int maxMs}) =>
+    RustLib.instance.api.crateApiWaitOnline(maxMs: maxMs);
+
+/// This device's pairing link as of now; once online it also carries the relay.
+Future<String> currentLink() => RustLib.instance.api.crateApiCurrentLink();
 
 /// Finds a peer over mDNS, then measures both directions. Cancelled by [`disconnect`].
 Future<RunReport> runDiscovered({required int runs}) =>

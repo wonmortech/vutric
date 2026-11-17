@@ -63,7 +63,7 @@ async fn serve(name: &str, lan_only: bool, proxy: EventLoopProxy<Incoming>) -> R
     )
     .await?;
     // With internet, wait briefly for a relay so the QR also works from another network.
-    let online = peer.wait_online(Duration::from_secs(3)).await;
+    let online = peer.wait_online(Duration::from_secs(8)).await;
     let link = peer.ticket().to_uri();
     let qr = QrCode::new(link.as_bytes())?;
     println!("{}", qr.render::<Dense1x2>().quiet_zone(true).build());

@@ -131,9 +131,17 @@ class _SpikeHomeState extends State<SpikeHome> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {
         _myLink = link;
-        _status = hasMdns
-            ? 'Tarmoqda koʻrinadi. Internet ishlatilmaydi.'
-            : 'Tayyor. iPhone QR kod orqali ulanadi. Internet ishlatilmaydi.';
+        _status = hasMdns ? 'Tarmoqda koʻrinadi. Internet tekshirilmoqda…' : 'Tayyor: QR kod orqali ulanadi. Internet tekshirilmoqda…';
+      });
+      // The relay takes ~3 s; until then the QR works on this network only. Swap in the fuller link when ready.
+      final online = await vutric.waitOnline(maxMs: 10000);
+      final full = await vutric.currentLink();
+      if (!mounted) return;
+      setState(() {
+        _myLink = full;
+        _status = online
+            ? 'Tayyor: shu tarmoqda va internet orqali (shifrlangan) ulanadi.'
+            : 'Tayyor: faqat shu tarmoqda (internet yoʻq).';
       });
     } catch (e) {
       if (!mounted) return;

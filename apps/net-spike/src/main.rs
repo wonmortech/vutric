@@ -108,7 +108,7 @@ fn via(s: &Session) -> String {
 
 async fn listen(peer: &Peer, a: &Args) -> Result<()> {
     if peer.reach() == Reach::Anywhere {
-        let online = peer.wait_online(Duration::from_secs(3)).await;
+        let online = peer.wait_online(Duration::from_secs(8)).await;
         println!(
             "{}",
             if online {

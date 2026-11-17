@@ -92,14 +92,11 @@ pub fn new_identity() -> Vec<u8> {
     vutric_net::new_identity().to_vec()
 }
 
-/// How long [`start`] waits for the internet relay before it hands out a link without one (the link still
-/// works on the same network; a later link carries the relay).
-const ONLINE_WAIT: Duration = Duration::from_millis(1500);
-
 /// Starts (or restarts, e.g. after a rename) this device's peer; returns its pairing link for the QR code.
 /// `lan_only` keeps it off the internet; otherwise it is reachable on this network first and, failing that,
 /// over the internet (direct through NAT where possible, else an encrypted relay). Cancels whatever was
-/// running and closes the open session.
+/// running and closes the open session. Returns at once: the link carries this network's addresses, and
+/// [`wait_online`] then [`current_link`] give the one that also carries the internet relay.
 pub fn start(name: String, identity: Vec<u8>, lan_only: bool) -> Result<String> {
     static STARTING: Mutex<()> = Mutex::new(());
     let key: [u8; 32] = identity
@@ -120,11 +117,22 @@ pub fn start(name: String, identity: Vec<u8>, lan_only: bool) -> Result<String> 
             Reach::Anywhere
         };
         let p = Peer::bind(key, &name, PLATFORM, reach).await?;
-        p.wait_online(ONLINE_WAIT).await;
         let link = p.ticket().to_uri();
         *peer_slot().lock().expect("peer lock") = Some(p);
         Ok(link)
     })
+}
+
+/// Waits up to `max_ms` for the internet relay (about 3 s on a good line). True: devices on other networks
+/// can reach this one too. False at once in LAN-only mode.
+pub fn wait_online(max_ms: u32) -> Result<bool> {
+    let p = peer()?;
+    Ok(runtime().block_on(p.wait_online(Duration::from_millis(max_ms.into()))))
+}
+
+/// This device's pairing link as of now; once online it also carries the relay.
+pub fn current_link() -> Result<String> {
+    Ok(peer()?.ticket().to_uri())
 }
 
 // ---- Measurement runs (spike 0.2) ----
