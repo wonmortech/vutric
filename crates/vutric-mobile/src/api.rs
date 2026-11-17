@@ -162,6 +162,117 @@ pub fn run_link(link: String, runs: u32) -> Result<RunReport> {
     })
 }
 
+// ---- Fling: one open session, photos thrown one after another ----
+
+fn session_slot() -> &'static Mutex<Option<Session>> {
+    static SESSION: Mutex<Option<Session>> = Mutex::new(None);
+    &SESSION
+}
+
+/// The device a fling goes to, shown with the pairing check before the first throw.
+#[derive(Debug, Clone)]
+pub struct Connected {
+    pub peer_name: String,
+    pub peer_platform: String,
+    pub check_code: String,
+    pub connect_ms: f64,
+}
+
+fn keep(s: Session, connect: Duration) -> Result<Connected> {
+    let c = Connected {
+        peer_name: s.remote_name.clone(),
+        peer_platform: format!("{:?}", s.remote_platform),
+        check_code: s.check_code()?,
+        connect_ms: ms(connect),
+    };
+    if let Some(old) = session_slot().lock().expect("session lock").replace(s) {
+        old.close();
+    }
+    Ok(c)
+}
+
+/// Opens the fling session with a pairing link (scanned or pasted).
+pub fn connect_link(link: String) -> Result<Connected> {
+    let p = peer()?;
+    let t = PairingTicket::parse(link.trim())?;
+    runtime().block_on(async {
+        let t0 = Instant::now();
+        let s = p.connect(t.endpoint, &t.addrs).await?;
+        keep(s, t0.elapsed())
+    })
+}
+
+/// Opens the fling session with the first device found over mDNS.
+pub fn connect_discovered() -> Result<Connected> {
+    let p = peer()?;
+    runtime().block_on(async {
+        let near = p.discover(Duration::from_secs(15)).await?;
+        let t0 = Instant::now();
+        let s = p.connect(near.id, &near.addrs).await?;
+        keep(s, t0.elapsed())
+    })
+}
+
+/// A photo ready to throw: JPEG, longest side at most 512 px. Prepared when picked, so the throw itself only
+/// sends bytes.
+#[derive(Debug, Clone)]
+pub struct Photo {
+    pub file_name: String,
+    pub jpeg: Vec<u8>,
+    pub width: u16,
+    pub height: u16,
+}
+
+/// Any picked image (JPEG, PNG or WebP) → the preview the receiver plays.
+pub fn prepare_photo(file_name: String, bytes: Vec<u8>) -> Result<Photo> {
+    let img = image::load_from_memory(&bytes)
+        .context("not a JPEG, PNG or WebP image")?
+        .thumbnail(512, 512)
+        .to_rgb8();
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 80).encode_image(&img)?;
+    Ok(Photo {
+        file_name,
+        jpeg,
+        width: u16::try_from(img.width())?,
+        height: u16::try_from(img.height())?,
+    })
+}
+
+/// Throws the photo; returns milliseconds from the call until the receiver reported its first frame on screen
+/// (there and back, so an upper bound of "release → first frame").
+pub fn fling(photo: Photo, speed: f32, angle: f32, exit_x: f32) -> Result<f64> {
+    let gesture = vutric_core::Gesture {
+        speed,
+        angle,
+        exit_x,
+    };
+    let msg = probe::photo(
+        &photo.file_name,
+        photo.jpeg,
+        photo.width,
+        photo.height,
+        gesture,
+    );
+    let mut s = session_slot()
+        .lock()
+        .expect("session lock")
+        .take()
+        .context("connect to a device first")?;
+    let r = runtime().block_on(probe::round_trip(&mut s, &msg));
+    if r.is_ok() {
+        *session_slot().lock().expect("session lock") = Some(s);
+    }
+    Ok(ms(r?))
+}
+
+/// Closes the fling session.
+pub fn disconnect() {
+    if let Some(s) = session_slot().lock().expect("session lock").take() {
+        s.close();
+    }
+}
+
 /// Waits for a peer to connect (desktop: `vutric-net-spike send --discover`), answers its probes, then
 /// measures this phone → that peer.
 pub fn listen(runs: u32) -> Result<RunReport> {

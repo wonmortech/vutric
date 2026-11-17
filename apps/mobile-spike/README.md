@@ -45,3 +45,19 @@ Phone and desktop on the same Wi-Fi (for the offline run, unplug the router's in
 
 Each run sends 3 warm-up and 100 measured probes one way, then the other way. Both screens show the same
 six-digit check code. Pass: one-way p50 < 40 ms and p95 < 80 ms ([roadmap](../../docs/roadmap.md)).
+
+## Throw a photo (Phase 0 end to end)
+
+On the desktop, from a terminal on the desktop session (the overlay needs a window):
+
+```sh
+cargo run --release -p vutric-overlay-spike -- --listen --name "Studio PC"
+```
+
+On the phone: **Rasmni kompyuterga otish** → scan the QR code (or **Tarmoqdan topish** on Android) → pick a photo
+→ flick it upwards. Faster than 700 px/s counts as a throw; slower drags spring back. The photo (a JPEG preview,
+longest side 512 px) flies onto the desktop through the Halqa effect.
+
+The phone shows *release → first frame on the computer*, measured there and back (so an upper bound); the
+desktop prints *arrived → first frame* for the same throw. Pass: under 100 ms ([roadmap](../../docs/roadmap.md)).
+Without a phone, `vutric-net-spike fling --ticket LINK --photo PATH` throws a photo from another desktop.

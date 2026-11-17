@@ -1,5 +1,9 @@
 //! Networking related utilities
 
+// Vutric vendoring: noq-udp in our lock deprecates UdpSocketState::send; keep upstream code as is, and keep
+// the workspace RUSTFLAGS=-D warnings from failing on it.
+#![allow(deprecated)]
+
 pub mod interfaces;
 pub mod ip;
 mod ip_family;

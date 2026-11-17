@@ -4736,6 +4736,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "flutter_rust_bridge",
+ "image",
  "tokio",
  "vutric-core",
  "vutric-net",

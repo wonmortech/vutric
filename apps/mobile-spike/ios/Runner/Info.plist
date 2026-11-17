@@ -8,6 +8,8 @@
 	<array>
 		<string>_vutric._udp</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pick a photo to throw to your computer.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan the pairing QR code shown on your other device.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

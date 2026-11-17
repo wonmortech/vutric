@@ -7,9 +7,9 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `as_initiator`, `ms`, `peer_slot`, `peer`, `report`, `runtime`, `sent_of`
+// These functions are ignored because they are not marked as `pub`: `as_initiator`, `keep`, `ms`, `peer_slot`, `peer`, `report`, `runtime`, `sent_of`, `session_slot`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Sent`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
 
 /// 32 random bytes to keep forever as this device's identity.
 Future<Uint8List> newIdentity() => RustLib.instance.api.crateApiNewIdentity();
@@ -26,10 +26,104 @@ Future<RunReport> runDiscovered({required int runs}) =>
 Future<RunReport> runLink({required String link, required int runs}) =>
     RustLib.instance.api.crateApiRunLink(link: link, runs: runs);
 
+/// Opens the fling session with a pairing link (scanned or pasted).
+Future<Connected> connectLink({required String link}) =>
+    RustLib.instance.api.crateApiConnectLink(link: link);
+
+/// Opens the fling session with the first device found over mDNS.
+Future<Connected> connectDiscovered() =>
+    RustLib.instance.api.crateApiConnectDiscovered();
+
+/// Any picked image (JPEG, PNG or WebP) → the preview the receiver plays.
+Future<Photo> preparePhoto({
+  required String fileName,
+  required List<int> bytes,
+}) =>
+    RustLib.instance.api.crateApiPreparePhoto(fileName: fileName, bytes: bytes);
+
+/// Throws the photo; returns milliseconds from the call until the receiver reported its first frame on screen
+/// (there and back, so an upper bound of "release → first frame").
+Future<double> fling({
+  required Photo photo,
+  required double speed,
+  required double angle,
+  required double exitX,
+}) => RustLib.instance.api.crateApiFling(
+  photo: photo,
+  speed: speed,
+  angle: angle,
+  exitX: exitX,
+);
+
+/// Closes the fling session.
+Future<void> disconnect() => RustLib.instance.api.crateApiDisconnect();
+
 /// Waits for a peer to connect (desktop: `vutric-net-spike send --discover`), answers its probes, then
 /// measures this phone → that peer.
 Future<RunReport> listen({required int runs}) =>
     RustLib.instance.api.crateApiListen(runs: runs);
+
+/// The device a fling goes to, shown with the pairing check before the first throw.
+class Connected {
+  final String peerName;
+  final String peerPlatform;
+  final String checkCode;
+  final double connectMs;
+
+  const Connected({
+    required this.peerName,
+    required this.peerPlatform,
+    required this.checkCode,
+    required this.connectMs,
+  });
+
+  @override
+  int get hashCode =>
+      peerName.hashCode ^
+      peerPlatform.hashCode ^
+      checkCode.hashCode ^
+      connectMs.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Connected &&
+          runtimeType == other.runtimeType &&
+          peerName == other.peerName &&
+          peerPlatform == other.peerPlatform &&
+          checkCode == other.checkCode &&
+          connectMs == other.connectMs;
+}
+
+/// A photo ready to throw: JPEG, longest side at most 512 px. Prepared when picked, so the throw itself only
+/// sends bytes.
+class Photo {
+  final String fileName;
+  final Uint8List jpeg;
+  final int width;
+  final int height;
+
+  const Photo({
+    required this.fileName,
+    required this.jpeg,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  int get hashCode =>
+      fileName.hashCode ^ jpeg.hashCode ^ width.hashCode ^ height.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Photo &&
+          runtimeType == other.runtimeType &&
+          fileName == other.fileName &&
+          jpeg == other.jpeg &&
+          width == other.width &&
+          height == other.height;
+}
 
 /// What one spike run measured, both directions, for the screen and the report.
 class RunReport {

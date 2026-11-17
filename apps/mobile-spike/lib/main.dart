@@ -10,6 +10,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'fling_page.dart';
 import 'src/rust/api.dart' as vutric;
 import 'src/rust/frb_generated.dart';
 
@@ -120,13 +121,19 @@ class _SpikeHomeState extends State<SpikeHome> {
     }
   }
 
-  void _connectLink(String link) =>
-      _run('Havola orqali ulanmoqda…', () => vutric.runLink(link: link, runs: _runs));
+  void _connectLink(String link) => _run('Havola orqali ulanmoqda…', () => vutric.runLink(link: link, runs: _runs));
+
+  Future<String?> _scanLink() =>
+      Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const _ScanPage()));
+
+  void _openFling() => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => FlingPage(scan: _scanLink, link: _link.text),
+    ),
+  );
 
   Future<void> _scan() async {
-    final link = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const _ScanPage()),
-    );
+    final link = await _scanLink();
     if (link == null || !mounted) return;
     _link.text = link;
     _connectLink(link);
@@ -150,7 +157,13 @@ class _SpikeHomeState extends State<SpikeHome> {
               onSubmitted: (_) => _start(),
             ),
             const SizedBox(height: 16),
-            FilledButton(
+            FilledButton.icon(
+              onPressed: ready ? _openFling : null,
+              icon: const Icon(Icons.north),
+              label: const Text('Rasmni kompyuterga otish'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
               onPressed: ready
                   ? () => _run('Kompyuter qidirilmoqda (mDNS)…', () => vutric.runDiscovered(runs: _runs))
                   : null,
@@ -171,16 +184,17 @@ class _SpikeHomeState extends State<SpikeHome> {
               ),
             ),
             const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: ready ? _scan : null,
-              child: const Text('QR kodni skanerlab oʻlchash'),
-            ),
+            OutlinedButton(onPressed: ready ? _scan : null, child: const Text('QR kodni skanerlab oʻlchash')),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: ready ? () => _connectLink(_link.text) : null,
               child: const Text('Havola orqali ulanib oʻlchash'),
             ),
-            if (_busy) const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator(color: _signal)),
+            if (_busy)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: LinearProgressIndicator(color: _signal),
+              ),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 16),
@@ -240,8 +254,10 @@ class _ReportCard extends StatelessWidget {
               style: t.bodyMedium?.copyWith(color: pass ? _ok : _err),
             ),
             const SizedBox(height: 8),
-            Text('${report.peerName} → telefon: ${report.receivedProbes} ta preview qabul qilindi; '
-                'raqamlari u tomonda chiqadi.'),
+            Text(
+              '${report.peerName} → telefon: ${report.receivedProbes} ta preview qabul qilindi; '
+              'raqamlari u tomonda chiqadi.',
+            ),
             const SizedBox(height: 8),
             SelectableText(report.sent, style: t.bodySmall?.copyWith(fontFamily: 'monospace')),
           ],
