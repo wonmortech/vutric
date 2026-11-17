@@ -57,8 +57,8 @@ jobs:
           flutter pub get
           flutter build ios --release --no-codesign
           # The Rust bridge is looked up by name at run time; make sure the linker kept it.
-          n=$(nm -gU build/ios/iphoneos/Runner.app/Runner | grep -c frbgen_vutric_spike || true)
-          echo "frbgen symbols in Runner: $n"
+          n=$(nm -gU build/ios/iphoneos/Runner.app/Runner | grep -c frb_get_rust_content_hash || true)
+          echo "Rust bridge symbols in Runner: $n"
           test "$n" -gt 0
           mkdir Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
