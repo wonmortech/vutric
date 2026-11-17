@@ -7,8 +7,12 @@
 //!
 //! Keep typing in another window while it runs: the report fails the focus check if a single keystroke would
 //! have been lost.
+//!
+//! `--listen` turns it into the Phase 0 end-to-end check: it waits for a phone on the LAN and plays the effect
+//! with every photo flung from it (see `listen.rs`).
 
 mod args;
+mod listen;
 mod sample_image;
 mod stats;
 
@@ -37,7 +41,10 @@ fn main() -> Result<()> {
         None => sample_image::dusk(960, 720),
     };
 
-    let event_loop = EventLoop::new()?;
+    let event_loop = EventLoop::<listen::Incoming>::with_user_event().build()?;
+    if args.listen {
+        listen::spawn(args.name.clone(), event_loop.create_proxy())?;
+    }
     let mut app = Spike::new(args, image);
     event_loop.run_app(&mut app)?;
     if let Some(err) = app.fatal.take() {
@@ -67,6 +74,8 @@ struct Run {
     started: Instant,
     last_present: Option<Instant>,
     stats: RunStats,
+    /// `--listen`: told when the first frame of this fling is on screen.
+    notify: Option<tokio::sync::oneshot::Sender<Instant>>,
 }
 
 struct Spike {
@@ -99,14 +108,22 @@ impl Spike {
         event_loop.exit();
     }
 
-    fn start_run(&mut self) {
-        let Some(gpu) = &self.gpu else { return };
-        let screen = [gpu.config.width as f32, gpu.config.height as f32];
-        let gesture = Gesture {
+    fn scripted_gesture(&self) -> Gesture {
+        Gesture {
             speed: self.args.speed,
             angle: self.args.angle,
             exit_x: 0.35 + 0.3 * (self.runs_done % 3) as f32 / 2.0,
-        };
+        }
+    }
+
+    fn start_run(
+        &mut self,
+        gesture: Gesture,
+        triggered: Instant,
+        notify: Option<tokio::sync::oneshot::Sender<Instant>>,
+    ) {
+        let Some(gpu) = &self.gpu else { return };
+        let screen = [gpu.config.width as f32, gpu.config.height as f32];
         let aspect = self.image.width() as f32 / self.image.height() as f32;
         let now = Instant::now();
         self.run = Some(Run {
@@ -117,10 +134,11 @@ impl Spike {
                 gesture,
                 aspect,
             ),
-            triggered: now,
+            triggered,
             started: now,
             last_present: None,
             stats: RunStats::new(platform_foreground()),
+            notify,
         });
         gpu.window.request_redraw();
     }
@@ -172,7 +190,12 @@ impl Spike {
 
         let now = Instant::now();
         match run.last_present {
-            None => run.stats.first_frame = Some(now - run.triggered),
+            None => {
+                run.stats.first_frame = Some(now - run.triggered);
+                if let Some(tx) = run.notify.take() {
+                    let _ = tx.send(now);
+                }
+            }
             Some(prev) => run.stats.intervals.push(now - prev),
         }
         run.last_present = Some(now);
@@ -182,26 +205,48 @@ impl Spike {
         if finished {
             run.stats.foreground_changed = foreground != run.stats.foreground_before;
             let done = self.run.take().expect("run present");
-            self.summary.runs.push(done.stats);
             self.runs_done += 1;
-            self.next_trigger = Instant::now() + Duration::from_secs_f32(self.args.interval);
-            if self.runs_done >= self.args.runs {
-                event_loop.exit();
+            if !self.args.listen {
+                self.next_trigger = Instant::now() + Duration::from_secs_f32(self.args.interval);
+                if self.runs_done >= self.args.runs {
+                    event_loop.exit();
+                }
             }
+            self.summary.runs.push(done.stats);
         } else {
             gpu.window.request_redraw();
         }
     }
 }
 
-impl ApplicationHandler for Spike {
+impl ApplicationHandler<listen::Incoming> for Spike {
     fn new_events(&mut self, _: &ActiveEventLoop, cause: StartCause) {
-        if matches!(cause, StartCause::ResumeTimeReached { .. })
+        if !self.args.listen
+            && matches!(cause, StartCause::ResumeTimeReached { .. })
             && self.run.is_none()
             && self.gpu.is_some()
         {
-            self.start_run();
+            self.start_run(self.scripted_gesture(), Instant::now(), None);
         }
+    }
+
+    /// A photo flung from a phone (`--listen`): swap the texture and play the effect at once.
+    fn user_event(&mut self, _: &ActiveEventLoop, fling: listen::Incoming) {
+        let Some(gpu) = &mut self.gpu else { return };
+        gpu.renderer.set_image(
+            &gpu.device,
+            &gpu.queue,
+            fling.image.as_raw(),
+            fling.image.width(),
+            fling.image.height(),
+        );
+        self.image = fling.image;
+        if let Some(mut previous) = self.run.take()
+            && let Some(tx) = previous.notify.take()
+        {
+            let _ = tx.send(Instant::now());
+        }
+        self.start_run(fling.gesture, fling.arrived, Some(fling.first_frame));
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -226,7 +271,7 @@ impl ApplicationHandler for Spike {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        if self.run.is_some() {
+        if self.run.is_some() || self.args.listen {
             event_loop.set_control_flow(ControlFlow::Wait);
         } else {
             event_loop.set_control_flow(ControlFlow::WaitUntil(self.next_trigger));

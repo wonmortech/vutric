@@ -1,6 +1,6 @@
 [package]
 name = "vutric-overlay-spike"
-description = "Phase 0.1 spike: the Halqa effect on a real desktop, with frame-time statistics."
+description = "Phase 0 spikes: the Halqa effect on a real desktop (0.1), and with photos flung from a phone (--listen)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,8 +13,11 @@ publish = false
 anyhow.workspace = true
 image.workspace = true
 pollster.workspace = true
+qrcode = { version = "0.14.1", default-features = false }
 raw-window-handle.workspace = true
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "sync", "time"] }
 vutric-core.workspace = true
+vutric-net = { path = "../../crates/vutric-net" }
 vutric-overlay.workspace = true
 wgpu.workspace = true
 winit.workspace = true

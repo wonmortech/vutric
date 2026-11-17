@@ -48,16 +48,44 @@ fn fling(seq: u32) -> Message {
 
 /// Sends one probe and waits for the answer; returns the round trip.
 pub async fn send_one(session: &mut Session, seq: u32) -> Result<Duration> {
-    let msg = fling(seq);
-    let Message::FlingStart(ref start) = msg else {
-        unreachable!()
+    round_trip(session, &fling(seq)).await
+}
+
+/// A real photo fling, as a phone sends it: a JPEG preview (longest side <= 512 px) and the throw. The receiver
+/// plays the effect with the preview and answers `EffectStarted` once its first frame is on screen.
+#[must_use]
+pub fn photo(file_name: &str, jpeg: Vec<u8>, width: u16, height: u16, gesture: Gesture) -> Message {
+    Message::FlingStart(FlingStart {
+        id: crate::new_fling_id(),
+        file_name: file_name.to_owned(),
+        mime: "image/jpeg".into(),
+        size: jpeg.len() as u64,
+        blake3: *blake3::hash(&jpeg).as_bytes(),
+        gesture,
+        effect: EffectId::Halqa,
+        preview: Some(Preview {
+            format: PreviewFormat::Jpeg,
+            width,
+            height,
+            bytes: jpeg,
+        }),
+    })
+}
+
+/// Sends a `FlingStart` and waits for its `EffectStarted`; returns the round trip.
+pub async fn round_trip(session: &mut Session, msg: &Message) -> Result<Duration> {
+    let Message::FlingStart(start) = msg else {
+        bail!("round_trip takes a FlingStart");
     };
     let id = start.id;
     let t0 = Instant::now();
-    session.send(&msg).await?;
-    match session.recv().await? {
-        Message::EffectStarted { id: got, .. } if got == id => Ok(t0.elapsed()),
-        other => bail!("expected EffectStarted for this probe, got {other:?}"),
+    session.send(msg).await?;
+    loop {
+        match session.recv().await? {
+            Message::EffectStarted { id: got, .. } if got == id => return Ok(t0.elapsed()),
+            Message::EffectStarted { .. } => {} // a late answer to an earlier fling
+            other => bail!("expected EffectStarted, got {other:?}"),
+        }
     }
 }
 

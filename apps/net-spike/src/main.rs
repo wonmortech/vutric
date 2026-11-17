@@ -5,16 +5,20 @@
 //!     Shows the pairing QR and link, waits for a peer, answers N probes, then sends N back.
 //! vutric-net-spike send (--ticket LINK | --discover) [--name NAME] [--runs N]
 //!     Finds the peer (pairing link or mDNS), sends N probes, then answers N.
+//! vutric-net-spike fling (--ticket LINK | --discover) --photo PATH [--count N]
+//!     Flings a real photo to a listening overlay (`vutric-overlay-spike --listen`) and prints the round trip
+//!     until its first frame was on that screen.
 //! ```
 //! Both sides print the same six-digit pairing check and their own statistics; the first 3 probes per direction
 //! are warm-up (QUIC path validation) and are reported separately.
 
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context as _, Result, bail};
 use qrcode::QrCode;
 use qrcode::render::unicode::Dense1x2;
-use vutric_core::{PairingTicket, Platform};
+use vutric_core::{Gesture, PairingTicket, Platform};
 use vutric_net::probe;
 use vutric_net::{Peer, Session};
 
@@ -24,6 +28,8 @@ struct Args {
     runs: u32,
     ticket: Option<String>,
     discover: bool,
+    photo: Option<PathBuf>,
+    count: u32,
 }
 
 fn parse() -> Result<Args> {
@@ -35,6 +41,8 @@ fn parse() -> Result<Args> {
         runs: 100,
         ticket: None,
         discover: false,
+        photo: None,
+        count: 1,
     };
     while let Some(flag) = it.next() {
         match flag.as_str() {
@@ -42,6 +50,8 @@ fn parse() -> Result<Args> {
             "--runs" => a.runs = it.next().context("--runs needs a value")?.parse()?,
             "--ticket" => a.ticket = Some(it.next().context("--ticket needs a value")?),
             "--discover" => a.discover = true,
+            "--photo" => a.photo = Some(it.next().context("--photo needs a path")?.into()),
+            "--count" => a.count = it.next().context("--count needs a value")?.parse()?,
             other => bail!("unknown argument {other}"),
         }
     }
@@ -131,6 +141,12 @@ async fn send(peer: &Peer, a: &Args) -> Result<()> {
         ms(t1.elapsed()),
         s.check_code()?
     );
+    if let Some(path) = &a.photo {
+        fling_photo(&mut s, path, a.count).await?;
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        s.close();
+        return Ok(());
+    }
     let label = format!("{} -> {}", a.name, s.remote_name);
     send_run(&mut s, a.runs, &label).await?;
     probe::answer_run(&mut s, a.runs).await?;
@@ -142,6 +158,38 @@ async fn send(peer: &Peer, a: &Args) -> Result<()> {
     // Give the last answer time to leave before the connection closes.
     tokio::time::sleep(Duration::from_millis(200)).await;
     s.close();
+    Ok(())
+}
+
+/// Flings a photo like the phone does: a JPEG preview, longest side 512 px.
+async fn fling_photo(s: &mut Session, path: &Path, count: u32) -> Result<()> {
+    let img = image::open(path)
+        .with_context(|| format!("open {}", path.display()))?
+        .thumbnail(512, 512)
+        .to_rgb8();
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 80).encode_image(&img)?;
+    let name = path
+        .file_name()
+        .map_or_else(|| "photo.jpg".into(), |n| n.to_string_lossy().into_owned());
+    let (w, h) = (u16::try_from(img.width())?, u16::try_from(img.height())?);
+    for i in 0..count {
+        let gesture = Gesture {
+            speed: 2400.0,
+            angle: 0.15 * (f32::from(u8::try_from(i % 3)?) - 1.0),
+            exit_x: 0.5,
+        };
+        let rtt = probe::round_trip(s, &probe::photo(&name, jpeg.clone(), w, h, gesture)).await?;
+        println!(
+            "{name} ({} KB) -> {}: sent -> first frame there and back {:.1} ms",
+            jpeg.len() / 1024,
+            s.remote_name,
+            ms(rtt)
+        );
+        if i + 1 < count {
+            tokio::time::sleep(Duration::from_millis(1500)).await;
+        }
+    }
     Ok(())
 }
 
@@ -157,9 +205,9 @@ async fn main() -> Result<()> {
     println!("{} ({:?}) id {}", a.name, platform(), peer.id());
     let result = match a.mode.as_str() {
         "listen" => listen(&peer, &a).await,
-        "send" => send(&peer, &a).await,
+        "send" | "fling" => send(&peer, &a).await,
         _ => Err(anyhow::anyhow!(
-            "usage: vutric-net-spike listen|send [--ticket LINK | --discover] [--name NAME] [--runs N]"
+            "usage: vutric-net-spike listen|send|fling [--ticket LINK | --discover] [--name NAME] [--runs N] [--photo PATH [--count N]]"
         )),
     };
     peer.close().await;

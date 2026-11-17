@@ -12,6 +12,9 @@ pub struct Args {
     pub speed: f32,
     pub angle: f32,
     pub frame_latency: u32,
+    /// Wait for flings from a phone instead of playing scripted runs.
+    pub listen: bool,
+    pub name: String,
 }
 
 impl Args {
@@ -24,6 +27,10 @@ impl Args {
             speed: 2600.0,
             angle: 0.25,
             frame_latency: 2,
+            listen: false,
+            name: std::env::var("COMPUTERNAME")
+                .or_else(|_| std::env::var("HOSTNAME"))
+                .unwrap_or_else(|_| "Desktop".into()),
         };
         while let Some(flag) = it.next() {
             let mut value = || it.next().with_context(|| format!("{flag} needs a value"));
@@ -34,6 +41,8 @@ impl Args {
                 "--angle" => args.angle = value()?.parse()?,
                 "--latency" => args.frame_latency = value()?.parse()?,
                 "--image" => args.image = Some(value()?.into()),
+                "--listen" => args.listen = true,
+                "--name" => args.name = value()?,
                 "--zone" => {
                     args.zone = match value()?.as_str() {
                         "left" => SendZone::Left,
@@ -45,7 +54,8 @@ impl Args {
                 "-h" | "--help" => {
                     println!(
                         "vutric-overlay-spike [--runs N] [--interval SECS] [--zone left|right|top] \
-                         [--image PATH] [--speed PX_PER_S] [--angle RAD] [--latency FRAMES]"
+                         [--image PATH] [--speed PX_PER_S] [--angle RAD] [--latency FRAMES] \
+                         [--listen [--name NAME]]"
                     );
                     std::process::exit(0);
                 }
