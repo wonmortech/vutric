@@ -33,7 +33,9 @@ bool isCancelled(Object e) => '$e'.contains('vutric: cancelled');
 
 /// The Rust error, trimmed to its first line for the screen.
 String errorText(Object e) {
-  final s = '$e'.replaceFirst(RegExp(r'^AnyhowException\((.*)\)$', dotAll: true), r'$1');
+  // Dart's replaceFirst has no $1 back-references (it would print a literal "$1"): take the group by hand.
+  final raw = '$e';
+  final s = RegExp(r'^AnyhowException\((.*)\)$', dotAll: true).firstMatch(raw)?.group(1) ?? raw;
   final line = s.split('\n').first.trim();
   return line.isEmpty ? 'Nomaʼlum xato' : line;
 }
