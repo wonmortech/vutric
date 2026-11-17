@@ -79,13 +79,13 @@ pub enum Message {
         platform: Platform,
     },
     FlingStart(FlingStart),
-    /// Desktop → phone: the effect has started (first frame presented). Carries the desktop's monotonic
+    /// Receiver → sender: the effect has started (first frame presented). Carries the receiver's monotonic
     /// timestamp so the latency probe can be computed without synchronized clocks.
     EffectStarted {
         id: FlingId,
-        desktop_micros: u64,
+        receiver_micros: u64,
     },
-    /// Desktop → phone: the file arrived and its hash matched.
+    /// Receiver → sender: the file arrived and its hash matched.
     FlingComplete {
         id: FlingId,
     },

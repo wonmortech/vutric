@@ -4,6 +4,9 @@ members = [
     "crates/vutric-core",
     "crates/vutric-overlay",
     "crates/vutric-host-win",
+    "crates/vutric-net",
+    "apps/net-spike",
+    "crates/vutric-mobile",
     "apps/overlay-spike",
 ]
 

@@ -83,7 +83,7 @@ mod tests {
             },
             Message::EffectStarted {
                 id: FlingId([2; 16]),
-                desktop_micros: 123_456,
+                receiver_micros: 123_456,
             },
         ]
     }

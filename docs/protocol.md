@@ -1,11 +1,13 @@
 # Vutric protocol v1
 
-Normative description of what `crates/vutric-core` implements. Transport is QUIC via iroh (TLS 1.3, peers
+Normative description of what `crates/vutric-core` implements. Every device is a peer: any device can send to any
+other, in both directions ([ADR-0005](decisions/0005-any-to-any-offline-first.md)); "sender" and "receiver" are per
+transfer, not per platform. Transport is QUIC via iroh (TLS 1.3, peers
 authenticated by Ed25519 endpoint key). ALPN: `vutric/1`.
 
 ## Pairing
 
-The desktop shows a QR code with a pairing ticket:
+The receiving side of a pairing (any device with a screen) shows a QR code with a pairing ticket:
 
 ```
 vutric://pair?v=1&id=<64 hex endpoint id>&n=<percent-encoded device name>&a=<ip:port>,<ip:port>
@@ -15,7 +17,7 @@ vutric://pair?v=1&id=<64 hex endpoint id>&n=<percent-encoded device name>&a=<ip:
 - `a` (optional, ≤ 8 entries) are LAN address hints for networks where mDNS/multicast is blocked.
 - The name is display-only: control characters are stripped and it is cut to 64 characters.
 
-After the phone connects with the ticket, both sides store each other's endpoint id. Later connections are
+After the other device connects with the ticket, both sides store each other's endpoint id. Later connections are
 discovered via mDNS and authenticated by key; an unknown key is refused.
 
 ## Streams
@@ -23,7 +25,7 @@ discovered via mDNS and authenticated by key; an unknown key is refused.
 | Stream | Direction | Content |
 |---|---|---|
 | Control (bidirectional, one per connection) | both | length-prefixed messages (below) |
-| File (unidirectional, one per fling) | phone → desktop | 16-byte `FlingId`, then the raw file bytes |
+| File (unidirectional, one per fling) | sender → receiver | 16-byte `FlingId`, then the raw file bytes |
 
 ### Framing
 
@@ -35,9 +37,9 @@ detected from the header, before any allocation. Every decoded message is valida
 | Message | From | Meaning |
 |---|---|---|
 | `Hello { protocol, device_name, platform }` | both, first | version check and display name |
-| `FlingStart { id, file_name, mime, size, blake3, gesture, effect, preview }` | phone | a fling begins; the desktop starts the effect as soon as it arrives |
-| `EffectStarted { id, desktop_micros }` | desktop | first effect frame presented (latency probe) |
-| `FlingComplete { id }` | desktop | file received and BLAKE3 matched; it is now in the save folder |
+| `FlingStart { id, file_name, mime, size, blake3, gesture, effect, preview }` | sender | a fling begins; the receiver starts the effect as soon as it arrives |
+| `EffectStarted { id, receiver_micros }` | receiver | first effect frame presented (latency probe) |
+| `FlingComplete { id }` | receiver | file received and BLAKE3 matched; it is now in the save folder |
 | `FlingFailed { id, reason }` | both | `HashMismatch`, `DiskFull`, `Rejected`, `Cancelled`, `Paused` |
 
 `gesture` = `{ speed (px/s ≥ 0), angle (rad, 0 = up, + = clockwise), exit_x (0..=1) }`. `preview` ≤ 96 KiB,

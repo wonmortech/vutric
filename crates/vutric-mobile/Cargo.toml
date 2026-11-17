@@ -1,0 +1,23 @@
+[package]
+name = "vutric-mobile"
+description = "Vutric for Flutter apps: the vutric-net peer behind a flutter_rust_bridge API."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+anyhow.workspace = true
+flutter_rust_bridge = "=2.13.0"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "time"] }
+vutric-core.workspace = true
+vutric-net = { path = "../vutric-net" }
+
+[lints]
+workspace = true

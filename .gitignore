@@ -9,3 +9,5 @@ Thumbs.db
 *.mp4
 /shots/
 .taste-skill/
+# Android spike: Rust libraries built by cargo-ndk
+apps/android-spike/android/app/src/main/jniLibs/
