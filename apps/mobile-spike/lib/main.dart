@@ -1,10 +1,12 @@
-// Vutric spike 0.2 on Android: one LAN-only peer (Rust, vutric-net) and three ways to measure a 30 KB preview
+// Vutric spike 0.2 on Android and iOS: one LAN-only peer (Rust, vutric-net) and three ways to measure a 30 KB preview
 // in both directions. No internet is used (ADR-0005).
 
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart' show ExternalLibrary;
 import 'package:material_ui/material_ui.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -23,7 +25,8 @@ const _multicast = MethodChannel('vutric/multicast');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await RustLib.init();
+  // iOS: the Rust library is linked into the app itself (-force_load in the Xcode project), not shipped as a framework.
+  await RustLib.init(externalLibrary: Platform.isIOS ? ExternalLibrary.process(iKnowHowToUseIt: true) : null);
   runApp(const SpikeApp());
 }
 
@@ -53,7 +56,7 @@ class SpikeHome extends StatefulWidget {
 }
 
 class _SpikeHomeState extends State<SpikeHome> {
-  final _name = TextEditingController(text: 'Android telefon');
+  final _name = TextEditingController(text: Platform.isIOS ? 'iPhone' : 'Android telefon');
   final _link = TextEditingController();
   String? _myLink;
   String _status = 'Tayyorlanmoqda…';
@@ -82,7 +85,8 @@ class _SpikeHomeState extends State<SpikeHome> {
 
   Future<void> _start() async {
     try {
-      await _multicast.invokeMethod('acquire');
+      // Android drops mDNS replies without a multicast lock; iOS has no such switch.
+      if (Platform.isAndroid) await _multicast.invokeMethod('acquire');
       final link = await vutric.start(name: _name.text.trim(), identity: await _identity());
       setState(() {
         _myLink = link;
@@ -114,6 +118,18 @@ class _SpikeHomeState extends State<SpikeHome> {
     } finally {
       setState(() => _busy = false);
     }
+  }
+
+  void _connectLink(String link) =>
+      _run('Havola orqali ulanmoqda…', () => vutric.runLink(link: link, runs: _runs));
+
+  Future<void> _scan() async {
+    final link = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const _ScanPage()),
+    );
+    if (link == null || !mounted) return;
+    _link.text = link;
+    _connectLink(link);
   }
 
   @override
@@ -156,9 +172,12 @@ class _SpikeHomeState extends State<SpikeHome> {
             ),
             const SizedBox(height: 8),
             OutlinedButton(
-              onPressed: ready
-                  ? () => _run('Havola orqali ulanmoqda…', () => vutric.runLink(link: _link.text, runs: _runs))
-                  : null,
+              onPressed: ready ? _scan : null,
+              child: const Text('QR kodni skanerlab oʻlchash'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: ready ? () => _connectLink(_link.text) : null,
               child: const Text('Havola orqali ulanib oʻlchash'),
             ),
             if (_busy) const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator(color: _signal)),
@@ -227,6 +246,38 @@ class _ReportCard extends StatelessWidget {
             SelectableText(report.sent, style: t.bodySmall?.copyWith(fontFamily: 'monospace')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Full-screen camera that returns the first `vutric://pair?` link it sees.
+class _ScanPage extends StatefulWidget {
+  const _ScanPage();
+
+  @override
+  State<_ScanPage> createState() => _ScanPageState();
+}
+
+class _ScanPageState extends State<_ScanPage> {
+  bool _done = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('QR kodni skanerlang')),
+      body: MobileScanner(
+        onDetect: (capture) {
+          if (_done) return;
+          for (final code in capture.barcodes) {
+            final v = code.rawValue;
+            if (v != null && v.startsWith('vutric://pair?')) {
+              _done = true;
+              Navigator.of(context).pop(v);
+              return;
+            }
+          }
+        },
       ),
     );
   }

@@ -11,6 +11,11 @@ use tokio::runtime::Runtime;
 use vutric_core::{PairingTicket, Platform};
 use vutric_net::{Peer, Session, probe};
 
+#[cfg(target_os = "ios")]
+const PLATFORM: Platform = Platform::Ios;
+#[cfg(not(target_os = "ios"))]
+const PLATFORM: Platform = Platform::Android;
+
 fn runtime() -> &'static Runtime {
     static RT: OnceLock<Runtime> = OnceLock::new();
     RT.get_or_init(|| {
@@ -53,7 +58,7 @@ pub fn start(name: String, identity: Vec<u8>) -> Result<String> {
         if let Some(old) = old {
             old.close().await;
         }
-        let p = Peer::bind(key, &name, Platform::Android).await?;
+        let p = Peer::bind(key, &name, PLATFORM).await?;
         let link = p.ticket().to_uri();
         *peer_slot().lock().expect("peer lock") = Some(p);
         Ok(link)

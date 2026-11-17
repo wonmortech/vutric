@@ -29,7 +29,8 @@ pub const MDNS_SERVICE: &str = "vutric";
 #[derive(Debug, Clone)]
 pub struct Peer {
     endpoint: Endpoint,
-    mdns: MdnsAddressLookup,
+    /// `None` where the OS refused multicast (iOS without the multicast entitlement): link/QR pairing still works.
+    mdns: Option<MdnsAddressLookup>,
     name: String,
     platform: Platform,
 }
@@ -56,14 +57,22 @@ impl Peer {
             .bind()
             .await
             .context("bind endpoint")?;
-        let mdns = MdnsAddressLookup::builder()
+        let mdns = match MdnsAddressLookup::builder()
             .service_name(MDNS_SERVICE)
             .build(endpoint.id())
-            .context("start mDNS")?;
-        endpoint
-            .address_lookup()
-            .context("address lookup")?
-            .add(mdns.clone());
+        {
+            Ok(mdns) => {
+                endpoint
+                    .address_lookup()
+                    .context("address lookup")?
+                    .add(mdns.clone());
+                Some(mdns)
+            }
+            Err(e) => {
+                eprintln!("vutric-net: mDNS unavailable, pairing link only: {e:#}");
+                None
+            }
+        };
         Ok(Self {
             endpoint,
             mdns,
@@ -97,9 +106,19 @@ impl Peer {
         }
     }
 
+    /// Whether this peer can find and be found over mDNS (false: pairing link only).
+    #[must_use]
+    pub fn has_mdns(&self) -> bool {
+        self.mdns.is_some()
+    }
+
     /// Waits for the first other Vutric device announced over mDNS.
     pub async fn discover(&self, timeout: Duration) -> Result<Nearby> {
-        let mut events = self.mdns.subscribe().await;
+        let mdns = self
+            .mdns
+            .as_ref()
+            .context("mDNS is unavailable on this device; pair with the QR code or link")?;
+        let mut events = mdns.subscribe().await;
         let me = self.endpoint.id();
         tokio::time::timeout(timeout, async {
             while let Some(event) = events.next().await {

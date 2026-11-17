@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Builds the Phase 0.2 spike for iPhone as an UNSIGNED .ipa. Testers sign it with their own Apple ID while
+# sideloading (Sideloadly, AltStore, or Xcode); nothing is published to the App Store or TestFlight.
+
+name: iOS spike
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - apps/mobile-spike/**
+      - crates/vutric-core/**
+      - crates/vutric-net/**
+      - crates/vutric-mobile/**
+      - Cargo.lock
+      - .github/workflows/ios-spike.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust library for iPhone (arm64)
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+        run: |
+          rustup target add aarch64-apple-ios
+          cargo build --locked --release -p vutric-mobile --target aarch64-apple-ios
+          mkdir -p apps/mobile-spike/ios/Rust
+          cp target/aarch64-apple-ios/release/libvutric_mobile.a apps/mobile-spike/ios/Rust/
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.50.0
+          cache: true
+
+      - name: App (release, no code signing)
+        working-directory: apps/mobile-spike
+        run: |
+          flutter pub get
+          flutter build ios --release --no-codesign
+          mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry vutric-spike-unsigned.ipa Payload
+          ls -la vutric-spike-unsigned.ipa
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vutric-spike-ios
+          path: apps/mobile-spike/vutric-spike-unsigned.ipa
+          retention-days: 14
+          if-no-files-found: error
