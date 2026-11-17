@@ -42,11 +42,13 @@ jobs:
           mkdir -p apps/mobile-spike/ios/Rust
           cp target/aarch64-apple-ios/release/libvutric_mobile.a apps/mobile-spike/ios/Rust/
 
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          channel: stable
-          flutter-version: 3.50.0
-          cache: true
+      # Straight from the Flutter repo: the org allows only GitHub-owned and verified actions.
+      - name: Flutter 3.50.0
+        run: |
+          git clone --quiet --depth 1 --branch 3.50.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --disable-analytics
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
 
       - name: App (release, no code signing)
         working-directory: apps/mobile-spike
