@@ -1,0 +1,10 @@
+/target
+*.pdb
+*.log
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+# Screen recordings and frame grabs made while measuring the overlay
+*.mp4
+/shots/

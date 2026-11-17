@@ -1,0 +1,26 @@
+[package]
+name = "vutric-overlay-spike"
+description = "Phase 0.1 spike: the Halqa effect on a real desktop, with frame-time statistics."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+image.workspace = true
+pollster.workspace = true
+raw-window-handle.workspace = true
+vutric-core.workspace = true
+vutric-overlay.workspace = true
+wgpu.workspace = true
+winit.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+vutric-host-win.workspace = true
+
+[lints]
+workspace = true

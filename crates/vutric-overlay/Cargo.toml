@@ -1,0 +1,20 @@
+[package]
+name = "vutric-overlay"
+description = "Vutric effect timelines and the wgpu overlay renderer."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+bytemuck.workspace = true
+vutric-core.workspace = true
+wgpu.workspace = true
+
+[dev-dependencies]
+naga = { version = "30.0.2", features = ["wgsl-in"] }
+
+[lints]
+workspace = true
