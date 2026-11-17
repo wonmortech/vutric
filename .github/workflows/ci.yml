@@ -42,6 +42,9 @@ jobs:
             target
           key: cargo-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
+      - name: Design-system site (CSP, links, forbidden text)
+        if: runner.os == 'Linux'
+        run: node tools/check-site.mjs
       - name: Format
         if: runner.os == 'Linux'
         run: cargo fmt --all --check

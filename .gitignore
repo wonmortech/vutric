@@ -8,3 +8,4 @@ Thumbs.db
 # Screen recordings and frame grabs made while measuring the overlay
 *.mp4
 /shots/
+.taste-skill/

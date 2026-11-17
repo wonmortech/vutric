@@ -7,13 +7,13 @@ pub struct Palette {
 }
 
 impl Palette {
-    /// Vutric default: ion violet `#7C5CFF` → aurora mint `#3BE8B0`, over a deep indigo `#120E2E` portal.
+    /// Vutric default (design system v0.1): Signal 500 `#2F6BFF` → Glow 200 `#F4D9A6`, over a Night 950 `#040C29` portal.
     #[must_use]
     pub fn vutric() -> Self {
         Self {
-            rim_a: srgb(0x7C, 0x5C, 0xFF),
-            rim_b: srgb(0x3B, 0xE8, 0xB0),
-            depth: srgb(0x12, 0x0E, 0x2E),
+            rim_a: srgb(0x2F, 0x6B, 0xFF),
+            rim_b: srgb(0xF4, 0xD9, 0xA6),
+            depth: srgb(0x04, 0x0C, 0x29),
         }
     }
 }
