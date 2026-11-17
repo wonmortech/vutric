@@ -14,11 +14,11 @@ pub mod pairing;
 pub use effect::{EffectId, SendZone};
 pub use error::{Error, Result};
 pub use id::{EndpointId, FlingId};
-pub use message::{FlingStart, Gesture, Message, Platform, Preview, PreviewFormat};
+pub use message::{FlingStart, Gesture, Message, OfferEntry, Platform, Preview, PreviewFormat};
 pub use pairing::PairingTicket;
 
 /// QUIC ALPN identifier. Bumped only on a wire-incompatible change.
 pub const ALPN: &[u8] = b"vutric/1";
 
 /// Protocol version carried in [`Message::Hello`] and in pairing tickets.
-pub const PROTOCOL_VERSION: u16 = 1;
+pub const PROTOCOL_VERSION: u16 = 2;

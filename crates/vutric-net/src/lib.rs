@@ -18,6 +18,7 @@
 
 pub mod preview;
 pub mod probe;
+pub mod transfer;
 
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};

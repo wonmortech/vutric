@@ -8,6 +8,24 @@ pub const MAX_PREVIEW_BYTES: usize = 96 * 1024;
 /// Longest file name accepted on the wire, in bytes. The receiver still sanitizes it.
 pub const MAX_FILE_NAME_BYTES: usize = 512;
 
+/// Most entries in one [`Message::Offer`]; a bigger selection goes as several offers of one transfer.
+pub const MAX_OFFER_ENTRIES: usize = 256;
+
+/// Longest relative path of an offered file (`/`-separated, folders kept), in bytes.
+pub const MAX_PATH_BYTES: usize = 1024;
+
+/// Longest MIME type on the wire, in bytes.
+pub const MAX_MIME_BYTES: usize = 128;
+
+/// One file of an offer. The bytes follow on a data stream of their own (see `docs/protocol.md`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OfferEntry {
+    /// Relative path, `/`-separated: `IMG_2041.jpg` or `Trip/day 1/IMG_2041.jpg`. Hostile until sanitized.
+    pub path: String,
+    pub size: u64,
+    pub mime: String,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Platform {
     Android,
@@ -94,6 +112,30 @@ pub enum Message {
         id: FlingId,
         reason: FailReason,
     },
+    /// Sender → receiver: files on offer. A transfer of more than [`MAX_OFFER_ENTRIES`] files is several
+    /// offers with the same `id`; `first` is the transfer-wide index of `entries[0]`, so the receiver asks the
+    /// user once (at `first == 0`) and the totals cover the whole transfer.
+    Offer {
+        id: FlingId,
+        first: u32,
+        entries: Vec<OfferEntry>,
+        total_files: u32,
+        total_bytes: u64,
+    },
+    /// Receiver → sender. `have[i]` is how many leading bytes of `entries[i]` the receiver already holds from an
+    /// interrupted transfer; the sender resumes there (and still proves the whole file with its hash).
+    OfferReply {
+        id: FlingId,
+        accept: bool,
+        have: Vec<u64>,
+    },
+    /// Receiver → sender, after the last data stream of one offer: how many of its files arrived whole and
+    /// verified, and which (transfer-wide indices) did not.
+    OfferDone {
+        id: FlingId,
+        received: u32,
+        failed: Vec<u32>,
+    },
 }
 
 impl Message {
@@ -106,6 +148,9 @@ impl Message {
             Self::EffectStarted { .. } => "EffectStarted",
             Self::FlingComplete { .. } => "FlingComplete",
             Self::FlingFailed { .. } => "FlingFailed",
+            Self::Offer { .. } => "Offer",
+            Self::OfferReply { .. } => "OfferReply",
+            Self::OfferDone { .. } => "OfferDone",
         }
     }
 }
@@ -148,6 +193,35 @@ impl Message {
                     });
                 }
                 start.gesture.validate()
+            }
+            Self::Offer {
+                first,
+                entries,
+                total_files,
+                ..
+            } => {
+                let end = u64::from(*first) + entries.len() as u64;
+                if entries.is_empty()
+                    || entries.len() > MAX_OFFER_ENTRIES
+                    || end > u64::from(*total_files)
+                {
+                    return Err(Error::Malformed("offer entry count".into()));
+                }
+                for e in entries {
+                    if e.path.is_empty() || e.path.len() > MAX_PATH_BYTES {
+                        return Err(Error::Malformed("offer path length".into()));
+                    }
+                    if e.mime.len() > MAX_MIME_BYTES {
+                        return Err(Error::Malformed("offer mime length".into()));
+                    }
+                }
+                Ok(())
+            }
+            Self::OfferReply { have, .. } if have.len() > MAX_OFFER_ENTRIES => {
+                Err(Error::Malformed("offer reply length".into()))
+            }
+            Self::OfferDone { failed, .. } if failed.len() > MAX_OFFER_ENTRIES => {
+                Err(Error::Malformed("offer done length".into()))
             }
             _ => Ok(()),
         }
@@ -232,6 +306,34 @@ mod tests {
             start.gesture = gesture;
             assert!(Message::FlingStart(start).validate().is_err());
         }
+    }
+
+    fn entry(path: &str) -> OfferEntry {
+        OfferEntry {
+            path: path.into(),
+            size: 10,
+            mime: "image/jpeg".into(),
+        }
+    }
+
+    #[test]
+    fn offer_bounds() {
+        let offer = |first, entries: Vec<OfferEntry>, total_files| Message::Offer {
+            id: FlingId([1; 16]),
+            first,
+            entries,
+            total_files,
+            total_bytes: 0,
+        };
+        offer(0, vec![entry("a.jpg")], 1).validate().unwrap();
+        offer(256, vec![entry("a.jpg")], 257).validate().unwrap();
+        assert!(offer(0, vec![], 0).validate().is_err());
+        assert!(offer(1, vec![entry("a.jpg")], 1).validate().is_err());
+        assert!(offer(0, vec![entry("")], 1).validate().is_err());
+        let long = "x".repeat(MAX_PATH_BYTES + 1);
+        assert!(offer(0, vec![entry(&long)], 1).validate().is_err());
+        let many = vec![entry("a"); MAX_OFFER_ENTRIES + 1];
+        assert!(offer(0, many, 1000).validate().is_err());
     }
 
     #[test]

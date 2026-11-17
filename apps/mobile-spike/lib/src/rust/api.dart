@@ -7,9 +7,9 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `as_initiator`, `bump`, `cancellable`, `drop_session`, `epoch`, `forget_on_error`, `keep`, `ms`, `now_epoch`, `open`, `peer_slot`, `peer`, `receiver_clock`, `report`, `retire`, `route_name`, `runtime`, `sent_of`, `session_slot`, `session`
+// These functions are ignored because they are not marked as `pub`: `as_initiator`, `bump`, `cancellable`, `drop_session`, `epoch`, `finished`, `forget_on_error`, `keep`, `ms`, `now_epoch`, `open`, `peer_slot`, `peer`, `pending_slot`, `progress_of`, `receiver_clock`, `report`, `reporter`, `retire`, `route_name`, `runtime`, `sent_of`, `session_slot`, `session`, `take_offer`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Sent`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// 32 random bytes to keep forever as this device's identity.
 Future<Uint8List> newIdentity() => RustLib.instance.api.crateApiNewIdentity();
@@ -93,10 +93,10 @@ Future<double> fling({
   exitX: exitX,
 );
 
-/// Waits for the next photo on the open session (either side may have opened it). Latency probes are answered
-/// here and never shown; a fling whose preview is not a sane JPEG is refused (`FlingFailed`), so its thrower
-/// learns at once. Cancelled by [`disconnect`].
-Future<Caught> nextFling() => RustLib.instance.api.crateApiNextFling();
+/// Waits for the next photo or file offer on the open session (either side may have opened it). Latency probes
+/// are answered here and never shown; a fling whose preview is not a sane JPEG is refused (`FlingFailed`), so its
+/// thrower learns at once. Cancelled by [`disconnect`].
+Future<Incoming> nextIncoming() => RustLib.instance.api.crateApiNextIncoming();
 
 /// Tells the thrower this phone could not show the photo after all (its round trip ends with a refusal, at
 /// once, instead of a timeout).
@@ -106,6 +106,24 @@ Future<void> refuse({required List<int> id}) =>
 /// Tells the thrower that the photo's first frame is on this screen (closes its round trip).
 Future<void> shown({required List<int> id}) =>
     RustLib.instance.api.crateApiShown(id: id);
+
+/// Sends files on the open session. `names[i]` is what the receiver sees for `paths[i]` (pickers hand out
+/// temporary copies with made-up names); an empty or missing name keeps the file's own. Progress goes to
+/// `sink`; its last event has `done`. A "no" from the other side is the error "declined" and keeps the
+/// session. Cancelled by [`disconnect`].
+Stream<TransferProgress> sendFiles({
+  required List<String> paths,
+  required List<String> names,
+}) => RustLib.instance.api.crateApiSendFiles(paths: paths, names: names);
+
+/// Accepts the offer [`next_incoming`] returned and saves it under `dir` (folders kept). Each file appears
+/// only once its hash matched; an interrupted transfer resumes where it stopped when sent again. Progress goes
+/// to `sink`; its last event has `done` and `saved`. Cancelled by [`disconnect`].
+Stream<TransferProgress> receiveFiles({required String dir}) =>
+    RustLib.instance.api.crateApiReceiveFiles(dir: dir);
+
+/// Says no to the offer [`next_incoming`] returned.
+Future<void> declineFiles() => RustLib.instance.api.crateApiDeclineFiles();
 
 /// A photo thrown at this phone; its preview has been checked (a real JPEG, preview-sized, as announced).
 class Caught {
@@ -195,6 +213,52 @@ class Connected {
           route == other.route;
 }
 
+/// Files another device offers this phone: answer with [`receive_files`] or [`decline_files`].
+class FilesOffer {
+  final int files;
+  final BigInt bytes;
+
+  /// The first few paths, to show.
+  final List<String> names;
+
+  const FilesOffer({
+    required this.files,
+    required this.bytes,
+    required this.names,
+  });
+
+  @override
+  int get hashCode => files.hashCode ^ bytes.hashCode ^ names.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FilesOffer &&
+          runtimeType == other.runtimeType &&
+          files == other.files &&
+          bytes == other.bytes &&
+          names == other.names;
+}
+
+/// What arrived on the open session: a photo thrown at this phone, or files offered to it.
+class Incoming {
+  final Caught? photo;
+  final FilesOffer? files;
+
+  const Incoming({this.photo, this.files});
+
+  @override
+  int get hashCode => photo.hashCode ^ files.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Incoming &&
+          runtimeType == other.runtimeType &&
+          photo == other.photo &&
+          files == other.files;
+}
+
 /// A photo ready to throw: an upright JPEG, longest side at most 512 px, small enough for one frame. Prepared
 /// when picked, so the throw itself only sends bytes.
 class Photo {
@@ -281,4 +345,70 @@ class RunReport {
           sentP50Ms == other.sentP50Ms &&
           sentP95Ms == other.sentP95Ms &&
           receivedProbes == other.receivedProbes;
+}
+
+/// A transfer in progress (about every 150 ms), and its end (`done`, with what failed and where files went).
+class TransferProgress {
+  final BigInt bytesDone;
+  final BigInt bytesTotal;
+  final int filesDone;
+  final int filesTotal;
+  final int failed;
+
+  /// The file most recently started.
+  final String current;
+  final double bytesPerSec;
+  final bool done;
+
+  /// When done: paths that did not arrive whole.
+  final List<String> failedNames;
+
+  /// When done, receiving: where each file was saved.
+  final List<String> saved;
+  final double seconds;
+
+  const TransferProgress({
+    required this.bytesDone,
+    required this.bytesTotal,
+    required this.filesDone,
+    required this.filesTotal,
+    required this.failed,
+    required this.current,
+    required this.bytesPerSec,
+    required this.done,
+    required this.failedNames,
+    required this.saved,
+    required this.seconds,
+  });
+
+  @override
+  int get hashCode =>
+      bytesDone.hashCode ^
+      bytesTotal.hashCode ^
+      filesDone.hashCode ^
+      filesTotal.hashCode ^
+      failed.hashCode ^
+      current.hashCode ^
+      bytesPerSec.hashCode ^
+      done.hashCode ^
+      failedNames.hashCode ^
+      saved.hashCode ^
+      seconds.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TransferProgress &&
+          runtimeType == other.runtimeType &&
+          bytesDone == other.bytesDone &&
+          bytesTotal == other.bytesTotal &&
+          filesDone == other.filesDone &&
+          filesTotal == other.filesTotal &&
+          failed == other.failed &&
+          current == other.current &&
+          bytesPerSec == other.bytesPerSec &&
+          done == other.done &&
+          failedNames == other.failedNames &&
+          saved == other.saved &&
+          seconds == other.seconds;
 }

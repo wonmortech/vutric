@@ -10,6 +10,10 @@
 //!     until its first frame was on that screen. The target may be a phone on its catch screen, too.
 //! vutric-net-spike fling --photo PATH [--count N]
 //!     Shows the pairing QR, waits for a phone to scan it (catch screen), then flings the photo to it.
+//! vutric-net-spike files PATH... [--ticket LINK | --discover]
+//!     Sends files and folders (any type and size) to the target, or shows the QR and sends to whoever connects.
+//! vutric-net-spike receive [--dir DIR]
+//!     Shows the QR and saves whatever is sent, in `DIR` (default: Downloads/Vutric). Keeps running.
 //! ```
 //! Every mode takes `--lan-only` (never use the internet). `send`/`fling` with `--ticket` also take
 //! `--via-internet`: ignore the link's LAN addresses and reach the peer by its key, relay and lookup server
@@ -24,9 +28,9 @@ use std::time::{Duration, Instant};
 use anyhow::{Context as _, Result, bail};
 use qrcode::QrCode;
 use qrcode::render::unicode::Dense1x2;
-use vutric_core::{Gesture, PairingTicket, Platform};
+use vutric_core::{Gesture, Message, PairingTicket, Platform};
 use vutric_net::{Peer, Reach, Route, Session};
-use vutric_net::{preview, probe};
+use vutric_net::{preview, probe, transfer};
 
 struct Args {
     mode: String,
@@ -38,6 +42,8 @@ struct Args {
     count: u32,
     lan_only: bool,
     via_internet: bool,
+    paths: Vec<PathBuf>,
+    dir: Option<PathBuf>,
 }
 
 fn parse() -> Result<Args> {
@@ -53,6 +59,8 @@ fn parse() -> Result<Args> {
         count: 1,
         lan_only: false,
         via_internet: false,
+        paths: Vec::new(),
+        dir: None,
     };
     while let Some(flag) = it.next() {
         match flag.as_str() {
@@ -64,6 +72,8 @@ fn parse() -> Result<Args> {
             "--count" => a.count = it.next().context("--count needs a value")?.parse()?,
             "--lan-only" => a.lan_only = true,
             "--via-internet" => a.via_internet = true,
+            "--dir" => a.dir = Some(it.next().context("--dir needs a path")?.into()),
+            other if !other.starts_with("--") => a.paths.push(other.into()),
             other => bail!("unknown argument {other}"),
         }
     }
@@ -106,7 +116,8 @@ fn via(s: &Session) -> String {
     }
 }
 
-async fn listen(peer: &Peer, a: &Args) -> Result<()> {
+/// Shows this peer's pairing QR and link (after waiting for the relay, so the link works from anywhere).
+async fn show_qr(peer: &Peer) -> Result<()> {
     if peer.reach() == Reach::Anywhere {
         let online = peer.wait_online(Duration::from_secs(8)).await;
         println!(
@@ -122,6 +133,11 @@ async fn listen(peer: &Peer, a: &Args) -> Result<()> {
     let qr = QrCode::new(link.as_bytes())?;
     println!("{}", qr.render::<Dense1x2>().quiet_zone(true).build());
     println!("pairing link: {link}");
+    Ok(())
+}
+
+async fn listen(peer: &Peer, a: &Args) -> Result<()> {
+    show_qr(peer).await?;
     println!("waiting for a peer (Ctrl+C to stop)...");
     let mut s = peer.accept().await?;
     println!(
@@ -149,10 +165,11 @@ async fn listen(peer: &Peer, a: &Args) -> Result<()> {
     Ok(())
 }
 
-async fn send(peer: &Peer, a: &Args) -> Result<()> {
+/// Connects to the target given by `--ticket` or `--discover`.
+async fn connect(peer: &Peer, a: &Args) -> Result<Session> {
     let t0 = Instant::now();
     let t1;
-    let mut s = if let Some(link) = &a.ticket {
+    let s = if let Some(link) = &a.ticket {
         let mut t = PairingTicket::parse(link)?;
         println!(
             "pairing link for {} with {} address hint(s), relay {}",
@@ -186,6 +203,11 @@ async fn send(peer: &Peer, a: &Args) -> Result<()> {
         via(&s),
         s.check_code()?
     );
+    Ok(s)
+}
+
+async fn send(peer: &Peer, a: &Args) -> Result<()> {
+    let mut s = connect(peer, a).await?;
     if let Some(path) = &a.photo {
         fling_photo(&mut s, path, a.count).await?;
         s.finish().await;
@@ -202,6 +224,105 @@ async fn send(peer: &Peer, a: &Args) -> Result<()> {
     // Our last act was an answer: close only once the peer has it.
     s.finish().await;
     Ok(())
+}
+
+fn failed_note(label: &str, failed: &[String]) -> String {
+    if failed.is_empty() {
+        String::new()
+    } else {
+        format!("; {label}: {}", failed.join(", "))
+    }
+}
+
+fn rate(sum: &transfer::Summary) -> f64 {
+    sum.bytes as f64 / 1e6 / sum.elapsed.as_secs_f64().max(1e-3)
+}
+
+/// Sends files and folders to the target, or to whoever scans our QR code.
+async fn files(peer: &Peer, a: &Args) -> Result<()> {
+    let list = transfer::collect(&a.paths)?;
+    let total: u64 = list.iter().map(|f| f.size).sum();
+    println!("{} file(s), {:.1} MB", list.len(), total as f64 / 1e6);
+    let mut s = if a.ticket.is_some() || a.discover {
+        connect(peer, a).await?
+    } else {
+        show_qr(peer).await?;
+        println!("waiting for a phone to scan the QR code...");
+        let s = peer.accept().await?;
+        println!(
+            "connected: {} ({}), pairing check {}",
+            s.remote_name,
+            via(&s),
+            s.check_code()?
+        );
+        s
+    };
+    let sum = transfer::send(&mut s, list, transfer::log_progress("sending")).await?;
+    println!(
+        "sent {} file(s), {:.1} MB in {:.1} s ({:.1} MB/s, {}){}",
+        sum.files,
+        sum.bytes as f64 / 1e6,
+        sum.elapsed.as_secs_f64(),
+        rate(&sum),
+        via(&s),
+        failed_note("not sent", &sum.failed)
+    );
+    s.finish().await;
+    Ok(())
+}
+
+/// Saves whatever connected peers send, until Ctrl+C. Latency probes are answered too.
+async fn receive(peer: &Peer, a: &Args) -> Result<()> {
+    let dir = match &a.dir {
+        Some(d) => d.clone(),
+        None => transfer::downloads_dir()?,
+    };
+    show_qr(peer).await?;
+    println!("saving into {} (Ctrl+C to stop)", dir.display());
+    loop {
+        let mut s = peer.accept().await?;
+        println!(
+            "connected: {} ({}), pairing check {}",
+            s.remote_name,
+            via(&s),
+            s.check_code()?
+        );
+        if let Err(e) = serve_files(&mut s, &dir).await {
+            println!("{}: {e:#}", s.remote_name);
+        }
+    }
+}
+
+async fn serve_files(s: &mut Session, dir: &Path) -> Result<()> {
+    let clock = Instant::now();
+    loop {
+        let msg = s.recv().await?;
+        if let Some(offer) = transfer::IncomingOffer::from_message(&msg) {
+            println!(
+                "{} offers {} file(s), {:.1} MB: {}",
+                s.remote_name,
+                offer.total_files,
+                offer.total_bytes as f64 / 1e6,
+                offer.names(3).join(", ")
+            );
+            let sum = transfer::receive(s, offer, dir, transfer::log_progress("receiving")).await?;
+            println!(
+                "saved {} file(s), {:.1} MB in {:.1} s ({:.1} MB/s, {}){}",
+                sum.files,
+                sum.bytes as f64 / 1e6,
+                sum.elapsed.as_secs_f64(),
+                rate(&sum),
+                via(s),
+                failed_note("failed", &sum.failed)
+            );
+        } else if let Message::FlingStart(f) = msg {
+            s.send(&Message::EffectStarted {
+                id: f.id,
+                receiver_micros: vutric_net::micros_since(clock),
+            })
+            .await?;
+        }
+    }
 }
 
 /// Flings a photo like the phone does (the same preview, see `vutric_net::preview`).
@@ -256,8 +377,10 @@ async fn main() -> Result<()> {
         // found over mDNS, such as an iPhone).
         "fling" if a.ticket.is_none() && !a.discover => listen(&peer, &a).await,
         "send" | "fling" => send(&peer, &a).await,
+        "files" if !a.paths.is_empty() => files(&peer, &a).await,
+        "receive" => receive(&peer, &a).await,
         _ => Err(anyhow::anyhow!(
-            "usage: vutric-net-spike listen|send|fling [--ticket LINK | --discover] [--name NAME] [--runs N] [--photo PATH [--count N]]"
+            "usage: vutric-net-spike listen|send|fling|files PATH...|receive [--ticket LINK | --discover] [--dir DIR] [--name NAME] [--runs N] [--photo PATH [--count N]]"
         )),
     };
     peer.close().await;

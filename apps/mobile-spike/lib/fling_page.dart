@@ -1,6 +1,7 @@
-// The Phase 0 end-to-end check from the phone: pick a photo, throw it upwards, and it lands on the other device
-// (a computer running `vutric-overlay-spike --listen`, or a phone on its catch screen). The number shown is
-// release → the receiver's first frame of the photo, there and back (an upper bound).
+// Sending from the phone. Throw one photo upwards and it lands on the other device (a computer running
+// `vutric-overlay-spike --listen`, or a phone on its catch screen); the number shown is release → the receiver's
+// first frame, there and back. Or send whole files, as many as you like: photos and videos from the gallery, or
+// any file from the Files app, with progress, resume and a hash check on every file.
 
 import 'dart:math' as math;
 
@@ -9,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'src/rust/api.dart' as vutric;
+import 'transfer_ui.dart';
 import 'ui.dart';
 
 /// Upward release speed (logical px/s) that counts as a throw; slower drags spring back.
@@ -45,6 +47,8 @@ class _FlingPageState extends State<FlingPage> with SingleTickerProviderStateMix
   bool _connecting = false;
   bool _throwing = false;
   bool _preparing = false;
+  bool _sending = false;
+  String? _sent;
   final _throws = <_Throw>[];
 
   /// Where the card is, relative to the middle of the stage; driven by the finger or by [_move].
@@ -130,6 +134,42 @@ class _FlingPageState extends State<FlingPage> with SingleTickerProviderStateMix
     }
   }
 
+  /// Picks files and sends them whole, with a progress sheet.
+  Future<void> _sendPicked(Future<Picked> Function() pick) async {
+    final peer = _peer;
+    if (peer == null) {
+      setState(() => _error = 'Avval qurilmaga ulaning');
+      return;
+    }
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    try {
+      final Picked picked;
+      try {
+        picked = await pick();
+      } catch (e) {
+        if (mounted) setState(() => _error = 'Tanlab boʻlmadi: ${errorText(e)}');
+        return;
+      }
+      if (picked.isEmpty || !mounted) return;
+      final r = await runTransfer(
+        context,
+        title: '${peer.peerName} ga yuborilmoqda',
+        stream: vutric.sendFiles(paths: picked.paths, names: picked.names),
+      );
+      if (!mounted) return;
+      if (r != null) {
+        setState(() => _sent = doneText(r, sending: true));
+      } else if ((await vutric.currentRoute()).isEmpty && mounted) {
+        setState(() => _peer = null); // the session is gone; connect again
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   bool get _canThrow => _photo != null && _peer != null && !_throwing;
 
   void _release(DragEndDetails d, Size area) {
@@ -188,7 +228,7 @@ class _FlingPageState extends State<FlingPage> with SingleTickerProviderStateMix
     final t = Theme.of(context).textTheme;
     final peer = _peer;
     return Scaffold(
-      appBar: AppBar(backgroundColor: sand, title: const Text('Rasm otish')),
+      appBar: AppBar(backgroundColor: sand, title: const Text('Yuborish')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -253,6 +293,31 @@ class _FlingPageState extends State<FlingPage> with SingleTickerProviderStateMix
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _peer == null || _sending || _throwing ? null : () => _sendPicked(pickMedia),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      label: const Text('Galereyadan'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _peer == null || _sending || _throwing ? null : () => _sendPicked(pickAnyFiles),
+                      icon: const Icon(Icons.folder_open_outlined),
+                      label: const Text('Fayllar'),
+                    ),
+                  ),
+                ],
+              ),
+              if (_sent != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_sent!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: ok)),
+                ),
               if (_throws.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 for (final th in _throws.take(4))

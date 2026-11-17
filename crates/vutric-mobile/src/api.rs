@@ -20,7 +20,9 @@ use tokio::runtime::Runtime;
 use tokio::sync::{Mutex as AsyncMutex, watch};
 use vutric_core::message::FailReason;
 use vutric_core::{FlingId, Message, PairingTicket, Platform};
-use vutric_net::{Peer, Reach, Route, Session, preview, probe};
+use vutric_net::{Peer, Reach, Route, Session, preview, probe, transfer};
+
+use crate::frb_generated::StreamSink;
 
 #[cfg(target_os = "ios")]
 const PLATFORM: Platform = Platform::Ios;
@@ -293,6 +295,7 @@ fn forget_on_error<T>(s: &Shared, r: Result<T>) -> Result<T> {
     if let Err(e) = &r
         && e.to_string() != CANCELLED
         && e.downcast_ref::<probe::Refused>().is_none()
+        && e.downcast_ref::<transfer::Declined>().is_none()
     {
         let mut slot = session_slot().lock().expect("session lock");
         if slot.as_ref().is_some_and(|cur| Arc::ptr_eq(cur, s))
@@ -474,15 +477,50 @@ fn receiver_clock() -> Instant {
     *START.get_or_init(Instant::now)
 }
 
-/// Waits for the next photo on the open session (either side may have opened it). Latency probes are answered
-/// here and never shown; a fling whose preview is not a sane JPEG is refused (`FlingFailed`), so its thrower
-/// learns at once. Cancelled by [`disconnect`].
-pub fn next_fling() -> Result<Caught> {
+/// Files another device offers this phone: answer with [`receive_files`] or [`decline_files`].
+#[derive(Debug, Clone)]
+pub struct FilesOffer {
+    pub files: u32,
+    pub bytes: u64,
+    /// The first few paths, to show.
+    pub names: Vec<String>,
+}
+
+/// What arrived on the open session: a photo thrown at this phone, or files offered to it.
+#[derive(Debug, Clone)]
+pub struct Incoming {
+    pub photo: Option<Caught>,
+    pub files: Option<FilesOffer>,
+}
+
+/// The offer [`next_incoming`] returned, with the session it came on.
+fn pending_slot() -> &'static Mutex<Option<(Shared, transfer::IncomingOffer)>> {
+    static PENDING: Mutex<Option<(Shared, transfer::IncomingOffer)>> = Mutex::new(None);
+    &PENDING
+}
+
+/// Waits for the next photo or file offer on the open session (either side may have opened it). Latency probes
+/// are answered here and never shown; a fling whose preview is not a sane JPEG is refused (`FlingFailed`), so its
+/// thrower learns at once. Cancelled by [`disconnect`].
+pub fn next_incoming() -> Result<Incoming> {
     let (at, s) = session()?;
     let r = runtime().block_on(cancellable(at, async {
         let mut guard = s.lock().await;
         loop {
-            let Message::FlingStart(f) = guard.recv().await? else {
+            let msg = guard.recv().await?;
+            if let Some(offer) = transfer::IncomingOffer::from_message(&msg) {
+                let files = FilesOffer {
+                    files: offer.total_files,
+                    bytes: offer.total_bytes,
+                    names: offer.names(5),
+                };
+                *pending_slot().lock().expect("pending lock") = Some((Arc::clone(&s), offer));
+                return Ok(Incoming {
+                    photo: None,
+                    files: Some(files),
+                });
+            }
+            let Message::FlingStart(f) = msg else {
                 continue;
             };
             if probe::is_probe(&f) {
@@ -507,15 +545,18 @@ pub fn next_fling() -> Result<Caught> {
                     .await?;
                 continue;
             };
-            return Ok(Caught {
-                id: f.id.0.to_vec(),
-                file_name: f.file_name,
-                jpeg: p.bytes,
-                width: p.width,
-                height: p.height,
-                speed: f.gesture.speed,
-                angle: f.gesture.angle,
-                exit_x: f.gesture.exit_x,
+            return Ok(Incoming {
+                photo: Some(Caught {
+                    id: f.id.0.to_vec(),
+                    file_name: f.file_name,
+                    jpeg: p.bytes,
+                    width: p.width,
+                    height: p.height,
+                    speed: f.gesture.speed,
+                    angle: f.gesture.angle,
+                    exit_x: f.gesture.exit_x,
+                }),
+                files: None,
             });
         }
     }));
@@ -561,4 +602,128 @@ pub fn shown(id: Vec<u8>) -> Result<()> {
             .await
     }));
     forget_on_error(&s, r)
+}
+
+// ---- Files: any number, type and size, both ways ----
+
+/// A transfer in progress (about every 150 ms), and its end (`done`, with what failed and where files went).
+#[derive(Debug, Clone)]
+pub struct TransferProgress {
+    pub bytes_done: u64,
+    pub bytes_total: u64,
+    pub files_done: u32,
+    pub files_total: u32,
+    pub failed: u32,
+    /// The file most recently started.
+    pub current: String,
+    pub bytes_per_sec: f64,
+    pub done: bool,
+    /// When done: paths that did not arrive whole.
+    pub failed_names: Vec<String>,
+    /// When done, receiving: where each file was saved.
+    pub saved: Vec<String>,
+    pub seconds: f64,
+}
+
+fn progress_of(p: &transfer::Progress) -> TransferProgress {
+    TransferProgress {
+        bytes_done: p.bytes_done,
+        bytes_total: p.bytes_total,
+        files_done: p.files_done,
+        files_total: p.files_total,
+        failed: p.failed,
+        current: p.current.clone(),
+        bytes_per_sec: p.bytes_per_sec,
+        done: false,
+        failed_names: Vec::new(),
+        saved: Vec::new(),
+        seconds: 0.0,
+    }
+}
+
+type LastProgress = Arc<Mutex<transfer::Progress>>;
+
+fn reporter(sink: &StreamSink<TransferProgress>) -> (transfer::OnProgress, LastProgress) {
+    let last: LastProgress = Arc::new(Mutex::new(transfer::Progress::default()));
+    let (sink, keep) = (sink.clone(), Arc::clone(&last));
+    let on: transfer::OnProgress = Arc::new(move |p: transfer::Progress| {
+        let _ = sink.add(progress_of(&p));
+        *keep.lock().expect("progress lock") = p;
+    });
+    (on, last)
+}
+
+fn finished(last: &Mutex<transfer::Progress>, sum: transfer::Summary) -> TransferProgress {
+    let mut p = progress_of(&last.lock().expect("progress lock"));
+    p.done = true;
+    p.failed_names = sum.failed;
+    p.saved = sum
+        .saved
+        .iter()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect();
+    p.seconds = sum.elapsed.as_secs_f64();
+    p
+}
+
+/// Sends files on the open session. `names[i]` is what the receiver sees for `paths[i]` (pickers hand out
+/// temporary copies with made-up names); an empty or missing name keeps the file's own. Progress goes to
+/// `sink`; its last event has `done`. A "no" from the other side is the error "declined" and keeps the
+/// session. Cancelled by [`disconnect`].
+pub fn send_files(
+    paths: Vec<String>,
+    names: Vec<String>,
+    sink: StreamSink<TransferProgress>,
+) -> Result<()> {
+    let files = paths
+        .iter()
+        .enumerate()
+        .map(|(i, p)| transfer::Outgoing::file(p, names.get(i).cloned()))
+        .collect::<Result<Vec<_>>>()?;
+    let (at, s) = session()?;
+    let (on, last) = reporter(&sink);
+    let r = runtime().block_on(cancellable(at, async {
+        transfer::send(&mut *s.lock().await, files, on).await
+    }));
+    let sum = forget_on_error(&s, r)?;
+    sink.add(finished(&last, sum))
+        .map_err(|e| anyhow::anyhow!("progress stream: {e:?}"))
+}
+
+/// Accepts the offer [`next_incoming`] returned and saves it under `dir` (folders kept). Each file appears
+/// only once its hash matched; an interrupted transfer resumes where it stopped when sent again. Progress goes
+/// to `sink`; its last event has `done` and `saved`. Cancelled by [`disconnect`].
+pub fn receive_files(dir: String, sink: StreamSink<TransferProgress>) -> Result<()> {
+    let (at, s, offer) = take_offer()?;
+    let (on, last) = reporter(&sink);
+    let r = runtime().block_on(cancellable(at, async {
+        transfer::receive(&mut *s.lock().await, offer, std::path::Path::new(&dir), on).await
+    }));
+    let sum = forget_on_error(&s, r)?;
+    sink.add(finished(&last, sum))
+        .map_err(|e| anyhow::anyhow!("progress stream: {e:?}"))
+}
+
+/// Says no to the offer [`next_incoming`] returned.
+pub fn decline_files() -> Result<()> {
+    let (at, s, offer) = take_offer()?;
+    let r = runtime().block_on(cancellable(at, async {
+        transfer::decline(&mut *s.lock().await, &offer).await
+    }));
+    forget_on_error(&s, r)
+}
+
+/// The pending offer, if it came on the session that is still open.
+fn take_offer() -> Result<(u64, Shared, transfer::IncomingOffer)> {
+    let (at, cur) = session()?;
+    let (s, offer) = pending_slot()
+        .lock()
+        .expect("pending lock")
+        .take()
+        .context("no files on offer")?;
+    anyhow::ensure!(
+        Arc::ptr_eq(&s, &cur),
+        "that offer came on a session that is closed"
+    );
+    Ok((at, s, offer))
 }

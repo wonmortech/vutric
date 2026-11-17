@@ -1,31 +1,35 @@
-# Vutric protocol v1
+# Vutric protocol v2
 
-Normative description of what `crates/vutric-core` implements. Every device is a peer: any device can send to any
-other, in both directions ([ADR-0005](decisions/0005-any-to-any-offline-first.md)); "sender" and "receiver" are per
-transfer, not per platform. Transport is QUIC via iroh (TLS 1.3, peers
-authenticated by Ed25519 endpoint key). ALPN: `vutric/1`.
+Normative description of what `crates/vutric-core` (messages) and `crates/vutric-net` (streams, transfer)
+implement. Every device is a peer: any device can send to any other, in both directions
+([ADR-0005](decisions/0005-any-to-any-offline-first.md)); "sender" and "receiver" are per transfer, not per
+platform. Transport is QUIC via iroh (TLS 1.3, peers authenticated by Ed25519 endpoint key), on the same network
+or over the internet, direct or through an encrypted relay ([ADR-0006](decisions/0006-any-network-any-file.md)).
+ALPN: `vutric/1`. Protocol version 2 added file offers; a v1 peer is refused at `Hello`.
 
 ## Pairing
 
 The receiving side of a pairing (any device with a screen) shows a QR code with a pairing ticket:
 
 ```
-vutric://pair?v=1&id=<64 hex endpoint id>&n=<percent-encoded device name>&a=<ip:port>,<ip:port>
+vutric://pair?v=2&id=<64 hex endpoint id>&n=<percent-encoded device name>&a=<ip:port>,<ip:port>&r=<relay url>
 ```
 
 - `v` must equal the protocol version; other versions are rejected, not guessed.
 - `a` (optional, ≤ 8 entries) are LAN address hints for networks where mDNS/multicast is blocked.
-- The name is display-only: control characters are stripped and it is cut to 64 characters.
+- `r` (optional) is the `https://` relay the device is reachable through from other networks.
+- The name is display-only: control characters are stripped and it is cut to 64 characters. It is never
+  published to the lookup service.
 
 After the other device connects with the ticket, both sides store each other's endpoint id. Later connections are
-discovered via mDNS and authenticated by key; an unknown key is refused.
+discovered via mDNS, or looked up by key, and authenticated by key.
 
 ## Streams
 
 | Stream | Direction | Content |
 |---|---|---|
 | Control (bidirectional, one per connection) | both | length-prefixed messages (below) |
-| File (unidirectional, one per fling) | sender → receiver | 16-byte `FlingId`, then the raw file bytes |
+| Data (unidirectional, one per offered file) | sender → receiver | header, file bytes from the offset, BLAKE3 |
 
 ### Framing
 
@@ -37,23 +41,45 @@ detected from the header, before any allocation. Every decoded message is valida
 | Message | From | Meaning |
 |---|---|---|
 | `Hello { protocol, device_name, platform }` | both, first | version check and display name |
-| `FlingStart { id, file_name, mime, size, blake3, gesture, effect, preview }` | sender | a fling begins; the receiver starts the effect as soon as it arrives |
+| `FlingStart { id, file_name, mime, size, blake3, gesture, effect, preview }` | sender | a thrown photo; the receiver starts the effect as soon as it arrives |
 | `EffectStarted { id, receiver_micros }` | receiver | first effect frame presented (latency probe) |
-| `FlingComplete { id }` | receiver | file received and BLAKE3 matched; it is now in the save folder |
+| `FlingComplete { id }` | receiver | reserved |
 | `FlingFailed { id, reason }` | both | `HashMismatch`, `DiskFull`, `Rejected`, `Cancelled`, `Paused` |
+| `Offer { id, first, entries, total_files, total_bytes }` | sender | files on offer, ≤ 256 entries per message |
+| `OfferReply { id, accept, have }` | receiver | yes or no; `have[i]` = bytes of entry `i` already held |
+| `OfferDone { id, received, failed }` | receiver | one offer's files are in; `failed` = transfer-wide indices |
 
 `gesture` = `{ speed (px/s ≥ 0), angle (rad, 0 = up, + = clockwise), exit_x (0..=1) }`. `preview` ≤ 96 KiB,
 longest side ≤ 512 px, JPEG/WebP/PNG.
 
+`OfferEntry` = `{ path, size, mime }`; `path` is relative and `/`-separated (≤ 1024 bytes, folders kept),
+`mime` ≤ 128 bytes.
+
+## Sending files
+
+1. A selection of more than 256 files, or with long names, is split into several `Offer`s with the same `id`;
+   `first` is the transfer-wide index of the offer's first entry. The receiver asks its user once, at
+   `first == 0`, and accepts the following offers of that transfer without asking.
+2. After `OfferReply { accept: true }` the sender opens one data stream per entry, at most 4 at a time:
+   `id [16] | index u32 LE | offset u64 LE`, the file's bytes from `offset = have[i]`, then the BLAKE3 hash of the
+   **whole** file (32 bytes). Bytes the receiver already holds are hashed by the sender, not sent.
+3. After the offer's last data stream, the receiver sends `OfferDone`; then the next offer follows.
+4. A file the sender cannot read has its stream reset; the receiver lists it in `failed`.
+
 ## Receiving a file
 
-1. Write to `<save folder>/.vutric-partial/<FlingId>` while hashing with BLAKE3.
-2. On size + hash match, sanitize the peer's name (`filename::sanitize`), pick a free name (`filename::unique`),
-   and rename into the save folder. Only then send `FlingComplete`.
-3. On mismatch delete the partial file and send `FlingFailed { HashMismatch }`.
+1. Map `path` under the save folder: every component through `filename::sanitize`, `.`, `..` and empty
+   components dropped, at most 32 levels. Two entries that map to one name get distinct part files.
+2. Write to `<target>.vutric-part`, truncated to `have[i]`, while hashing the held prefix and every new byte.
+3. On hash match, pick a free name (`filename::unique`: `photo (2).jpg`) and rename into place. A file only ever
+   appears complete and verified.
+4. On mismatch delete the part file (a retry starts from 0) and list the entry in `OfferDone.failed`.
+5. A part file left by an interrupted transfer is resumed when the same path is offered again; its prefix is
+   still covered by the final hash, so a stale part cannot slip through.
 
-The peer-supplied file name is hostile input: path components, Windows device names (`CON`, `NUL`, `COM1`…),
-reserved characters and trailing dots/spaces are neutralised; see the tests in `crates/vutric-core/src/filename.rs`.
+The peer-supplied path is hostile input: path components, Windows device names (`CON`, `NUL`, `COM1`…),
+reserved characters and trailing dots/spaces are neutralised; see the tests in `crates/vutric-core/src/filename.rs`
+and `crates/vutric-net/src/transfer.rs`.
 
 ## Latency budget (finger release → first effect frame)
 

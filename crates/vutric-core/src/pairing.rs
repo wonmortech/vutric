@@ -1,6 +1,6 @@
 //! The one-time pairing payload shown as a QR code by the desktop.
 //!
-//! Format: `vutric://pair?v=1&id=<64 hex>&n=<percent-encoded name>&a=<ip:port>,<ip:port>&r=<relay url>`
+//! Format: `vutric://pair?v=<PROTOCOL_VERSION>&id=<64 hex>&n=<percent-encoded name>&a=<ip:port>,<ip:port>&r=<relay url>`
 //! Address hints let the phone connect when multicast/mDNS is blocked on the network. The optional relay URL
 //! (percent-encoded) lets it connect from another network at once; older links without it still parse, and
 //! older apps ignore it.
@@ -154,7 +154,9 @@ mod tests {
     #[test]
     fn rejects_foreign_links_and_wrong_versions() {
         assert!(PairingTicket::parse("https://example.com/pair?v=1").is_err());
-        let uri = ticket().to_uri().replace("v=1", "v=7");
+        let uri = ticket()
+            .to_uri()
+            .replace(&format!("v={PROTOCOL_VERSION}"), "v=7");
         assert_eq!(
             PairingTicket::parse(&uri),
             Err(Error::UnsupportedVersion(7))
@@ -163,13 +165,19 @@ mod tests {
 
     #[test]
     fn strips_control_characters_from_name() {
-        let uri = format!("{PREFIX}v=1&id={}&n=a%0Ab%1Bc", EndpointId([1; 32]));
+        let uri = format!(
+            "{PREFIX}v={PROTOCOL_VERSION}&id={}&n=a%0Ab%1Bc",
+            EndpointId([1; 32])
+        );
         assert_eq!(PairingTicket::parse(&uri).unwrap().device_name, "abc");
     }
 
     #[test]
     fn relay_is_optional_and_must_be_https() {
-        let old = format!("{PREFIX}v=1&id={}&n=x", EndpointId([1; 32]));
+        let old = format!(
+            "{PREFIX}v={PROTOCOL_VERSION}&id={}&n=x",
+            EndpointId([1; 32])
+        );
         assert_eq!(PairingTicket::parse(&old).unwrap().relay, None);
         let bad = format!("{old}&r=http%3A%2F%2Fevil.example%2F");
         assert!(PairingTicket::parse(&bad).is_err());
@@ -177,6 +185,6 @@ mod tests {
 
     #[test]
     fn missing_id_is_an_error() {
-        assert!(PairingTicket::parse(&format!("{PREFIX}v=1&n=x")).is_err());
+        assert!(PairingTicket::parse(&format!("{PREFIX}v={PROTOCOL_VERSION}&n=x")).is_err());
     }
 }

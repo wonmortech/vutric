@@ -5,6 +5,10 @@
 //! The 0.2 latency probes are answered at once, without the overlay, so the phone app's measurement buttons keep
 //! working against this listener. A preview that is not a sane JPEG (checked with hard size limits, off the
 //! network threads) is refused with `FlingFailed`, and the session stays up.
+//!
+//! Files (any number, type and size) sent from the phone are saved in `Downloads/Vutric`, folders kept, each
+//! verified by its BLAKE3 hash before it appears there (`vutric_net::transfer`). Spike: every offer from a
+//! connected device is accepted; Phase 1 asks first for devices not yet trusted.
 
 use std::time::{Duration, Instant};
 
@@ -14,7 +18,7 @@ use qrcode::render::unicode::Dense1x2;
 use tokio::sync::oneshot;
 use vutric_core::message::FailReason;
 use vutric_core::{FlingId, Gesture, Message, Platform};
-use vutric_net::{Peer, Reach, Route, Session, preview, probe};
+use vutric_net::{Peer, Reach, Route, Session, preview, probe, transfer};
 use winit::event_loop::EventLoopProxy;
 
 /// A fling handed from the network thread to the overlay thread.
@@ -113,11 +117,39 @@ async fn refuse(s: &mut Session, id: FlingId, reason: FailReason) -> Result<()> 
     s.send(&Message::FlingFailed { id, reason }).await
 }
 
+async fn save_files(s: &mut Session, offer: transfer::IncomingOffer) -> Result<()> {
+    let dir = transfer::downloads_dir()?;
+    vutric_net::say(format!(
+        "{} sends {} file(s), {:.1} MB -> {}",
+        s.remote_name,
+        offer.total_files,
+        offer.total_bytes as f64 / 1e6,
+        dir.display()
+    ));
+    let sum = transfer::receive(s, offer, &dir, transfer::log_progress("receiving")).await?;
+    vutric_net::say(format!(
+        "saved {} file(s), {:.1} MB in {:.1} s{}",
+        sum.files,
+        sum.bytes as f64 / 1e6,
+        sum.elapsed.as_secs_f64(),
+        if sum.failed.is_empty() {
+            String::new()
+        } else {
+            format!("; failed: {}", sum.failed.join(", "))
+        }
+    ));
+    Ok(())
+}
+
 async fn session(mut s: Session, proxy: EventLoopProxy<Incoming>) -> Result<()> {
     let clock = Instant::now();
     loop {
         let msg = s.recv().await?;
         let arrived = Instant::now();
+        if let Some(offer) = transfer::IncomingOffer::from_message(&msg) {
+            save_files(&mut s, offer).await?;
+            continue;
+        }
         let Message::FlingStart(f) = msg else {
             continue;
         };

@@ -1,7 +1,8 @@
-// The other direction: this phone catches photos thrown by a computer or another phone. The thrower either scans
-// this phone's QR code (we wait), or this phone scans the computer's QR code (`vutric-net-spike fling --photo
-// PATH`). Each photo flies in from the top edge, the way it left the thrower, and the thrower's round trip
-// closes only once the decoded photo is drawn on this screen.
+// The other direction: this phone receives from a computer or another phone. The sender either scans this phone's
+// QR code (we wait), or this phone scans the computer's QR code (`vutric-net-spike fling --photo PATH`, or
+// `vutric-net-spike files PATH...`). A thrown photo flies in from the top edge, the way it left the thrower, and
+// the thrower's round trip closes only once it is drawn here. Offered files are accepted or declined by the user;
+// photos and videos then go to the gallery, everything else stays in Vutric's folder (Files app).
 
 import 'dart:math' as math;
 
@@ -11,6 +12,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'src/rust/api.dart' as vutric;
+import 'transfer_ui.dart';
 import 'ui.dart';
 
 class CatchPage extends StatefulWidget {
@@ -36,6 +38,7 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
   bool _showQr = false;
   int _count = 0;
   double? _lastMs;
+  String? _received;
 
   late final AnimationController _land = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
 
@@ -58,7 +61,7 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
       if (!mounted) return;
       setState(() {
         _peer = c;
-        _status = 'Ulandi. Rasm kutilmoqda…';
+        _status = 'Ulandi. Rasm yoki fayllar kutilmoqda…';
       });
       _catchLoop();
     } catch (e) {
@@ -97,17 +100,63 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
     });
   }
 
-  /// One photo at a time: decode it, put it on screen, wait for the frame that draws it, then tell the thrower.
+  /// Asks the user, then saves the files with a progress sheet. False when the session is gone.
+  Future<bool> _offered(vutric.FilesOffer offer) async {
+    HapticFeedback.mediumImpact();
+    final yes = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text('${_peer?.peerName ?? 'Qurilma'} fayl yubormoqda'),
+        content: Text(offerText(offer)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Rad etish')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Qabul qilish')),
+        ],
+      ),
+    );
+    if (!mounted) return false;
+    try {
+      if (yes != true) {
+        await vutric.declineFiles();
+        return true;
+      }
+      final dir = await receiveDir();
+      if (!mounted) return false;
+      final r = await runTransfer(context, title: 'Qabul qilinmoqda', stream: vutric.receiveFiles(dir: dir));
+      if (!mounted) return false;
+      if (r == null) return (await vutric.currentRoute()).isNotEmpty;
+      final inGallery = await saveMediaToGallery(r.saved);
+      if (mounted) setState(() => _received = doneText(r, sending: false, inGallery: inGallery));
+      return true;
+    } catch (e) {
+      _lost(e);
+      return false;
+    }
+  }
+
+  /// One thing at a time: a photo is decoded, put on screen, and the thrower told once it is drawn; files are
+  /// offered to the user.
   Future<void> _catchLoop() async {
     while (mounted && _peer != null) {
-      final vutric.Caught p;
+      final vutric.Incoming next;
       try {
-        p = await vutric.nextFling();
+        next = await vutric.nextIncoming();
       } catch (e) {
         _lost(e);
         return;
       }
       if (!mounted) return;
+      final files = next.files;
+      if (files != null) {
+        if (!await _offered(files)) {
+          if (mounted) setState(() => _peer = null);
+          return;
+        }
+        continue;
+      }
+      final p = next.photo;
+      if (p == null) continue;
       final clock = Stopwatch()..start();
       final image = MemoryImage(p.jpeg);
       // Decode before showing, so the frame we report really contains the photo. precacheImage reports a decode
@@ -151,7 +200,7 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
     final t = Theme.of(context).textTheme;
     final peer = _peer;
     return Scaffold(
-      appBar: AppBar(backgroundColor: sand, title: const Text('Rasm qabul qilish')),
+      appBar: AppBar(backgroundColor: sand, title: const Text('Qabul qilish')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -207,6 +256,11 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
                 ),
               const SizedBox(height: 12),
               Expanded(child: LayoutBuilder(builder: (context, box) => _stage(context, box.biggest))),
+              if (_received != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(_received!, style: t.bodySmall?.copyWith(color: ok)),
+                ),
               if (_count > 0)
                 Text(
                   '$_count ta rasm keldi · oxirgisi kelgandan ekranda koʻringuncha '
@@ -237,8 +291,8 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
       return Center(
         child: Text(
           _peer == null
-              ? 'Kompyuterda: vutric-net-spike fling --photo RASM.jpg\nsoʻng uning QR kodini skanerlang'
-              : 'Rasm kutilmoqda…',
+              ? 'Kompyuterda: vutric-net-spike files FAYL_YOKI_PAPKA\nsoʻng uning QR kodini skanerlang'
+              : 'Rasm yoki fayllar kutilmoqda…',
           style: Theme.of(context).textTheme.bodyMedium,
           textAlign: TextAlign.center,
         ),

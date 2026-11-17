@@ -3,13 +3,19 @@
 <plist version="1.0">
 <dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Vutric finds and connects to your own devices on this Wi-Fi. Nothing goes to the internet.</string>
+	<string>Vutric finds and connects to your own devices on this Wi-Fi. Files go only to the device you choose, encrypted.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_vutric._udp</string>
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Pick a photo to throw to your computer.</string>
+	<string>Pick photos and videos to send to your other device.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save the photos and videos you receive into your library.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan the pairing QR code shown on your other device.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

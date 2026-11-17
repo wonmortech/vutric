@@ -230,13 +230,13 @@ class _SpikeHomeState extends State<SpikeHome> with WidgetsBindingObserver {
             FilledButton.icon(
               onPressed: ready ? _openFling : null,
               icon: const Icon(Icons.north),
-              label: const Text('Rasmni kompyuterga otish'),
+              label: const Text('Yuborish: rasm otish yoki fayllar'),
             ),
             const SizedBox(height: 8),
             FilledButton.tonalIcon(
               onPressed: ready ? _openCatch : null,
               icon: const Icon(Icons.south),
-              label: const Text('Rasm qabul qilish'),
+              label: const Text('Qabul qilish'),
             ),
             const SizedBox(height: 8),
             if (hasMdns) ...[

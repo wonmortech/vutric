@@ -56,6 +56,7 @@ fn rt() -> tokio::runtime::Runtime {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // one scenario after another on the one global peer
 fn phone_api_end_to_end() {
     let link = api::start("Test phone".into(), api::new_identity(), true).expect("start");
 
@@ -82,7 +83,10 @@ fn phone_api_end_to_end() {
     let phone = std::thread::spawn(move || {
         let c = api::accept_session().expect("accept");
         assert_eq!(c.peer_name, "Thrower");
-        let caught = api::next_fling().expect("next fling");
+        let caught = api::next_incoming()
+            .expect("next incoming")
+            .photo
+            .expect("a photo");
         api::shown(caught.id.clone()).expect("shown");
         api::disconnect();
         tx.send(caught).expect("send");
@@ -164,4 +168,38 @@ fn phone_api_end_to_end() {
     let after = api::fling(photo, 2000.0, 0.0, 0.5).expect_err("session gone");
     assert!(after.to_string().contains("not connected"), "{after:#}");
     silent.join().expect("silent thread");
+
+    // 4. Files offered to the phone show up as an offer, and a "no" reaches the sender as Declined.
+    let dir = std::env::temp_dir().join(format!("vutric-catch-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("dir");
+    let file = dir.join("report.pdf");
+    std::fs::write(&file, b"%PDF-1.7 hello").expect("write");
+    let (tx, rx) = mpsc::channel();
+    let phone = std::thread::spawn(move || {
+        api::accept_session().expect("accept");
+        let offer = api::next_incoming()
+            .expect("next incoming")
+            .files
+            .expect("a file offer");
+        api::decline_files().expect("decline");
+        tx.send(offer).expect("send");
+    });
+    rt().block_on(async {
+        let (peer, mut s) = thrower(&link).await;
+        let one = vec![vutric_net::transfer::Outgoing::file(&file, None).expect("file")];
+        let err = vutric_net::transfer::send(&mut s, one, std::sync::Arc::new(|_| {}))
+            .await
+            .expect_err("declined");
+        assert!(
+            err.downcast_ref::<vutric_net::transfer::Declined>()
+                .is_some(),
+            "{err:#}"
+        );
+        s.close();
+        peer.close().await;
+    });
+    let offer = rx.recv_timeout(Duration::from_secs(10)).expect("offer");
+    phone.join().expect("phone thread");
+    assert_eq!((offer.files, offer.bytes), (1, 14));
+    assert_eq!(offer.names, vec!["report.pdf".to_owned()]);
 }
