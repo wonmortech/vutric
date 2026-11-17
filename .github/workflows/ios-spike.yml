@@ -26,7 +26,8 @@ concurrency:
 
 jobs:
   ipa:
-    runs-on: macos-15
+    # Intel host: arm64 macOS runners kept timing out in the queue; the iPhone target is cross-compiled anyway.
+    runs-on: macos-15-intel
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
