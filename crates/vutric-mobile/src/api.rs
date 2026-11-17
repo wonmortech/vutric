@@ -1,20 +1,37 @@
 //! The API the Flutter app calls (`flutter_rust_bridge` generates the Dart side).
 //!
-//! Every function here is blocking and runs on a bridge worker thread, never the UI thread. Inside, the
-//! peer lives on one Tokio runtime owned by this crate, so iroh always has the runtime it needs.
+//! Every function here is blocking and runs on a bridge worker thread, never the UI thread. Inside, the peer
+//! lives on one Tokio runtime owned by this crate, so iroh always has the runtime it needs.
+//!
+//! Two rules keep the screens honest:
+//! - **Every wait can be cancelled.** [`disconnect`] (and [`start`], and opening a new session) moves the
+//!   *epoch* on; every blocking call watches it and returns [`CANCELLED`] at once. A page that closes therefore
+//!   never leaves a bridge thread parked, and a stale call can never touch a newer session.
+//! - **The open session stays in its slot.** Calls borrow it through an async lock instead of taking it out, so
+//!   [`disconnect`] always finds it. A call that fails on it (the peer vanished, an answer timed out) drops it,
+//!   and the screen goes back to "connect".
 
-use std::sync::{Mutex, OnceLock};
+use std::future::Future;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use tokio::runtime::Runtime;
-use vutric_core::{PairingTicket, Platform};
-use vutric_net::{Peer, Session, probe};
+use tokio::sync::{Mutex as AsyncMutex, watch};
+use vutric_core::message::FailReason;
+use vutric_core::{FlingId, Message, PairingTicket, Platform};
+use vutric_net::{Peer, Session, preview, probe};
 
 #[cfg(target_os = "ios")]
 const PLATFORM: Platform = Platform::Ios;
 #[cfg(not(target_os = "ios"))]
 const PLATFORM: Platform = Platform::Android;
+
+/// The error text of a call that [`disconnect`] (or a newer session) cancelled; the app ignores it.
+pub const CANCELLED: &str = "vutric: cancelled";
+
+/// How long "find a computer" looks over mDNS.
+const DISCOVER_TIMEOUT: Duration = Duration::from_secs(15);
 
 fn runtime() -> &'static Runtime {
     static RT: OnceLock<Runtime> = OnceLock::new();
@@ -27,6 +44,34 @@ fn runtime() -> &'static Runtime {
             .expect("tokio runtime")
     })
 }
+
+// ---- Epoch: cancels every wait in flight ----
+
+fn epoch() -> &'static watch::Sender<u64> {
+    static EPOCH: OnceLock<watch::Sender<u64>> = OnceLock::new();
+    EPOCH.get_or_init(|| watch::channel(0).0)
+}
+
+fn now_epoch() -> u64 {
+    *epoch().borrow()
+}
+
+/// Moves the epoch on: every call that started before returns [`CANCELLED`].
+fn bump() -> u64 {
+    epoch().send_modify(|e| *e += 1);
+    now_epoch()
+}
+
+/// Runs `fut` until it finishes or the epoch leaves `at`.
+async fn cancellable<T>(at: u64, fut: impl Future<Output = Result<T>>) -> Result<T> {
+    let mut rx = epoch().subscribe();
+    tokio::select! {
+        r = fut => r,
+        _ = rx.wait_for(|e| *e != at) => bail!(CANCELLED),
+    }
+}
+
+// ---- The peer (this device on the LAN) ----
 
 fn peer_slot() -> &'static Mutex<Option<Peer>> {
     static PEER: Mutex<Option<Peer>> = Mutex::new(None);
@@ -47,12 +92,17 @@ pub fn new_identity() -> Vec<u8> {
     vutric_net::new_identity().to_vec()
 }
 
-/// Starts (or restarts) this device's LAN-only peer; returns its pairing link for the QR code.
+/// Starts (or restarts, e.g. after a rename) this device's LAN-only peer; returns its pairing link for the QR
+/// code. Cancels whatever was running and closes the open session.
 pub fn start(name: String, identity: Vec<u8>) -> Result<String> {
+    static STARTING: Mutex<()> = Mutex::new(());
     let key: [u8; 32] = identity
         .as_slice()
         .try_into()
         .context("identity must be 32 bytes")?;
+    // One restart at a time, so two quick renames cannot leave a second peer advertising unseen.
+    let _one = STARTING.lock().expect("start lock");
+    drop_session();
     let old = peer_slot().lock().expect("peer lock").take();
     runtime().block_on(async {
         if let Some(old) = old {
@@ -64,6 +114,8 @@ pub fn start(name: String, identity: Vec<u8>) -> Result<String> {
         Ok(link)
     })
 }
+
+// ---- Measurement runs (spike 0.2) ----
 
 /// What one spike run measured, both directions, for the screen and the report.
 #[derive(Debug, Clone)]
@@ -121,55 +173,118 @@ fn report(
     })
 }
 
-/// We connect: send our probes, then answer the peer's.
-async fn as_initiator(s: &mut Session, runs: u32) -> Result<Sent> {
-    let (_warm, stats) = probe::send_run(s, runs).await?;
-    probe::answer_run(s, runs).await?;
-    Ok(sent_of(&stats))
+/// We connected: send our probes, answer the peer's, then close once the peer has our last answer.
+async fn as_initiator(
+    mut s: Session,
+    found: Duration,
+    connect: Duration,
+    runs: u32,
+) -> Result<RunReport> {
+    let (_warm, stats) = probe::send_run(&mut s, runs).await?;
+    probe::answer_run(&mut s, runs).await?;
+    let r = report(&s, found, connect, sent_of(&stats), runs);
+    s.finish().await;
+    r
 }
 
-/// Finds a peer over mDNS, then measures both directions.
+/// Finds a peer over mDNS, then measures both directions. Cancelled by [`disconnect`].
 pub fn run_discovered(runs: u32) -> Result<RunReport> {
     let p = peer()?;
-    runtime().block_on(async {
+    let at = now_epoch();
+    runtime().block_on(cancellable(at, async {
         let t0 = Instant::now();
-        let near = p.discover(Duration::from_secs(15)).await?;
+        let near = p.discover(DISCOVER_TIMEOUT).await?;
         let found = t0.elapsed();
         let t1 = Instant::now();
-        let mut s = p.connect(near.id, &near.addrs).await?;
-        let connect = t1.elapsed();
-        let sent = as_initiator(&mut s, runs).await?;
-        let r = report(&s, found, connect, sent, runs);
-        tokio::time::sleep(Duration::from_millis(200)).await;
-        s.close();
-        r
-    })
+        let s = p.connect(near.id, &near.addrs).await?;
+        as_initiator(s, found, t1.elapsed(), runs).await
+    }))
 }
 
-/// Connects with a pairing link (scanned or pasted), then measures both directions.
+/// Connects with a pairing link (scanned or pasted), then measures both directions. Cancelled by [`disconnect`].
 pub fn run_link(link: String, runs: u32) -> Result<RunReport> {
     let p = peer()?;
     let t = PairingTicket::parse(link.trim())?;
-    runtime().block_on(async {
+    let at = now_epoch();
+    runtime().block_on(cancellable(at, async {
         let t1 = Instant::now();
-        let mut s = p.connect(t.endpoint, &t.addrs).await?;
-        let connect = t1.elapsed();
-        let sent = as_initiator(&mut s, runs).await?;
-        let r = report(&s, Duration::ZERO, connect, sent, runs);
-        tokio::time::sleep(Duration::from_millis(200)).await;
-        s.close();
-        r
-    })
+        let s = p.connect(t.endpoint, &t.addrs).await?;
+        as_initiator(s, Duration::ZERO, t1.elapsed(), runs).await
+    }))
 }
 
-// ---- Fling: one open session, photos thrown one after another ----
+/// Waits for a peer to connect (desktop: `vutric-net-spike send --discover`), answers its probes, then
+/// measures this phone → that peer. Cancelled by [`disconnect`].
+pub fn listen(runs: u32) -> Result<RunReport> {
+    let p = peer()?;
+    let at = now_epoch();
+    runtime().block_on(cancellable(at, async {
+        let t1 = Instant::now();
+        let mut s = p.accept().await?;
+        let waited = t1.elapsed();
+        probe::answer_run(&mut s, runs).await?;
+        let (_warm, stats) = probe::send_run(&mut s, runs).await?;
+        let r = report(&s, waited, Duration::ZERO, sent_of(&stats), runs);
+        s.close(); // our last act was a receive: nothing of ours is in flight
+        r
+    }))
+}
 
-fn session_slot() -> &'static Mutex<Option<Session>> {
-    static SESSION: Mutex<Option<Session>> = Mutex::new(None);
+// ---- The open session (fling and catch) ----
+
+type Shared = Arc<AsyncMutex<Session>>;
+
+fn session_slot() -> &'static Mutex<Option<Shared>> {
+    static SESSION: Mutex<Option<Shared>> = Mutex::new(None);
     &SESSION
 }
 
-/// The device a fling goes to, shown with the pairing check before the first throw.
+/// The open session, or an error the app shows as "connect first".
+fn session() -> Result<(u64, Shared)> {
+    // The epoch is read under the slot lock, like every bump that retires a session: a call can never hold a
+    // retired session together with an epoch that will not move again.
+    let slot = session_slot().lock().expect("session lock");
+    let s = slot.clone().context("not connected to a device")?;
+    Ok((now_epoch(), s))
+}
+
+/// Closes a session in the background once no call is using it, after its last bytes left.
+fn retire(s: Shared) {
+    runtime().spawn(async move {
+        s.lock().await.finish().await;
+    });
+}
+
+/// Cancels every waiting call and closes the open session (the epoch moves under the slot lock).
+fn drop_session() {
+    let mut slot = session_slot().lock().expect("session lock");
+    bump();
+    let old = slot.take();
+    drop(slot);
+    if let Some(s) = old {
+        retire(s);
+    }
+}
+
+/// After a call failed on `s`: forget it if it is still the open one. A photo the other device refused leaves
+/// a healthy session, so that keeps it. (A cancelled call needs nothing: whatever cancelled it also retired
+/// the session.)
+fn forget_on_error<T>(s: &Shared, r: Result<T>) -> Result<T> {
+    if let Err(e) = &r
+        && e.to_string() != CANCELLED
+        && e.downcast_ref::<probe::Refused>().is_none()
+    {
+        let mut slot = session_slot().lock().expect("session lock");
+        if slot.as_ref().is_some_and(|cur| Arc::ptr_eq(cur, s))
+            && let Some(dead) = slot.take()
+        {
+            retire(dead);
+        }
+    }
+    r
+}
+
+/// The device a fling goes to (or comes from), shown with the pairing check.
 #[derive(Debug, Clone)]
 pub struct Connected {
     pub peer_name: String,
@@ -178,43 +293,70 @@ pub struct Connected {
     pub connect_ms: f64,
 }
 
-fn keep(s: Session, connect: Duration) -> Result<Connected> {
+/// Makes `s` the open session, unless the call that opened it was cancelled meanwhile (then `s` is closed).
+fn keep(at: u64, s: Session, connect: Duration) -> Result<Connected> {
     let c = Connected {
         peer_name: s.remote_name.clone(),
         peer_platform: format!("{:?}", s.remote_platform),
         check_code: s.check_code()?,
         connect_ms: ms(connect),
     };
-    if let Some(old) = session_slot().lock().expect("session lock").replace(s) {
-        old.close();
+    let mut slot = session_slot().lock().expect("session lock");
+    if now_epoch() != at {
+        drop(slot);
+        retire(Arc::new(AsyncMutex::new(s)));
+        bail!(CANCELLED);
+    }
+    // A new session cancels every call still waiting on the old one.
+    bump();
+    if let Some(old) = slot.replace(Arc::new(AsyncMutex::new(s))) {
+        retire(old);
     }
     Ok(c)
 }
 
-/// Opens the fling session with a pairing link (scanned or pasted).
+fn open(job: impl Future<Output = Result<Session>>) -> Result<Connected> {
+    let at = now_epoch();
+    runtime().block_on(async {
+        let t0 = Instant::now();
+        let s = cancellable(at, job).await?;
+        keep(at, s, t0.elapsed())
+    })
+}
+
+/// Opens the session with a pairing link (scanned or pasted). Cancelled by [`disconnect`].
 pub fn connect_link(link: String) -> Result<Connected> {
     let p = peer()?;
     let t = PairingTicket::parse(link.trim())?;
-    runtime().block_on(async {
-        let t0 = Instant::now();
-        let s = p.connect(t.endpoint, &t.addrs).await?;
-        keep(s, t0.elapsed())
-    })
+    open(async move { p.connect(t.endpoint, &t.addrs).await })
 }
 
-/// Opens the fling session with the first device found over mDNS.
+/// Opens the session with the first device found over mDNS (not on iPhone: no multicast there). Cancelled by
+/// [`disconnect`].
 pub fn connect_discovered() -> Result<Connected> {
     let p = peer()?;
-    runtime().block_on(async {
-        let near = p.discover(Duration::from_secs(15)).await?;
-        let t0 = Instant::now();
-        let s = p.connect(near.id, &near.addrs).await?;
-        keep(s, t0.elapsed())
+    open(async move {
+        let near = p.discover(DISCOVER_TIMEOUT).await?;
+        p.connect(near.id, &near.addrs).await
     })
 }
 
-/// A photo ready to throw: JPEG, longest side at most 512 px. Prepared when picked, so the throw itself only
-/// sends bytes.
+/// Waits for another device to connect to this phone (it scanned our QR code) and keeps that session.
+/// Cancelled by [`disconnect`].
+pub fn accept_session() -> Result<Connected> {
+    let p = peer()?;
+    open(async move { p.accept().await })
+}
+
+/// Closes the open session and cancels every call still waiting (on it or on opening one). Returns at once.
+pub fn disconnect() {
+    drop_session();
+}
+
+// ---- Throw ----
+
+/// A photo ready to throw: an upright JPEG, longest side at most 512 px, small enough for one frame. Prepared
+/// when picked, so the throw itself only sends bytes.
 #[derive(Debug, Clone)]
 pub struct Photo {
     pub file_name: String,
@@ -225,27 +367,32 @@ pub struct Photo {
 
 /// Any picked image (JPEG, PNG or WebP) → the preview the receiver plays.
 pub fn prepare_photo(file_name: String, bytes: Vec<u8>) -> Result<Photo> {
-    let img = image::load_from_memory(&bytes)
-        .context("not a JPEG, PNG or WebP image")?
-        .thumbnail(512, 512)
-        .to_rgb8();
-    let mut jpeg = Vec::new();
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 80).encode_image(&img)?;
+    let e = preview::encode(&bytes)?;
+    // The protocol allows 1..=512 bytes of name; a picker can hand anything over.
+    let mut name: String = file_name.chars().filter(|c| !c.is_control()).collect();
+    while name.len() > 200 {
+        name.pop();
+    }
+    if name.trim().is_empty() {
+        name = "photo.jpg".into();
+    }
     Ok(Photo {
-        file_name,
-        jpeg,
-        width: u16::try_from(img.width())?,
-        height: u16::try_from(img.height())?,
+        file_name: name,
+        jpeg: e.jpeg,
+        width: e.width,
+        height: e.height,
     })
 }
 
 /// Throws the photo; returns milliseconds from the call until the receiver reported its first frame on screen
-/// (there and back, so an upper bound of "release → first frame").
+/// (there and back, so an upper bound of "release → first frame"). Fails after
+/// [`probe::ROUND_TRIP_TIMEOUT`] without an answer, and then the session is closed.
 pub fn fling(photo: Photo, speed: f32, angle: f32, exit_x: f32) -> Result<f64> {
+    let finite = |v: f32, or: f32| if v.is_finite() { v } else { or };
     let gesture = vutric_core::Gesture {
-        speed,
-        angle,
-        exit_x,
+        speed: finite(speed, 0.0),
+        angle: finite(angle, 0.0),
+        exit_x: finite(exit_x, 0.5).clamp(0.0, 1.0),
     };
     let msg = probe::photo(
         &photo.file_name,
@@ -254,39 +401,19 @@ pub fn fling(photo: Photo, speed: f32, angle: f32, exit_x: f32) -> Result<f64> {
         photo.height,
         gesture,
     );
-    let mut s = session_slot()
-        .lock()
-        .expect("session lock")
-        .take()
-        .context("connect to a device first")?;
-    let r = runtime().block_on(probe::round_trip(&mut s, &msg));
-    if r.is_ok() {
-        *session_slot().lock().expect("session lock") = Some(s);
-    }
-    Ok(ms(r?))
-}
-
-/// Closes the fling session.
-pub fn disconnect() {
-    if let Some(s) = session_slot().lock().expect("session lock").take() {
-        s.close();
-    }
+    // A message this side would refuse to send is the caller's problem, not the session's.
+    msg.validate()?;
+    let (at, s) = session()?;
+    let r = runtime().block_on(cancellable(at, async {
+        let mut guard = s.lock().await;
+        probe::round_trip(&mut guard, &msg).await
+    }));
+    forget_on_error(&s, r).map(ms)
 }
 
 // ---- Catch: this phone receives (desktop → phone, phone → phone) ----
 
-/// Waits for another device to connect to this phone (it scanned our QR code, or found us over mDNS) and keeps
-/// that session for [`next_fling`].
-pub fn accept_session() -> Result<Connected> {
-    let p = peer()?;
-    runtime().block_on(async {
-        let t0 = Instant::now();
-        let s = p.accept().await?;
-        keep(s, t0.elapsed())
-    })
-}
-
-/// A photo thrown at this phone.
+/// A photo thrown at this phone; its preview has been checked (a real JPEG, preview-sized, as announced).
 #[derive(Debug, Clone)]
 pub struct Caught {
     /// Pass back to [`shown`] once the photo is on screen.
@@ -306,28 +433,36 @@ fn receiver_clock() -> Instant {
 }
 
 /// Waits for the next photo on the open session (either side may have opened it). Latency probes are answered
-/// here and skipped, so the measurement buttons of another device keep working.
+/// here and never shown; a fling whose preview is not a sane JPEG is refused (`FlingFailed`), so its thrower
+/// learns at once. Cancelled by [`disconnect`].
 pub fn next_fling() -> Result<Caught> {
-    let mut s = session_slot()
-        .lock()
-        .expect("session lock")
-        .take()
-        .context("no open session")?;
-    let r = runtime().block_on(async {
+    let (at, s) = session()?;
+    let r = runtime().block_on(cancellable(at, async {
+        let mut guard = s.lock().await;
         loop {
-            let vutric_core::Message::FlingStart(f) = s.recv().await? else {
+            let Message::FlingStart(f) = guard.recv().await? else {
                 continue;
             };
-            let photo = f.preview.filter(|p| {
-                p.format == vutric_core::PreviewFormat::Jpeg
-                    && image::guess_format(&p.bytes).is_ok()
-            });
-            let Some(p) = photo else {
-                s.send(&vutric_core::Message::EffectStarted {
-                    id: f.id,
-                    receiver_micros: vutric_net::micros_since(receiver_clock()),
-                })
-                .await?;
+            if probe::is_probe(&f) {
+                guard
+                    .send(&Message::EffectStarted {
+                        id: f.id,
+                        receiver_micros: vutric_net::micros_since(receiver_clock()),
+                    })
+                    .await?;
+                continue;
+            }
+            let checked = f.preview.as_ref().map_or_else(
+                || Err(anyhow::anyhow!("no preview")),
+                |p| preview::check(&p.bytes, (p.width, p.height)),
+            );
+            let (Ok(()), Some(p)) = (checked, f.preview) else {
+                guard
+                    .send(&Message::FlingFailed {
+                        id: f.id,
+                        reason: FailReason::Rejected,
+                    })
+                    .await?;
                 continue;
             };
             return Ok(Caught {
@@ -341,47 +476,47 @@ pub fn next_fling() -> Result<Caught> {
                 exit_x: f.gesture.exit_x,
             });
         }
-    });
-    if r.is_ok() {
-        *session_slot().lock().expect("session lock") = Some(s);
-    }
-    r
+    }));
+    forget_on_error(&s, r)
 }
 
-/// Tells the thrower that the photo's first frame is on this screen (closes its round trip).
-pub fn shown(id: Vec<u8>) -> Result<()> {
-    let id = vutric_core::FlingId(
+/// Tells the thrower this phone could not show the photo after all (its round trip ends with a refusal, at
+/// once, instead of a timeout).
+pub fn refuse(id: Vec<u8>) -> Result<()> {
+    let id = FlingId(
         id.as_slice()
             .try_into()
             .context("fling id must be 16 bytes")?,
     );
-    let mut s = session_slot()
-        .lock()
-        .expect("session lock")
-        .take()
-        .context("no open session")?;
-    let r = runtime().block_on(s.send(&vutric_core::Message::EffectStarted {
-        id,
-        receiver_micros: vutric_net::micros_since(receiver_clock()),
+    let (at, s) = session()?;
+    let r = runtime().block_on(cancellable(at, async {
+        s.lock()
+            .await
+            .send(&Message::FlingFailed {
+                id,
+                reason: FailReason::Rejected,
+            })
+            .await
     }));
-    if r.is_ok() {
-        *session_slot().lock().expect("session lock") = Some(s);
-    }
-    r
+    forget_on_error(&s, r)
 }
 
-/// Waits for a peer to connect (desktop: `vutric-net-spike send --discover`), answers its probes, then
-/// measures this phone → that peer.
-pub fn listen(runs: u32) -> Result<RunReport> {
-    let p = peer()?;
-    runtime().block_on(async {
-        let t1 = Instant::now();
-        let mut s = p.accept().await?;
-        let waited = t1.elapsed();
-        probe::answer_run(&mut s, runs).await?;
-        let (_warm, stats) = probe::send_run(&mut s, runs).await?;
-        let r = report(&s, waited, Duration::ZERO, sent_of(&stats), runs);
-        s.close();
-        r
-    })
+/// Tells the thrower that the photo's first frame is on this screen (closes its round trip).
+pub fn shown(id: Vec<u8>) -> Result<()> {
+    let id = FlingId(
+        id.as_slice()
+            .try_into()
+            .context("fling id must be 16 bytes")?,
+    );
+    let (at, s) = session()?;
+    let r = runtime().block_on(cancellable(at, async {
+        s.lock()
+            .await
+            .send(&Message::EffectStarted {
+                id,
+                receiver_micros: vutric_net::micros_since(receiver_clock()),
+            })
+            .await
+    }));
+    forget_on_error(&s, r)
 }

@@ -15,10 +15,12 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 [dependencies]
 anyhow.workspace = true
 flutter_rust_bridge = "=2.13.0"
-image.workspace = true
-tokio = { version = "1.54.1", features = ["rt-multi-thread", "time"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 vutric-core.workspace = true
 vutric-net = { path = "../vutric-net" }
+
+[dev-dependencies]
+image.workspace = true
 
 [lints]
 workspace = true

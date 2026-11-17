@@ -87,6 +87,8 @@ struct Spike {
     next_trigger: Instant,
     summary: Summary,
     fatal: Option<anyhow::Error>,
+    /// `--listen`: a fling that arrived before the GPU was ready; played as soon as it is.
+    pending: Option<listen::Incoming>,
 }
 
 impl Spike {
@@ -100,6 +102,7 @@ impl Spike {
             next_trigger: Instant::now() + Duration::from_millis(900),
             summary: Summary::default(),
             fatal: None,
+            pending: None,
         }
     }
 
@@ -232,7 +235,10 @@ impl ApplicationHandler<listen::Incoming> for Spike {
 
     /// A photo flung from a phone (`--listen`): swap the texture and play the effect at once.
     fn user_event(&mut self, _: &ActiveEventLoop, fling: listen::Incoming) {
-        let Some(gpu) = &mut self.gpu else { return };
+        let Some(gpu) = &mut self.gpu else {
+            self.pending = Some(fling); // an older pending fling is dropped: its thrower hears "cancelled"
+            return;
+        };
         gpu.renderer.set_image(
             &gpu.device,
             &gpu.queue,
@@ -241,11 +247,9 @@ impl ApplicationHandler<listen::Incoming> for Spike {
             fling.image.height(),
         );
         self.image = fling.image;
-        if let Some(mut previous) = self.run.take()
-            && let Some(tx) = previous.notify.take()
-        {
-            let _ = tx.send(Instant::now());
-        }
+        // A run cut short by this fling: if it never drew, dropping its sender tells its thrower "cancelled";
+        // if it did, its thrower was already told at its first frame.
+        self.run = None;
         self.start_run(fling.gesture, fling.arrived, Some(fling.first_frame));
     }
 
@@ -257,6 +261,9 @@ impl ApplicationHandler<listen::Incoming> for Spike {
             Ok(gpu) => {
                 self.summary.adapter = gpu_label(&gpu);
                 self.gpu = Some(gpu);
+                if let Some(fling) = self.pending.take() {
+                    self.user_event(event_loop, fling);
+                }
             }
             Err(err) => self.fail(event_loop, err),
         }

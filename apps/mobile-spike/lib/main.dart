@@ -14,21 +14,28 @@ import 'catch_page.dart';
 import 'fling_page.dart';
 import 'src/rust/api.dart' as vutric;
 import 'src/rust/frb_generated.dart';
+import 'ui.dart';
 
-const _cobalt = Color(0xFF062B8A);
-const _signal = Color(0xFF2F6BFF);
-const _sand = Color(0xFFE6DBC7);
-const _paper = Color(0xFFF7F2E9);
-const _ok = Color(0xFF1D7A4E);
-const _err = Color(0xFFA8321F);
 const _runs = 100;
 
 const _multicast = MethodChannel('vutric/multicast');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // iOS: the Rust library is linked into the app itself (-force_load in the Xcode project), not shipped as a framework.
-  await RustLib.init(externalLibrary: Platform.isIOS ? ExternalLibrary.process(iKnowHowToUseIt: true) : null);
+  try {
+    // iOS: the Rust library is linked into the app itself (-force_load in the Xcode project), not a framework.
+    await RustLib.init(externalLibrary: Platform.isIOS ? ExternalLibrary.process(iKnowHowToUseIt: true) : null);
+  } catch (e) {
+    // A broken build (e.g. the Rust bridge stripped by the linker) says so instead of showing a blank screen.
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: SafeArea(child: Center(child: Text('Rust kutubxonasi yuklanmadi: $e'))),
+        ),
+      ),
+    );
+    return;
+  }
   runApp(const SpikeApp());
 }
 
@@ -41,8 +48,8 @@ class SpikeApp extends StatelessWidget {
       title: 'Vutric spike',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: _cobalt, primary: _cobalt, surface: _sand),
-        scaffoldBackgroundColor: _sand,
+        colorScheme: ColorScheme.fromSeed(seedColor: cobalt, primary: cobalt, surface: sand),
+        scaffoldBackgroundColor: sand,
         useMaterial3: true,
       ),
       home: const SpikeHome(),
@@ -57,19 +64,42 @@ class SpikeHome extends StatefulWidget {
   State<SpikeHome> createState() => _SpikeHomeState();
 }
 
-class _SpikeHomeState extends State<SpikeHome> {
+class _SpikeHomeState extends State<SpikeHome> with WidgetsBindingObserver {
   final _name = TextEditingController(text: Platform.isIOS ? 'iPhone' : 'Android telefon');
   final _link = TextEditingController();
   String? _myLink;
   String _status = 'Tayyorlanmoqda…';
   bool _busy = false;
+
+  /// A measurement run is in flight (the only thing Bekor qilish can cancel on this screen).
+  bool _running = false;
   vutric.RunReport? _report;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _start();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _name.dispose();
+    _link.dispose();
+    super.dispose();
+  }
+
+  /// Android: hold the multicast lock (battery) only while the app is in front.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!Platform.isAndroid) return;
+    if (state == AppLifecycleState.resumed) {
+      _multicast.invokeMethod('acquire');
+    } else if (state == AppLifecycleState.paused) {
+      _multicast.invokeMethod('release');
+    }
   }
 
   /// The device identity lives in app-private storage and is reused, so the pairing link stays stable.
@@ -85,40 +115,65 @@ class _SpikeHomeState extends State<SpikeHome> {
     return fresh;
   }
 
+  /// Starts (or, after a rename, restarts) this device on the network.
   Future<void> _start() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+      _status = 'Tayyorlanmoqda…';
+    });
     try {
       // Android drops mDNS replies without a multicast lock; iOS has no such switch.
       if (Platform.isAndroid) await _multicast.invokeMethod('acquire');
-      final link = await vutric.start(name: _name.text.trim(), identity: await _identity());
+      final name = _name.text.trim().isEmpty ? 'Telefon' : _name.text.trim();
+      final link = await vutric.start(name: name, identity: await _identity());
+      if (!mounted) return;
       setState(() {
         _myLink = link;
-        _status = 'Tarmoqda koʻrinadi. Internet ishlatilmaydi.';
+        _status = hasMdns
+            ? 'Tarmoqda koʻrinadi. Internet ishlatilmaydi.'
+            : 'Tayyor. iPhone QR kod orqali ulanadi. Internet ishlatilmaydi.';
       });
     } catch (e) {
-      setState(() => _error = '$e');
+      if (!mounted) return;
+      setState(() {
+        _error = errorText(e);
+        _status = 'Ishga tushmadi. Nomni oʻzgartirib Enter bosing yoki ilovani qayta oching.';
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _run(String label, Future<vutric.RunReport> Function() job) async {
     setState(() {
       _busy = true;
+      _running = true;
       _status = label;
       _error = null;
       _report = null;
     });
     try {
       final r = await job();
+      if (!mounted) return;
       setState(() {
         _report = r;
         _status = 'Tayyor';
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = '$e';
-        _status = 'Xato';
+        _error = isCancelled(e) ? null : errorText(e);
+        _status = isCancelled(e) ? 'Bekor qilindi' : 'Xato';
       });
     } finally {
-      setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _running = false;
+        });
+      }
     }
   }
 
@@ -151,16 +206,16 @@ class _SpikeHomeState extends State<SpikeHome> {
     final t = Theme.of(context).textTheme;
     final ready = !_busy && _myLink != null;
     return Scaffold(
-      appBar: AppBar(backgroundColor: _sand, title: const Text('Vutric · spike 0.2')),
+      appBar: AppBar(backgroundColor: sand, title: const Text('Vutric · spike 0.2')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(_status, style: t.bodyMedium?.copyWith(color: _cobalt)),
+            Text(_status, style: t.bodyMedium?.copyWith(color: cobalt)),
             const SizedBox(height: 12),
             TextField(
               controller: _name,
-              decoration: const InputDecoration(labelText: 'Qurilma nomi', filled: true, fillColor: _paper),
+              decoration: const InputDecoration(labelText: 'Qurilma nomi', filled: true, fillColor: paper),
               onSubmitted: (_) => _start(),
             ),
             const SizedBox(height: 16),
@@ -176,13 +231,15 @@ class _SpikeHomeState extends State<SpikeHome> {
               label: const Text('Rasm qabul qilish'),
             ),
             const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: ready
-                  ? () => _run('Kompyuter qidirilmoqda (mDNS)…', () => vutric.runDiscovered(runs: _runs))
-                  : null,
-              child: const Text('Kompyuterni topish va oʻlchash'),
-            ),
-            const SizedBox(height: 8),
+            if (hasMdns) ...[
+              OutlinedButton(
+                onPressed: ready
+                    ? () => _run('Kompyuter qidirilmoqda (mDNS)…', () => vutric.runDiscovered(runs: _runs))
+                    : null,
+                child: const Text('Kompyuterni topish va oʻlchash'),
+              ),
+              const SizedBox(height: 8),
+            ],
             OutlinedButton(
               onPressed: ready ? () => _run('Ulanish kutilmoqda…', () => vutric.listen(runs: _runs)) : null,
               child: const Text('Kutish: boshqa qurilma ulansin'),
@@ -193,7 +250,7 @@ class _SpikeHomeState extends State<SpikeHome> {
               decoration: const InputDecoration(
                 labelText: 'Ulash havolasi (vutric://pair?…)',
                 filled: true,
-                fillColor: _paper,
+                fillColor: paper,
               ),
             ),
             const SizedBox(height: 8),
@@ -203,24 +260,26 @@ class _SpikeHomeState extends State<SpikeHome> {
               onPressed: ready ? () => _connectLink(_link.text) : null,
               child: const Text('Havola orqali ulanib oʻlchash'),
             ),
-            if (_busy)
+            if (_busy) ...[
               const Padding(
                 padding: EdgeInsets.all(16),
-                child: LinearProgressIndicator(color: _signal),
+                child: LinearProgressIndicator(color: signal),
               ),
+              if (_running) OutlinedButton(onPressed: vutric.disconnect, child: const Text('Bekor qilish')),
+            ],
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 16),
-                child: Text(_error!, style: t.bodyMedium?.copyWith(color: _err)),
+                child: Text(_error!, style: t.bodyMedium?.copyWith(color: err)),
               ),
             if (_report != null) _ReportCard(report: _report!),
             if (_myLink != null) ...[
               const SizedBox(height: 24),
-              Text('Bu qurilmaning QR kodi', style: t.titleSmall?.copyWith(color: _cobalt)),
+              Text('Bu qurilmaning QR kodi', style: t.titleSmall?.copyWith(color: cobalt)),
               const SizedBox(height: 8),
               Center(
                 child: Container(
-                  color: _paper,
+                  color: paper,
                   padding: const EdgeInsets.all(12),
                   child: QrImageView(data: _myLink!, size: 220),
                 ),
@@ -246,17 +305,17 @@ class _ReportCard extends StatelessWidget {
     final pass = report.sentP50Ms < 40 && report.sentP95Ms < 80;
     String ms(double v) => '${v.toStringAsFixed(1)} ms';
     return Card(
-      color: _paper,
+      color: paper,
       margin: const EdgeInsets.only(top: 16),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${report.peerName} (${report.peerPlatform})', style: t.titleMedium?.copyWith(color: _cobalt)),
+            Text('${report.peerName} (${report.peerPlatform})', style: t.titleMedium?.copyWith(color: cobalt)),
             const SizedBox(height: 8),
             Text('Tekshiruv kodi', style: t.labelMedium),
-            Text(report.checkCode, style: t.displaySmall?.copyWith(color: _cobalt, letterSpacing: 4)),
+            Text(report.checkCode, style: t.displaySmall?.copyWith(color: cobalt, letterSpacing: 4)),
             const SizedBox(height: 8),
             if (report.foundMs > 0) Text('Topildi: ${ms(report.foundMs)}'),
             if (report.connectMs > 0) Text('Ulandi: ${ms(report.connectMs)}'),
@@ -264,7 +323,7 @@ class _ReportCard extends StatelessWidget {
             Text('Telefon → ${report.peerName}, bir tomonga: p50 ${ms(report.sentP50Ms)}, p95 ${ms(report.sentP95Ms)}'),
             Text(
               pass ? 'Mezon bajarildi (p50 < 40, p95 < 80 ms)' : 'Mezondan oshdi (p50 < 40, p95 < 80 ms)',
-              style: t.bodyMedium?.copyWith(color: pass ? _ok : _err),
+              style: t.bodyMedium?.copyWith(color: pass ? ok : err),
             ),
             const SizedBox(height: 8),
             Text(

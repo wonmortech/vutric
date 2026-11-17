@@ -96,6 +96,20 @@ pub enum Message {
     },
 }
 
+impl Message {
+    /// The variant's name, for errors and logs (never the payload, which may be large or peer-chosen).
+    #[must_use]
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Hello { .. } => "Hello",
+            Self::FlingStart(_) => "FlingStart",
+            Self::EffectStarted { .. } => "EffectStarted",
+            Self::FlingComplete { .. } => "FlingComplete",
+            Self::FlingFailed { .. } => "FlingFailed",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FailReason {
     HashMismatch,

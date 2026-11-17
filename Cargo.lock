@@ -4748,6 +4748,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "blake3",
+ "image",
  "iroh",
  "iroh-mdns-address-lookup",
  "n0-future",
@@ -4760,7 +4761,6 @@ name = "vutric-net-spike"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "image",
  "qrcode",
  "tokio",
  "vutric-core",

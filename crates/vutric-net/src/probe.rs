@@ -6,13 +6,44 @@
 
 use std::time::{Duration, Instant};
 
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
+use vutric_core::message::FailReason;
 use vutric_core::{EffectId, FlingId, FlingStart, Gesture, Message, Preview, PreviewFormat};
 
 use crate::{Session, micros_since};
 
 /// Preview size the roadmap measures with.
 pub const PREVIEW_BYTES: usize = 30 * 1024;
+
+/// Longest wait for the receiver's answer to one fling. A healthy LAN answers in milliseconds; this only stops a
+/// dead or stuck peer from hanging the thrower.
+pub const ROUND_TRIP_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// File-name prefix that marks a latency probe (with an all-zero hash): receivers answer it at once and never
+/// show it.
+const PROBE_PREFIX: &str = "probe_";
+
+/// Error text when the receiver answered `FlingFailed`; the session itself is still healthy.
+pub const REFUSED: &str = "the other device refused the photo";
+
+/// The receiver answered `FlingFailed`: the photo was not shown, but the session is healthy. Find it with
+/// `err.downcast_ref::<Refused>()` (text matching could be spoofed by a peer).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Refused(pub FailReason);
+
+impl std::fmt::Display for Refused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{REFUSED} ({:?})", self.0)
+    }
+}
+
+impl std::error::Error for Refused {}
+
+/// Whether a `FlingStart` is one of this module's latency probes rather than a real photo.
+#[must_use]
+pub fn is_probe(f: &FlingStart) -> bool {
+    f.blake3 == [0; 32] && f.file_name.starts_with(PROBE_PREFIX)
+}
 
 fn fling(seq: u32) -> Message {
     let mut id = [0u8; 16];
@@ -24,7 +55,7 @@ fn fling(seq: u32) -> Message {
     );
     Message::FlingStart(FlingStart {
         id: FlingId(id),
-        file_name: format!("probe_{seq:04}.jpg"),
+        file_name: format!("{PROBE_PREFIX}{seq:04}.jpg"),
         mime: "image/jpeg".into(),
         size: PREVIEW_BYTES as u64,
         blake3: [0; 32],
@@ -51,8 +82,8 @@ pub async fn send_one(session: &mut Session, seq: u32) -> Result<Duration> {
     round_trip(session, &fling(seq)).await
 }
 
-/// A real photo fling, as a phone sends it: a JPEG preview (longest side <= 512 px) and the throw. The receiver
-/// plays the effect with the preview and answers `EffectStarted` once its first frame is on screen.
+/// A real photo fling, as a phone sends it: a JPEG preview (see [`crate::preview::encode`]) and the throw. The
+/// receiver plays the effect with the preview and answers `EffectStarted` once its first frame is on screen.
 #[must_use]
 pub fn photo(file_name: &str, jpeg: Vec<u8>, width: u16, height: u16, gesture: Gesture) -> Message {
     Message::FlingStart(FlingStart {
@@ -72,7 +103,8 @@ pub fn photo(file_name: &str, jpeg: Vec<u8>, width: u16, height: u16, gesture: G
     })
 }
 
-/// Sends a `FlingStart` and waits for its `EffectStarted`; returns the round trip.
+/// Sends a `FlingStart` and waits for its `EffectStarted`; returns the round trip. Gives up after
+/// [`ROUND_TRIP_TIMEOUT`]; the session should then be dropped, since a late answer may still arrive on it.
 pub async fn round_trip(session: &mut Session, msg: &Message) -> Result<Duration> {
     let Message::FlingStart(start) = msg else {
         bail!("round_trip takes a FlingStart");
@@ -80,13 +112,22 @@ pub async fn round_trip(session: &mut Session, msg: &Message) -> Result<Duration
     let id = start.id;
     let t0 = Instant::now();
     session.send(msg).await?;
-    loop {
-        match session.recv().await? {
-            Message::EffectStarted { id: got, .. } if got == id => return Ok(t0.elapsed()),
-            Message::EffectStarted { .. } => {} // a late answer to an earlier fling
-            other => bail!("expected EffectStarted, got {other:?}"),
+    tokio::time::timeout(ROUND_TRIP_TIMEOUT, async {
+        // Answers to earlier flings may still be on their way (a timed-out one, say); skip a few, not forever.
+        for _ in 0..8 {
+            match session.recv().await? {
+                Message::EffectStarted { id: got, .. } if got == id => return Ok(t0.elapsed()),
+                Message::FlingFailed { id: got, reason } if got == id => {
+                    return Err(Refused(reason).into());
+                }
+                Message::EffectStarted { .. } | Message::FlingFailed { .. } => {}
+                other => bail!("expected EffectStarted, got {}", other.kind()),
+            }
         }
-    }
+        bail!("too many answers to other flings")
+    })
+    .await
+    .map_err(|_| anyhow!("no answer within {ROUND_TRIP_TIMEOUT:?}"))?
 }
 
 /// Answers one incoming probe; returns the preview size that arrived.
@@ -102,7 +143,7 @@ pub async fn answer_one(session: &mut Session, clock: Instant) -> Result<usize> 
                 .await?;
             Ok(len)
         }
-        other => bail!("expected FlingStart, got {other:?}"),
+        other => bail!("expected FlingStart, got {}", other.kind()),
     }
 }
 

@@ -1,7 +1,7 @@
 // The other direction: this phone catches photos thrown by a computer or another phone. The thrower either scans
 // this phone's QR code (we wait), or this phone scans the computer's QR code (`vutric-net-spike fling --photo
 // PATH`). Each photo flies in from the top edge, the way it left the thrower, and the thrower's round trip
-// closes once its first frame is on this screen.
+// closes only once the decoded photo is drawn on this screen.
 
 import 'dart:math' as math;
 
@@ -11,12 +11,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'src/rust/api.dart' as vutric;
-
-const _cobalt = Color(0xFF062B8A);
-const _signal = Color(0xFF2F6BFF);
-const _sand = Color(0xFFE6DBC7);
-const _paper = Color(0xFFF7F2E9);
-const _err = Color(0xFFA8321F);
+import 'ui.dart';
 
 class CatchPage extends StatefulWidget {
   const CatchPage({super.key, required this.scan, required this.myLink});
@@ -34,11 +29,11 @@ class CatchPage extends StatefulWidget {
 class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMixin {
   vutric.Connected? _peer;
   vutric.Caught? _photo;
+  MemoryImage? _image;
   String? _status;
   String? _error;
   bool _waiting = false;
-  bool _accepting = false;
-  bool _open = true;
+  bool _showQr = false;
   int _count = 0;
   double? _lastMs;
 
@@ -46,16 +41,15 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
 
   @override
   void dispose() {
-    _open = false;
     _land.dispose();
-    vutric.disconnect();
+    vutric.disconnect(); // cancels a wait for a device or for the next photo
     super.dispose();
   }
 
-  Future<void> _start(String label, Future<vutric.Connected> Function() job, {bool accepting = false}) async {
+  Future<void> _start(String label, Future<vutric.Connected> Function() job, {bool showQr = false}) async {
     setState(() {
       _waiting = true;
-      _accepting = accepting;
+      _showQr = showQr;
       _status = label;
       _error = null;
     });
@@ -68,15 +62,24 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
       });
       _catchLoop();
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (!mounted || isCancelled(e)) return;
+      setState(() {
+        _error = errorText(e);
+        _status = null;
+      });
     } finally {
       if (mounted) {
         setState(() {
           _waiting = false;
-          _accepting = false;
+          _showQr = false;
         });
       }
     }
+  }
+
+  Future<void> _cancel() async {
+    await vutric.disconnect();
+    if (mounted) setState(() => _status = null);
   }
 
   Future<void> _scanAndConnect() async {
@@ -85,38 +88,59 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
     await _start('Ulanmoqda…', () => vutric.connectLink(link: link));
   }
 
-  /// One photo at a time: show it, wait for the frame that draws it, then tell the thrower.
+  void _lost(Object e) {
+    if (!mounted || isCancelled(e)) return;
+    setState(() {
+      _error = 'Aloqa uzildi: ${errorText(e)}';
+      _peer = null;
+      _status = null;
+    });
+  }
+
+  /// One photo at a time: decode it, put it on screen, wait for the frame that draws it, then tell the thrower.
   Future<void> _catchLoop() async {
-    while (_open && mounted) {
+    while (mounted && _peer != null) {
       final vutric.Caught p;
       try {
         p = await vutric.nextFling();
       } catch (e) {
-        if (mounted) {
-          setState(() {
-            _error = 'Aloqa uzildi: $e';
-            _peer = null;
-            _status = null;
-          });
-        }
+        _lost(e);
         return;
       }
       if (!mounted) return;
       final clock = Stopwatch()..start();
+      final image = MemoryImage(p.jpeg);
+      // Decode before showing, so the frame we report really contains the photo. precacheImage reports a decode
+      // failure through onError (it does not throw).
+      var decoded = true;
+      await precacheImage(image, context, onError: (_, _) => decoded = false);
+      if (!mounted) return;
+      if (!decoded) {
+        // Rust accepted the JPEG but Flutter cannot draw it: tell the thrower now instead of letting it time out.
+        try {
+          await vutric.refuse(id: p.id);
+        } catch (e) {
+          _lost(e);
+          return;
+        }
+        continue;
+      }
       HapticFeedback.lightImpact();
       setState(() {
         _photo = p;
+        _image = image;
         _count++;
         _status = null;
       });
       _land.forward(from: 0);
       await SchedulerBinding.instance.endOfFrame;
       clock.stop();
-      if (mounted) setState(() => _lastMs = clock.elapsedMicroseconds / 1000);
+      if (!mounted) return;
+      setState(() => _lastMs = clock.elapsedMicroseconds / 1000);
       try {
         await vutric.shown(id: p.id);
       } catch (e) {
-        if (mounted) setState(() => _error = '$e');
+        _lost(e);
         return;
       }
     }
@@ -127,64 +151,63 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
     final t = Theme.of(context).textTheme;
     final peer = _peer;
     return Scaffold(
-      appBar: AppBar(backgroundColor: _sand, title: const Text('Rasm qabul qilish')),
+      appBar: AppBar(backgroundColor: sand, title: const Text('Rasm qabul qilish')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (peer == null) ...[
-                FilledButton(
-                  onPressed: _waiting ? null : _scanAndConnect,
-                  child: const Text('Kompyuter QR kodini skanerlash'),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: _waiting
-                      ? null
-                      : () => _start('Ulanish kutilmoqda…', vutric.acceptSession, accepting: true),
-                  child: const Text('Kutish: QR kodimni skanerlashsin'),
-                ),
-              ] else
+              if (peer != null)
                 Container(
-                  color: _paper,
+                  color: paper,
                   padding: const EdgeInsets.all(12),
                   child: Row(
                     children: [
-                      const Icon(Icons.south, color: _signal),
+                      const Icon(Icons.south, color: signal),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           '${peer.peerName} (${peer.peerPlatform})',
-                          style: t.titleSmall?.copyWith(color: _cobalt),
+                          style: t.titleSmall?.copyWith(color: cobalt),
                         ),
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text('tekshiruv kodi', style: t.labelSmall),
-                          Text(peer.checkCode, style: t.titleMedium?.copyWith(color: _cobalt, letterSpacing: 2)),
+                          Text(peer.checkCode, style: t.titleMedium?.copyWith(color: cobalt, letterSpacing: 2)),
                         ],
                       ),
                     ],
                   ),
+                )
+              else if (_waiting)
+                OutlinedButton(onPressed: _cancel, child: const Text('Bekor qilish'))
+              else ...[
+                FilledButton(onPressed: _scanAndConnect, child: const Text('Kompyuter QR kodini skanerlash')),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: () => _start('Ulanish kutilmoqda…', vutric.acceptSession, showQr: true),
+                  child: const Text('Kutish: QR kodimni skanerlashsin'),
                 ),
+              ],
               if (_status != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: Text(_status!, style: t.bodyMedium?.copyWith(color: _cobalt)),
+                  child: Text(_status!, style: t.bodyMedium?.copyWith(color: cobalt)),
                 ),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: Text(_error!, style: t.bodyMedium?.copyWith(color: _err)),
+                  child: Text(_error!, style: t.bodyMedium?.copyWith(color: err)),
                 ),
               const SizedBox(height: 12),
               Expanded(child: LayoutBuilder(builder: (context, box) => _stage(context, box.biggest))),
               if (_count > 0)
                 Text(
-                  '$_count ta rasm keldi · oxirgisi ekranga ${_lastMs?.toStringAsFixed(1) ?? '–'} ms da chiqdi',
+                  '$_count ta rasm keldi · oxirgisi kelgandan ekranda koʻringuncha '
+                  '${_lastMs?.toStringAsFixed(1) ?? '–'} ms',
                   style: t.bodySmall,
                 ),
             ],
@@ -196,12 +219,13 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
 
   Widget _stage(BuildContext context, Size area) {
     final p = _photo;
-    if (p == null) {
-      if (_accepting) {
+    final image = _image;
+    if (p == null || image == null) {
+      if (_showQr) {
         // Waiting to be found: the QR code the thrower scans.
         return Center(
           child: Container(
-            color: _paper,
+            color: paper,
             padding: const EdgeInsets.all(12),
             child: QrImageView(data: widget.myLink, size: math.min(area.width, area.height) * 0.7),
           ),
@@ -209,7 +233,9 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
       }
       return Center(
         child: Text(
-          'Kompyuterda: vutric-net-spike fling --photo RASM.jpg\nso‘ng uning QR kodini skanerlang',
+          _peer == null
+              ? 'Kompyuterda: vutric-net-spike fling --photo RASM.jpg\nsoʻng uning QR kodini skanerlang'
+              : 'Rasm kutilmoqda…',
           style: Theme.of(context).textTheme.bodyMedium,
           textAlign: TextAlign.center,
         ),
@@ -225,14 +251,12 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
       animation: _land,
       builder: (context, child) {
         final k = Curves.easeOutBack.transform(_land.value);
-        final dx = fromX * (1 - k);
-        final dy = -(area.height / 2 + h) * (1 - k);
         final tilt = p.angle.clamp(-0.6, 0.6) * (1 - k);
         return Stack(
           children: [
             Positioned(
-              left: (area.width - w) / 2 + dx,
-              top: (area.height - h) / 2 + dy,
+              left: (area.width - w) / 2 + fromX * (1 - k),
+              top: (area.height - h) / 2 - (area.height / 2 + h) * (1 - k),
               width: w,
               height: h,
               child: Transform.rotate(angle: tilt, child: child),
@@ -242,12 +266,17 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
       },
       child: Container(
         decoration: BoxDecoration(
-          color: _paper,
+          color: paper,
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [BoxShadow(color: Color(0x33062B8A), blurRadius: 24, offset: Offset(0, 8))],
         ),
         clipBehavior: Clip.antiAlias,
-        child: Image.memory(p.jpeg, fit: BoxFit.cover, gaplessPlayback: true),
+        child: Image(
+          image: image,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          semanticLabel: 'Qabul qilingan rasm ${p.fileName}',
+        ),
       ),
     );
   }

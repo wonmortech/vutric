@@ -7,32 +7,47 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `as_initiator`, `keep`, `ms`, `peer_slot`, `peer`, `receiver_clock`, `report`, `runtime`, `sent_of`, `session_slot`
+// These functions are ignored because they are not marked as `pub`: `as_initiator`, `bump`, `cancellable`, `drop_session`, `epoch`, `forget_on_error`, `keep`, `ms`, `now_epoch`, `open`, `peer_slot`, `peer`, `receiver_clock`, `report`, `retire`, `runtime`, `sent_of`, `session_slot`, `session`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Sent`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// 32 random bytes to keep forever as this device's identity.
 Future<Uint8List> newIdentity() => RustLib.instance.api.crateApiNewIdentity();
 
-/// Starts (or restarts) this device's LAN-only peer; returns its pairing link for the QR code.
+/// Starts (or restarts, e.g. after a rename) this device's LAN-only peer; returns its pairing link for the QR
+/// code. Cancels whatever was running and closes the open session.
 Future<String> start({required String name, required List<int> identity}) =>
     RustLib.instance.api.crateApiStart(name: name, identity: identity);
 
-/// Finds a peer over mDNS, then measures both directions.
+/// Finds a peer over mDNS, then measures both directions. Cancelled by [`disconnect`].
 Future<RunReport> runDiscovered({required int runs}) =>
     RustLib.instance.api.crateApiRunDiscovered(runs: runs);
 
-/// Connects with a pairing link (scanned or pasted), then measures both directions.
+/// Connects with a pairing link (scanned or pasted), then measures both directions. Cancelled by [`disconnect`].
 Future<RunReport> runLink({required String link, required int runs}) =>
     RustLib.instance.api.crateApiRunLink(link: link, runs: runs);
 
-/// Opens the fling session with a pairing link (scanned or pasted).
+/// Waits for a peer to connect (desktop: `vutric-net-spike send --discover`), answers its probes, then
+/// measures this phone → that peer. Cancelled by [`disconnect`].
+Future<RunReport> listen({required int runs}) =>
+    RustLib.instance.api.crateApiListen(runs: runs);
+
+/// Opens the session with a pairing link (scanned or pasted). Cancelled by [`disconnect`].
 Future<Connected> connectLink({required String link}) =>
     RustLib.instance.api.crateApiConnectLink(link: link);
 
-/// Opens the fling session with the first device found over mDNS.
+/// Opens the session with the first device found over mDNS (not on iPhone: no multicast there). Cancelled by
+/// [`disconnect`].
 Future<Connected> connectDiscovered() =>
     RustLib.instance.api.crateApiConnectDiscovered();
+
+/// Waits for another device to connect to this phone (it scanned our QR code) and keeps that session.
+/// Cancelled by [`disconnect`].
+Future<Connected> acceptSession() =>
+    RustLib.instance.api.crateApiAcceptSession();
+
+/// Closes the open session and cancels every call still waiting (on it or on opening one). Returns at once.
+Future<void> disconnect() => RustLib.instance.api.crateApiDisconnect();
 
 /// Any picked image (JPEG, PNG or WebP) → the preview the receiver plays.
 Future<Photo> preparePhoto({
@@ -42,7 +57,8 @@ Future<Photo> preparePhoto({
     RustLib.instance.api.crateApiPreparePhoto(fileName: fileName, bytes: bytes);
 
 /// Throws the photo; returns milliseconds from the call until the receiver reported its first frame on screen
-/// (there and back, so an upper bound of "release → first frame").
+/// (there and back, so an upper bound of "release → first frame"). Fails after
+/// [`probe::ROUND_TRIP_TIMEOUT`] without an answer, and then the session is closed.
 Future<double> fling({
   required Photo photo,
   required double speed,
@@ -55,28 +71,21 @@ Future<double> fling({
   exitX: exitX,
 );
 
-/// Closes the fling session.
-Future<void> disconnect() => RustLib.instance.api.crateApiDisconnect();
-
-/// Waits for another device to connect to this phone (it scanned our QR code, or found us over mDNS) and keeps
-/// that session for [`next_fling`].
-Future<Connected> acceptSession() =>
-    RustLib.instance.api.crateApiAcceptSession();
-
 /// Waits for the next photo on the open session (either side may have opened it). Latency probes are answered
-/// here and skipped, so the measurement buttons of another device keep working.
+/// here and never shown; a fling whose preview is not a sane JPEG is refused (`FlingFailed`), so its thrower
+/// learns at once. Cancelled by [`disconnect`].
 Future<Caught> nextFling() => RustLib.instance.api.crateApiNextFling();
+
+/// Tells the thrower this phone could not show the photo after all (its round trip ends with a refusal, at
+/// once, instead of a timeout).
+Future<void> refuse({required List<int> id}) =>
+    RustLib.instance.api.crateApiRefuse(id: id);
 
 /// Tells the thrower that the photo's first frame is on this screen (closes its round trip).
 Future<void> shown({required List<int> id}) =>
     RustLib.instance.api.crateApiShown(id: id);
 
-/// Waits for a peer to connect (desktop: `vutric-net-spike send --discover`), answers its probes, then
-/// measures this phone → that peer.
-Future<RunReport> listen({required int runs}) =>
-    RustLib.instance.api.crateApiListen(runs: runs);
-
-/// A photo thrown at this phone.
+/// A photo thrown at this phone; its preview has been checked (a real JPEG, preview-sized, as announced).
 class Caught {
   /// Pass back to [`shown`] once the photo is on screen.
   final Uint8List id;
@@ -125,7 +134,7 @@ class Caught {
           exitX == other.exitX;
 }
 
-/// The device a fling goes to, shown with the pairing check before the first throw.
+/// The device a fling goes to (or comes from), shown with the pairing check.
 class Connected {
   final String peerName;
   final String peerPlatform;
@@ -157,8 +166,8 @@ class Connected {
           connectMs == other.connectMs;
 }
 
-/// A photo ready to throw: JPEG, longest side at most 512 px. Prepared when picked, so the throw itself only
-/// sends bytes.
+/// A photo ready to throw: an upright JPEG, longest side at most 512 px, small enough for one frame. Prepared
+/// when picked, so the throw itself only sends bytes.
 class Photo {
   final String fileName;
   final Uint8List jpeg;

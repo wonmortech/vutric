@@ -21,8 +21,8 @@ use anyhow::{Context as _, Result, bail};
 use qrcode::QrCode;
 use qrcode::render::unicode::Dense1x2;
 use vutric_core::{Gesture, PairingTicket, Platform};
-use vutric_net::probe;
 use vutric_net::{Peer, Session};
+use vutric_net::{preview, probe};
 
 struct Args {
     mode: String,
@@ -103,8 +103,7 @@ async fn listen(peer: &Peer, a: &Args) -> Result<()> {
     if let Some(path) = &a.photo {
         // The phone scanned our QR code and waits on its catch screen: throw at it over this session.
         fling_photo(&mut s, path, a.count).await?;
-        tokio::time::sleep(Duration::from_millis(200)).await;
-        s.close();
+        s.finish().await;
         return Ok(());
     }
     probe::answer_run(&mut s, a.runs).await?;
@@ -152,8 +151,7 @@ async fn send(peer: &Peer, a: &Args) -> Result<()> {
     );
     if let Some(path) = &a.photo {
         fling_photo(&mut s, path, a.count).await?;
-        tokio::time::sleep(Duration::from_millis(200)).await;
-        s.close();
+        s.finish().await;
         return Ok(());
     }
     let label = format!("{} -> {}", a.name, s.remote_name);
@@ -164,24 +162,22 @@ async fn send(peer: &Peer, a: &Args) -> Result<()> {
         probe::WARMUP + a.runs,
         s.remote_name
     );
-    // Give the last answer time to leave before the connection closes.
-    tokio::time::sleep(Duration::from_millis(200)).await;
-    s.close();
+    // Our last act was an answer: close only once the peer has it.
+    s.finish().await;
     Ok(())
 }
 
-/// Flings a photo like the phone does: a JPEG preview, longest side 512 px.
+/// Flings a photo like the phone does (the same preview, see `vutric_net::preview`).
 async fn fling_photo(s: &mut Session, path: &Path, count: u32) -> Result<()> {
-    let img = image::open(path)
-        .with_context(|| format!("open {}", path.display()))?
-        .thumbnail(512, 512)
-        .to_rgb8();
-    let mut jpeg = Vec::new();
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 80).encode_image(&img)?;
+    let bytes = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
+    let preview::Encoded {
+        jpeg,
+        width: w,
+        height: h,
+    } = preview::encode(&bytes)?;
     let name = path
         .file_name()
         .map_or_else(|| "photo.jpg".into(), |n| n.to_string_lossy().into_owned());
-    let (w, h) = (u16::try_from(img.width())?, u16::try_from(img.height())?);
     for i in 0..count {
         let gesture = Gesture {
             speed: 2400.0,

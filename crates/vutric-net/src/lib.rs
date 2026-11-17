@@ -5,9 +5,15 @@
 //!   of a [`PairingTicket`].
 //! - [`Session`] is one control stream to one peer: `Hello` both ways, then framed [`Message`]s in either
 //!   direction. "Sender" and "receiver" are per transfer, never per platform.
-//! - [`Session::check_code`] is the pairing check shown on both screens. It is derived from this connection's TLS
-//!   keying material, so an attacker in the middle would make the two screens disagree.
+//! - [`Session::check_code`] is the pairing check shown on both screens, derived from this connection's TLS
+//!   keying material. It catches a passive mix-up (wrong device), but six digits without a commitment can be
+//!   ground by an active attacker who answers mDNS; only QR/link pairing (which pins the peer's key) is strong.
+//!   Phase 1 adds a trust store of paired keys and commit-then-reveal numeric comparison (see the 0.2 report).
+//!
+//! Every network wait is bounded ([`HANDSHAKE_TIMEOUT`], [`probe::ROUND_TRIP_TIMEOUT`]), so a silent peer can
+//! stall a caller for seconds, never forever.
 
+pub mod preview;
 pub mod probe;
 
 use std::net::{IpAddr, SocketAddr};
@@ -24,6 +30,12 @@ use vutric_core::{ALPN, EndpointId, Message, PROTOCOL_VERSION, PairingTicket, Pl
 
 /// mDNS service name; becomes `_vutric._udp.local.` on the wire (also what iOS will browse with `NWBrowser`).
 pub const MDNS_SERVICE: &str = "vutric";
+
+/// Longest wait for QUIC, the control stream and `Hello` when a session opens, either direction.
+pub const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(8);
+
+/// How long a closing side waits for the peer to take its last bytes before it closes anyway.
+const LINGER: Duration = Duration::from_secs(2);
 
 /// A device on the local network that can both send and receive.
 #[derive(Debug, Clone)]
@@ -95,6 +107,10 @@ impl Peer {
             .ip_addrs()
             .copied()
             .filter(|a| is_lan(a.ip()))
+            // A link-local IPv6 address carries this machine's interface index, meaningless on the other device.
+            .filter(
+                |a| !matches!(a, SocketAddr::V6(v6) if v6.ip().segments()[0] & 0xffc0 == 0xfe80),
+            )
             .collect();
         addrs.sort_by_key(|a| (a.is_ipv6(), *a));
         addrs.dedup();
@@ -146,25 +162,42 @@ impl Peer {
         for a in addrs {
             target = target.with_ip_addr(*a);
         }
-        let conn = self
-            .endpoint
-            .connect(target, ALPN)
-            .await
-            .context("connect")?;
-        let (send, recv) = conn.open_bi().await.context("open control stream")?;
-        Session::handshake(conn, send, recv, &self.name, self.platform).await
+        tokio::time::timeout(HANDSHAKE_TIMEOUT, async {
+            let conn = self
+                .endpoint
+                .connect(target, ALPN)
+                .await
+                .context("connect")?;
+            let (send, recv) = conn.open_bi().await.context("open control stream")?;
+            Session::handshake(conn, send, recv, &self.name, self.platform).await
+        })
+        .await
+        .map_err(|_| anyhow!("no answer from the device within {HANDSHAKE_TIMEOUT:?}"))?
     }
 
-    /// Waits for the next peer to connect to us.
+    /// Waits for the next peer to connect to us. A connection that fails or stalls its handshake is logged and
+    /// skipped (bounded by [`HANDSHAKE_TIMEOUT`]), so one bad client cannot stop the listener.
     pub async fn accept(&self) -> Result<Session> {
-        let incoming = self
-            .endpoint
-            .accept()
-            .await
-            .ok_or_else(|| anyhow!("endpoint closed"))?;
-        let conn = incoming.await.context("incoming connection")?;
-        let (send, recv) = conn.accept_bi().await.context("accept control stream")?;
-        Session::handshake(conn, send, recv, &self.name, self.platform).await
+        loop {
+            let incoming = self
+                .endpoint
+                .accept()
+                .await
+                .ok_or_else(|| anyhow!("endpoint closed"))?;
+            let opened = tokio::time::timeout(HANDSHAKE_TIMEOUT, async {
+                let conn = incoming.await.context("incoming connection")?;
+                let (send, recv) = conn.accept_bi().await.context("accept control stream")?;
+                Session::handshake(conn, send, recv, &self.name, self.platform).await
+            })
+            .await;
+            match opened {
+                Ok(Ok(s)) => return Ok(s),
+                Ok(Err(e)) => eprintln!("vutric-net: incoming connection dropped: {e:#}"),
+                Err(_) => {
+                    eprintln!("vutric-net: incoming connection stalled its handshake, dropped");
+                }
+            }
+        }
     }
 
     pub async fn close(&self) {
@@ -213,11 +246,11 @@ impl Session {
                     protocol == PROTOCOL_VERSION,
                     "peer speaks protocol {protocol}, we speak {PROTOCOL_VERSION}"
                 );
-                s.remote_name = device_name;
+                s.remote_name = display_name(&device_name);
                 s.remote_platform = platform;
                 Ok(s)
             }
-            other => bail!("expected Hello, got {other:?}"),
+            other => bail!("expected Hello, got {}", other.kind()),
         }
     }
 
@@ -226,7 +259,10 @@ impl Session {
         EndpointId(*self.conn.remote_id().as_bytes())
     }
 
+    /// Sends one message. It is validated first, so an oversized preview fails here, on the sender, instead of
+    /// killing the session on the receiver.
     pub async fn send(&mut self, msg: &Message) -> Result<()> {
+        msg.validate()?;
         let bytes = frame::encode(msg)?;
         self.send.write_all(&bytes).await.context("write frame")?;
         Ok(())
@@ -256,8 +292,36 @@ impl Session {
         Ok(format!("{:06}", u64::from_le_bytes(out) % 1_000_000))
     }
 
+    /// Closes at once. Bytes still in flight may be lost; after a final send use [`Session::finish`].
     pub fn close(&self) {
         self.conn.close(0u32.into(), b"bye");
+    }
+
+    /// Closes after the peer has taken everything we sent (or after a short linger), so a last answer is not
+    /// dropped by the close.
+    pub async fn finish(&mut self) {
+        if self.send.finish().is_ok() {
+            let _ = tokio::time::timeout(LINGER, self.send.stopped()).await;
+        }
+        self.close();
+    }
+}
+
+/// A peer-supplied device name made safe to print and show: no control characters, at most 64 bytes.
+fn display_name(raw: &str) -> String {
+    // Control characters and bidi overrides (a name must not reorder the text shown around it).
+    let clean: String = raw
+        .chars()
+        .filter(|c| {
+            !c.is_control()
+                && !matches!(c, '\u{200E}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')
+        })
+        .collect();
+    let clean = clip(clean.trim(), 64);
+    if clean.is_empty() {
+        "unnamed device".into()
+    } else {
+        clean
     }
 }
 
@@ -277,14 +341,36 @@ pub fn identity_file(file: &str) -> Result<[u8; 32]> {
         .context("no data directory")?
         .join("vutric");
     let path = dir.join(file);
-    if let Ok(bytes) = std::fs::read(&path)
-        && let Ok(key) = <[u8; 32]>::try_from(bytes.as_slice())
-    {
-        return Ok(key);
+    match std::fs::read(&path) {
+        Ok(bytes) => {
+            // Never silently replace an existing identity: that would break every pairing made with it.
+            return <[u8; 32]>::try_from(bytes.as_slice()).map_err(|_| {
+                anyhow!(
+                    "{} is not a 32-byte identity; move it away to create a new one",
+                    path.display()
+                )
+            });
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e).with_context(|| format!("read {}", path.display())),
     }
     std::fs::create_dir_all(&dir)?;
     let key = new_identity();
-    std::fs::write(&path, key)?;
+    // Owner-only, written beside and renamed into place so a crash never leaves half a key.
+    let tmp = dir.join(format!("{file}.tmp"));
+    {
+        use std::io::Write as _;
+        let mut opts = std::fs::OpenOptions::new();
+        opts.write(true).create(true).truncate(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+        let mut f = opts
+            .open(&tmp)
+            .with_context(|| format!("create {}", tmp.display()))?;
+        f.write_all(&key)?;
+        f.sync_all()?;
+    }
+    std::fs::rename(&tmp, &path)?;
     Ok(key)
 }
 
@@ -305,7 +391,11 @@ pub fn micros_since(start: Instant) -> u64 {
 fn is_lan(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => v4.is_private() || v4.is_link_local(),
-        IpAddr::V6(v6) => !v6.is_loopback() && !v6.is_multicast() && !v6.is_unspecified(),
+        // Unique local (fc00::/7) and link local (fe80::/10) only: a global address would leave the LAN.
+        IpAddr::V6(v6) => {
+            let first = v6.segments()[0];
+            (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
+        }
     }
 }
 

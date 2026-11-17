@@ -2,17 +2,19 @@
 //! with it, and `EffectStarted` goes back only after that effect's first frame was presented. The phone's round
 //! trip is therefore an upper bound of "finger released → first frame on the desktop".
 //!
-//! Previews that are not a decodable image (the 0.2 latency probes) are answered at once, without the overlay,
-//! so the phone app's measurement buttons keep working against this listener.
+//! The 0.2 latency probes are answered at once, without the overlay, so the phone app's measurement buttons keep
+//! working against this listener. A preview that is not a sane JPEG (checked with hard size limits, off the
+//! network threads) is refused with `FlingFailed`, and the session stays up.
 
 use std::time::{Duration, Instant};
 
-use anyhow::{Context as _, Result, anyhow};
+use anyhow::{Result, anyhow};
 use qrcode::QrCode;
 use qrcode::render::unicode::Dense1x2;
 use tokio::sync::oneshot;
-use vutric_core::{Gesture, Message, Platform};
-use vutric_net::{Peer, Session};
+use vutric_core::message::FailReason;
+use vutric_core::{FlingId, Gesture, Message, Platform};
+use vutric_net::{Peer, Session, preview, probe};
 use winit::event_loop::EventLoopProxy;
 
 /// A fling handed from the network thread to the overlay thread.
@@ -57,16 +59,17 @@ async fn serve(name: &str, proxy: EventLoopProxy<Incoming>) -> Result<()> {
     loop {
         let s = match peer.accept().await {
             Ok(s) => s,
+            // accept() itself only fails once the endpoint is closed (bad clients are skipped inside it).
             Err(e) => {
-                eprintln!("connection refused: {e:#}");
-                continue;
+                return Err(e);
             }
         };
+        let check = s
+            .check_code()
+            .unwrap_or_else(|e| format!("unavailable ({e})"));
         println!(
-            "connected: {} ({:?}), pairing check {}",
-            s.remote_name,
-            s.remote_platform,
-            s.check_code()?
+            "connected: {} ({:?}), pairing check {check}",
+            s.remote_name, s.remote_platform
         );
         let proxy = proxy.clone();
         tokio::spawn(async move {
@@ -77,6 +80,10 @@ async fn serve(name: &str, proxy: EventLoopProxy<Incoming>) -> Result<()> {
     }
 }
 
+async fn refuse(s: &mut Session, id: FlingId, reason: FailReason) -> Result<()> {
+    s.send(&Message::FlingFailed { id, reason }).await
+}
+
 async fn session(mut s: Session, proxy: EventLoopProxy<Incoming>) -> Result<()> {
     let clock = Instant::now();
     loop {
@@ -85,45 +92,73 @@ async fn session(mut s: Session, proxy: EventLoopProxy<Incoming>) -> Result<()> 
         let Message::FlingStart(f) = msg else {
             continue;
         };
-        let decoded = f
-            .preview
-            .as_ref()
-            .and_then(|p| image::load_from_memory(&p.bytes).ok());
-        let Some(img) = decoded else {
-            // A latency probe, not a photo: answer at once.
+        if probe::is_probe(&f) {
             s.send(&Message::EffectStarted {
                 id: f.id,
                 receiver_micros: vutric_net::micros_since(clock),
             })
             .await?;
             continue;
+        }
+        let Some(p) = f.preview else {
+            refuse(&mut s, f.id, FailReason::Rejected).await?;
+            continue;
+        };
+        let kb = p.bytes.len() / 1024;
+        // Decoding is CPU work on untrusted bytes: bounded by preview::decode, and kept off the network threads.
+        let decoded = tokio::task::spawn_blocking(move || {
+            preview::decode(&p.bytes, (p.width, p.height)).map(|img| {
+                image::DynamicImage::ImageRgba8(img)
+                    .thumbnail(1024, 1024)
+                    .to_rgba8()
+            })
+        })
+        .await?;
+        let img = match decoded {
+            Ok(img) => img,
+            Err(e) => {
+                println!("{}: refused: {e:#}", s.remote_name);
+                refuse(&mut s, f.id, FailReason::Rejected).await?;
+                continue;
+            }
         };
         let decode = arrived.elapsed();
         let (tx, rx) = oneshot::channel();
         proxy
             .send_event(Incoming {
-                image: img.thumbnail(1024, 1024).to_rgba8(),
+                image: img,
                 gesture: f.gesture,
                 arrived,
                 first_frame: tx,
             })
             .map_err(|_| anyhow!("overlay closed"))?;
-        let shown = tokio::time::timeout(Duration::from_secs(2), rx)
-            .await
-            .context("overlay did not draw within 2 s")?
-            .context("overlay dropped the fling")?;
+        let shown = match tokio::time::timeout(Duration::from_secs(2), rx).await {
+            Ok(Ok(shown)) => shown,
+            // Another fling took the screen before this one drew, or the GPU never came up: say so, keep going.
+            Ok(Err(_)) => {
+                refuse(&mut s, f.id, FailReason::Cancelled).await?;
+                continue;
+            }
+            Err(_) => {
+                println!("{}: overlay did not draw within 2 s", s.remote_name);
+                refuse(&mut s, f.id, FailReason::Cancelled).await?;
+                continue;
+            }
+        };
         s.send(&Message::EffectStarted {
             id: f.id,
             receiver_micros: vutric_net::micros_since(clock),
         })
         .await?;
         println!(
-            "{} from {}: arrived -> first frame {:.1} ms (decode {:.1} ms), {} KB preview",
-            f.file_name,
+            "{} from {}: arrived -> first frame {:.1} ms (decode {:.1} ms), {kb} KB preview",
+            f.file_name
+                .chars()
+                .filter(|c| !c.is_control())
+                .collect::<String>(),
             s.remote_name,
             (shown - arrived).as_secs_f64() * 1000.0,
             decode.as_secs_f64() * 1000.0,
-            f.preview.map_or(0, |p| p.bytes.len()) / 1024
         );
     }
 }
