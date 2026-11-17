@@ -60,7 +60,7 @@ class _FlingPageState extends State<FlingPage> with SingleTickerProviderStateMix
   void dispose() {
     _curve?.dispose();
     _move.dispose();
-    vutric.disconnect(); // also cancels a connect or a throw still waiting
+    disconnectNow(); // also cancels a connect or a throw still waiting
     super.dispose();
   }
 
@@ -86,7 +86,7 @@ class _FlingPageState extends State<FlingPage> with SingleTickerProviderStateMix
       _error = null;
     });
     try {
-      final c = await job();
+      final c = await afterDisconnect(job);
       if (!mounted) return;
       setState(() => _peer = c);
     } catch (e) {
@@ -202,7 +202,7 @@ class _FlingPageState extends State<FlingPage> with SingleTickerProviderStateMix
                 const SizedBox(height: 8),
                 const LinearProgressIndicator(color: signal),
                 const SizedBox(height: 8),
-                OutlinedButton(onPressed: vutric.disconnect, child: const Text('Bekor qilish')),
+                OutlinedButton(onPressed: disconnectNow, child: const Text('Bekor qilish')),
               ] else ...[
                 Text(
                   'Qabul qiluvchi: kompyuterda `vutric-overlay-spike --listen` yoki boshqa telefonda '

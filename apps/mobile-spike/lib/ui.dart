@@ -4,6 +4,20 @@ import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 
+import 'src/rust/api.dart' as vutric;
+
+Future<void> _lastDisconnect = Future.value();
+
+/// Closes the session and cancels every waiting call. A screen's dispose cannot await it, so calls started
+/// through [afterDisconnect] wait for it instead: a page closing can never cancel the next page's connect.
+Future<void> disconnectNow() => _lastDisconnect = vutric.disconnect().catchError((Object _) {});
+
+/// Runs [job] once the latest [disconnectNow] has finished.
+Future<T> afterDisconnect<T>(Future<T> Function() job) async {
+  await _lastDisconnect;
+  return job();
+}
+
 const cobalt = Color(0xFF062B8A);
 const signal = Color(0xFF2F6BFF);
 const sand = Color(0xFFE6DBC7);

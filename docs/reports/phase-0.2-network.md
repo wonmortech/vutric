@@ -74,8 +74,9 @@ controls stripped from device names, and local validation before a throw so a ba
 Handshakes now run side by side: a client that opens QUIC and then stalls no longer delays a real one
 (`crates/vutric-net/tests/stalled_client.rs`: the real client waited 7.8 s before, under 0.4 s now).
 
-Known small gaps, left for the real daemon: a desktop GPU that needs over 2 s to start refuses the first fling it then plays;
-leaving a phone screen and tapping connect within a few milliseconds can cancel that connect (tap again).
+Known small gaps, left for the real daemon: a desktop GPU that needs over 2 s to start refuses the first fling it then plays.
+(A phone screen closing can no longer cancel the next screen's connect: connects wait for the last
+disconnect to finish.)
 
 **Open, by design for Phase 1:** a receiver accepts any device that reaches it, and the six-digit check is shown
 but not confirmed. QR/link pairing pins the peer's key, so it is safe against an impostor; the mDNS path is not

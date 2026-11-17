@@ -42,7 +42,7 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
   @override
   void dispose() {
     _land.dispose();
-    vutric.disconnect(); // cancels a wait for a device or for the next photo
+    disconnectNow(); // cancels a wait for a device or for the next photo
     super.dispose();
   }
 
@@ -54,7 +54,7 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
       _error = null;
     });
     try {
-      final c = await job();
+      final c = await afterDisconnect(job);
       if (!mounted) return;
       setState(() {
         _peer = c;
@@ -78,7 +78,7 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
   }
 
   Future<void> _cancel() async {
-    await vutric.disconnect();
+    await disconnectNow();
     if (mounted) setState(() => _status = null);
   }
 

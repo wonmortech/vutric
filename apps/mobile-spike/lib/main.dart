@@ -155,7 +155,7 @@ class _SpikeHomeState extends State<SpikeHome> with WidgetsBindingObserver {
       _report = null;
     });
     try {
-      final r = await job();
+      final r = await afterDisconnect(job);
       if (!mounted) return;
       setState(() {
         _report = r;
@@ -265,7 +265,7 @@ class _SpikeHomeState extends State<SpikeHome> with WidgetsBindingObserver {
                 padding: EdgeInsets.all(16),
                 child: LinearProgressIndicator(color: signal),
               ),
-              if (_running) OutlinedButton(onPressed: vutric.disconnect, child: const Text('Bekor qilish')),
+              if (_running) OutlinedButton(onPressed: disconnectNow, child: const Text('Bekor qilish')),
             ],
             if (_error != null)
               Padding(
