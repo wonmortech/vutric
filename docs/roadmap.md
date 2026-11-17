@@ -43,7 +43,17 @@ Cross-check of the Phase 2 Linux daemon against the iOS client; nothing new on t
 `vutric-host-mac`: borderless `NSPanel` at `.screenSaver` level, `ignoresMouseEvents`, non-activating,
 `canJoinAllSpaces`, Metal via wgpu. Notarised `.dmg`. Works with both Android and iOS phones.
 
+## Routes and storage settings (across phases, [ADR-0007](decisions/0007-every-route-and-storage-settings.md))
+
+| When | Work |
+|---|---|
+| Spike 0.2 (done) | R0 same network + internet; any files, many at once, resume, hash check (ADR-0006) |
+| Phase 1 | R1 stronger LAN finding + failure screens · R2 our own relay + route badge · storage settings on desktop and Android (save folder, split by type, subfolders, gallery, conflicts, auto-accept, free-space guard, history) · R3 hotspot (Android host) · R4 BLE finding · R5 USB (Android) |
+| Phase 3 | storage settings on iPhone (Files folder bookmark, PhotoKit) · R3/R4 on iPhone · R5 USB (iPhone, after App Review check) · R6 Wi-Fi Aware within one platform |
+| After Phase 3 | R7 Wi-Fi Direct · R8 encrypted cloud handoff (opt-in) · R9 animated QR |
+| Watched | R10 iPhone ⇄ Android Wi-Fi Aware, re-checked every quarter |
+
 ## Later (any phase, owner decides)
 
-More effects (Kometa, Pufak, Oddiy + new ones), video and multi-file flings, clipboard, multi-monitor targeting,
+More effects (Kometa, Pufak, Oddiy + new ones), clipboard, multi-monitor targeting,
 LocalSend protocol compatibility, Play Store / App Store / Microsoft Store listings.
