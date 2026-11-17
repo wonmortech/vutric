@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors
+# SPDX-License-Identifier: Apache-2.0
+
+services:
+  vutric-site:
+    image: caddy:2-alpine
+    container_name: vutric-site
+    restart: unless-stopped
+    volumes:
+      # Config directory (not a single file) so a replaced Caddyfile is visible to `caddy reload`.
+      - ./conf:/etc/caddy:ro
+      - ./releases:/srv/releases:ro
+    networks:
+      - edge
+
+# The shared edge Caddy is on this network and proxies vutric.wonmor.io -> vutric-site:80
+networks:
+  edge:
+    external: true
+    name: dtwin-prod_default

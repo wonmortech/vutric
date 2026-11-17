@@ -35,7 +35,8 @@ Why this order: [ADR-0003](docs/decisions/0003-platform-order.md). Full plan: [d
   that never takes focus ([`vutric-host-win`](crates/vutric-host-win): DirectComposition).
 
 More: [architecture](docs/architecture.md) · [protocol](docs/protocol.md) · [effects](docs/effects.md) ·
-[decisions](docs/decisions/).
+[decisions](docs/decisions/) · [design system](https://vutric.wonmor.io) (source in [`site/`](site), deployed by
+[`deploy.yml`](.github/workflows/deploy.yml)).
 
 ## Try the overlay spike (Windows)
 
