@@ -383,6 +383,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				DEAD_CODE_STRIPPING = NO;
+				STRIP_STYLE = "non-global";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-force_load",
@@ -574,6 +576,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				DEAD_CODE_STRIPPING = NO;
+				STRIP_STYLE = "non-global";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-force_load",
@@ -606,6 +610,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				DEAD_CODE_STRIPPING = NO;
+				STRIP_STYLE = "non-global";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-force_load",
