@@ -28,6 +28,26 @@ use n0_future::StreamExt as _;
 use vutric_core::frame::{self, Decoder};
 use vutric_core::{ALPN, EndpointId, Message, PROTOCOL_VERSION, PairingTicket, Platform};
 
+/// Prints a line without ever blocking the caller: a Windows console in selection mode (`QuickEdit`) freezes
+/// every write, which must not freeze the network. Lines go to one printer thread; if it is stuck and 1024
+/// lines are queued, newer lines are dropped.
+pub fn say(line: String) {
+    static TX: std::sync::OnceLock<std::sync::mpsc::SyncSender<String>> =
+        std::sync::OnceLock::new();
+    let tx = TX.get_or_init(|| {
+        let (tx, rx) = std::sync::mpsc::sync_channel::<String>(1024);
+        let _ = std::thread::Builder::new()
+            .name("vutric-console".into())
+            .spawn(move || {
+                for l in rx {
+                    println!("{l}");
+                }
+            });
+        tx
+    });
+    let _ = tx.try_send(line);
+}
+
 /// mDNS service name; becomes `_vutric._udp.local.` on the wire (also what iOS will browse with `NWBrowser`).
 pub const MDNS_SERVICE: &str = "vutric";
 
@@ -81,7 +101,9 @@ impl Peer {
                 Some(mdns)
             }
             Err(e) => {
-                eprintln!("vutric-net: mDNS unavailable, pairing link only: {e:#}");
+                say(format!(
+                    "vutric-net: mDNS unavailable, pairing link only: {e:#}"
+                ));
                 None
             }
         };
@@ -196,9 +218,9 @@ impl Peer {
                 }
                 Some(done) = pending.join_next(), if !pending.is_empty() => match done {
                     Ok(Ok(Ok(s))) => return Ok(s),
-                    Ok(Ok(Err(e))) => eprintln!("vutric-net: incoming connection dropped: {e:#}"),
-                    Ok(Err(_)) => eprintln!("vutric-net: incoming connection stalled its handshake, dropped"),
-                    Err(e) => eprintln!("vutric-net: handshake task failed: {e}"),
+                    Ok(Ok(Err(e))) => say(format!("vutric-net: incoming connection dropped: {e:#}")),
+                    Ok(Err(_)) => say("vutric-net: incoming connection stalled its handshake, dropped".into()),
+                    Err(e) => say(format!("vutric-net: handshake task failed: {e}")),
                 },
             }
         }

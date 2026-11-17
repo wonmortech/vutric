@@ -55,7 +55,9 @@ async fn serve(name: &str, proxy: EventLoopProxy<Incoming>) -> Result<()> {
     let qr = QrCode::new(link.as_bytes())?;
     println!("{}", qr.render::<Dense1x2>().quiet_zone(true).build());
     println!("pairing link: {link}");
-    println!("waiting for a phone; fling a photo from it (Ctrl+C to stop)");
+    // From here on the network thread never writes to the console itself: a console frozen by a mouse
+    // selection (Windows QuickEdit) would otherwise stall every connection.
+    vutric_net::say("waiting for a phone; fling a photo from it (Ctrl+C to stop)".into());
     loop {
         let s = match peer.accept().await {
             Ok(s) => s,
@@ -67,14 +69,14 @@ async fn serve(name: &str, proxy: EventLoopProxy<Incoming>) -> Result<()> {
         let check = s
             .check_code()
             .unwrap_or_else(|e| format!("unavailable ({e})"));
-        println!(
+        vutric_net::say(format!(
             "connected: {} ({:?}), pairing check {check}",
             s.remote_name, s.remote_platform
-        );
+        ));
         let proxy = proxy.clone();
         tokio::spawn(async move {
             if let Err(e) = session(s, proxy).await {
-                println!("session ended: {e:#}");
+                vutric_net::say(format!("session ended: {e:#}"));
             }
         });
     }
@@ -117,7 +119,7 @@ async fn session(mut s: Session, proxy: EventLoopProxy<Incoming>) -> Result<()> 
         let img = match decoded {
             Ok(img) => img,
             Err(e) => {
-                println!("{}: refused: {e:#}", s.remote_name);
+                vutric_net::say(format!("{}: refused: {e:#}", s.remote_name));
                 refuse(&mut s, f.id, FailReason::Rejected).await?;
                 continue;
             }
@@ -140,7 +142,10 @@ async fn session(mut s: Session, proxy: EventLoopProxy<Incoming>) -> Result<()> 
                 continue;
             }
             Err(_) => {
-                println!("{}: overlay did not draw within 2 s", s.remote_name);
+                vutric_net::say(format!(
+                    "{}: overlay did not draw within 2 s",
+                    s.remote_name
+                ));
                 refuse(&mut s, f.id, FailReason::Cancelled).await?;
                 continue;
             }
@@ -150,7 +155,7 @@ async fn session(mut s: Session, proxy: EventLoopProxy<Incoming>) -> Result<()> 
             receiver_micros: vutric_net::micros_since(clock),
         })
         .await?;
-        println!(
+        vutric_net::say(format!(
             "{} from {}: arrived -> first frame {:.1} ms (decode {:.1} ms), {kb} KB preview",
             f.file_name
                 .chars()
@@ -159,6 +164,6 @@ async fn session(mut s: Session, proxy: EventLoopProxy<Incoming>) -> Result<()> 
             s.remote_name,
             (shown - arrived).as_secs_f64() * 1000.0,
             decode.as_secs_f64() * 1000.0,
-        );
+        ));
     }
 }
