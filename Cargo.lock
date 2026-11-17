@@ -2609,8 +2609,6 @@ dependencies = [
 [[package]]
 name = "netwatch"
 version = "0.19.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39da9cad5f23aa43401f09497d3b280e51b5feba115d9ffbf38ca35d6ff95e96"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -4748,6 +4746,7 @@ name = "vutric-net"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "blake3",
  "iroh",
  "iroh-mdns-address-lookup",
  "n0-future",
@@ -4760,6 +4759,7 @@ name = "vutric-net-spike"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "image",
  "qrcode",
  "tokio",
  "vutric-core",
@@ -4783,9 +4783,12 @@ dependencies = [
  "anyhow",
  "image",
  "pollster",
+ "qrcode",
  "raw-window-handle",
+ "tokio",
  "vutric-core",
  "vutric-host-win",
+ "vutric-net",
  "vutric-overlay",
  "wgpu",
  "winit",

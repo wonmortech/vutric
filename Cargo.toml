@@ -55,7 +55,8 @@ float_cmp = "allow"
 lto = "thin"
 codegen-units = 1
 
-# netdev 0.46.3 does not build for iOS with libc >= 0.2.190 (upstream shellrow/netdev#192, open).
-# third_party/netdev is 0.46.3 with that one fix; drop this once a fixed netdev is released.
+# libc >= 0.2.190 exposes some Darwin networking items on macOS only, which breaks iOS builds of iroh's network
+# stack. Vendored copies carry the upstream fixes until they are released (see third_party/README.md).
 [patch.crates-io]
 netdev = { path = "third_party/netdev" }
+netwatch = { path = "third_party/netwatch" }
