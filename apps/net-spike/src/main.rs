@@ -7,7 +7,9 @@
 //!     Finds the peer (pairing link or mDNS), sends N probes, then answers N.
 //! vutric-net-spike fling (--ticket LINK | --discover) --photo PATH [--count N]
 //!     Flings a real photo to a listening overlay (`vutric-overlay-spike --listen`) and prints the round trip
-//!     until its first frame was on that screen.
+//!     until its first frame was on that screen. The target may be a phone on its catch screen, too.
+//! vutric-net-spike fling --photo PATH [--count N]
+//!     Shows the pairing QR, waits for a phone to scan it (catch screen), then flings the photo to it.
 //! ```
 //! Both sides print the same six-digit pairing check and their own statistics; the first 3 probes per direction
 //! are warm-up (QUIC path validation) and are reported separately.
@@ -98,6 +100,13 @@ async fn listen(peer: &Peer, a: &Args) -> Result<()> {
         s.remote_platform,
         s.check_code()?
     );
+    if let Some(path) = &a.photo {
+        // The phone scanned our QR code and waits on its catch screen: throw at it over this session.
+        fling_photo(&mut s, path, a.count).await?;
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        s.close();
+        return Ok(());
+    }
     probe::answer_run(&mut s, a.runs).await?;
     println!(
         "answered {} probes from {}",
@@ -205,6 +214,9 @@ async fn main() -> Result<()> {
     println!("{} ({:?}) id {}", a.name, platform(), peer.id());
     let result = match a.mode.as_str() {
         "listen" => listen(&peer, &a).await,
+        // Without a target, `fling` shows its QR code and throws at whoever connects (a phone that cannot be
+        // found over mDNS, such as an iPhone).
+        "fling" if a.ticket.is_none() && !a.discover => listen(&peer, &a).await,
         "send" | "fling" => send(&peer, &a).await,
         _ => Err(anyhow::anyhow!(
             "usage: vutric-net-spike listen|send|fling [--ticket LINK | --discover] [--name NAME] [--runs N] [--photo PATH [--count N]]"

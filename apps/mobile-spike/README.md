@@ -61,3 +61,15 @@ longest side 512 px) flies onto the desktop through the Halqa effect.
 The phone shows *release → first frame on the computer*, measured there and back (so an upper bound); the
 desktop prints *arrived → first frame* for the same throw. Pass: under 100 ms ([roadmap](../../docs/roadmap.md)).
 Without a phone, `vutric-net-spike fling --ticket LINK --photo PATH` throws a photo from another desktop.
+
+## Catch a photo (desktop → phone, phone → phone)
+
+**Rasm qabul qilish** on the phone, then either:
+
+- desktop → phone: run `vutric-net-spike fling --photo PATH --count 3` (it prints a QR code), and on the phone
+  tap **Kompyuter QR kodini skanerlash**. Works on iPhone too, since nothing has to find the phone over mDNS;
+- phone → phone: tap **Kutish: QR kodimni skanerlashsin**; on the other phone, **Rasmni kompyuterga otish** →
+  scan this QR code → throw.
+
+The photo flies in from the top edge where the thrower let go, with its tilt. The phone shows how long the photo
+took to reach the screen; the thrower gets its round trip as usual.

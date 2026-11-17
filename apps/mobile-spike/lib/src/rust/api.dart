@@ -7,9 +7,9 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `as_initiator`, `keep`, `ms`, `peer_slot`, `peer`, `report`, `runtime`, `sent_of`, `session_slot`
+// These functions are ignored because they are not marked as `pub`: `as_initiator`, `keep`, `ms`, `peer_slot`, `peer`, `receiver_clock`, `report`, `runtime`, `sent_of`, `session_slot`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Sent`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// 32 random bytes to keep forever as this device's identity.
 Future<Uint8List> newIdentity() => RustLib.instance.api.crateApiNewIdentity();
@@ -58,10 +58,72 @@ Future<double> fling({
 /// Closes the fling session.
 Future<void> disconnect() => RustLib.instance.api.crateApiDisconnect();
 
+/// Waits for another device to connect to this phone (it scanned our QR code, or found us over mDNS) and keeps
+/// that session for [`next_fling`].
+Future<Connected> acceptSession() =>
+    RustLib.instance.api.crateApiAcceptSession();
+
+/// Waits for the next photo on the open session (either side may have opened it). Latency probes are answered
+/// here and skipped, so the measurement buttons of another device keep working.
+Future<Caught> nextFling() => RustLib.instance.api.crateApiNextFling();
+
+/// Tells the thrower that the photo's first frame is on this screen (closes its round trip).
+Future<void> shown({required List<int> id}) =>
+    RustLib.instance.api.crateApiShown(id: id);
+
 /// Waits for a peer to connect (desktop: `vutric-net-spike send --discover`), answers its probes, then
 /// measures this phone → that peer.
 Future<RunReport> listen({required int runs}) =>
     RustLib.instance.api.crateApiListen(runs: runs);
+
+/// A photo thrown at this phone.
+class Caught {
+  /// Pass back to [`shown`] once the photo is on screen.
+  final Uint8List id;
+  final String fileName;
+  final Uint8List jpeg;
+  final int width;
+  final int height;
+  final double speed;
+  final double angle;
+  final double exitX;
+
+  const Caught({
+    required this.id,
+    required this.fileName,
+    required this.jpeg,
+    required this.width,
+    required this.height,
+    required this.speed,
+    required this.angle,
+    required this.exitX,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      fileName.hashCode ^
+      jpeg.hashCode ^
+      width.hashCode ^
+      height.hashCode ^
+      speed.hashCode ^
+      angle.hashCode ^
+      exitX.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Caught &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          fileName == other.fileName &&
+          jpeg == other.jpeg &&
+          width == other.width &&
+          height == other.height &&
+          speed == other.speed &&
+          angle == other.angle &&
+          exitX == other.exitX;
+}
 
 /// The device a fling goes to, shown with the pairing check before the first throw.
 class Connected {

@@ -33,6 +33,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Photo dco_decode_box_autoadd_photo(dynamic raw);
 
   @protected
+  Caught dco_decode_caught(dynamic raw);
+
+  @protected
   Connected dco_decode_connected(dynamic raw);
 
   @protected
@@ -73,6 +76,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Photo sse_decode_box_autoadd_photo(SseDeserializer deserializer);
+
+  @protected
+  Caught sse_decode_caught(SseDeserializer deserializer);
 
   @protected
   Connected sse_decode_connected(SseDeserializer deserializer);
@@ -124,6 +130,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_box_autoadd_photo(Photo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_caught(Caught self, SseSerializer serializer);
 
   @protected
   void sse_encode_connected(Connected self, SseSerializer serializer);

@@ -10,6 +10,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'catch_page.dart';
 import 'fling_page.dart';
 import 'src/rust/api.dart' as vutric;
 import 'src/rust/frb_generated.dart';
@@ -132,6 +133,12 @@ class _SpikeHomeState extends State<SpikeHome> {
     ),
   );
 
+  void _openCatch() => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => CatchPage(scan: _scanLink, myLink: _myLink!),
+    ),
+  );
+
   Future<void> _scan() async {
     final link = await _scanLink();
     if (link == null || !mounted) return;
@@ -161,6 +168,12 @@ class _SpikeHomeState extends State<SpikeHome> {
               onPressed: ready ? _openFling : null,
               icon: const Icon(Icons.north),
               label: const Text('Rasmni kompyuterga otish'),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
+              onPressed: ready ? _openCatch : null,
+              icon: const Icon(Icons.south),
+              label: const Text('Rasm qabul qilish'),
             ),
             const SizedBox(height: 8),
             OutlinedButton(

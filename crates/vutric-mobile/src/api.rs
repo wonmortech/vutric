@@ -273,6 +273,103 @@ pub fn disconnect() {
     }
 }
 
+// ---- Catch: this phone receives (desktop → phone, phone → phone) ----
+
+/// Waits for another device to connect to this phone (it scanned our QR code, or found us over mDNS) and keeps
+/// that session for [`next_fling`].
+pub fn accept_session() -> Result<Connected> {
+    let p = peer()?;
+    runtime().block_on(async {
+        let t0 = Instant::now();
+        let s = p.accept().await?;
+        keep(s, t0.elapsed())
+    })
+}
+
+/// A photo thrown at this phone.
+#[derive(Debug, Clone)]
+pub struct Caught {
+    /// Pass back to [`shown`] once the photo is on screen.
+    pub id: Vec<u8>,
+    pub file_name: String,
+    pub jpeg: Vec<u8>,
+    pub width: u16,
+    pub height: u16,
+    pub speed: f32,
+    pub angle: f32,
+    pub exit_x: f32,
+}
+
+fn receiver_clock() -> Instant {
+    static START: OnceLock<Instant> = OnceLock::new();
+    *START.get_or_init(Instant::now)
+}
+
+/// Waits for the next photo on the open session (either side may have opened it). Latency probes are answered
+/// here and skipped, so the measurement buttons of another device keep working.
+pub fn next_fling() -> Result<Caught> {
+    let mut s = session_slot()
+        .lock()
+        .expect("session lock")
+        .take()
+        .context("no open session")?;
+    let r = runtime().block_on(async {
+        loop {
+            let vutric_core::Message::FlingStart(f) = s.recv().await? else {
+                continue;
+            };
+            let photo = f.preview.filter(|p| {
+                p.format == vutric_core::PreviewFormat::Jpeg
+                    && image::guess_format(&p.bytes).is_ok()
+            });
+            let Some(p) = photo else {
+                s.send(&vutric_core::Message::EffectStarted {
+                    id: f.id,
+                    receiver_micros: vutric_net::micros_since(receiver_clock()),
+                })
+                .await?;
+                continue;
+            };
+            return Ok(Caught {
+                id: f.id.0.to_vec(),
+                file_name: f.file_name,
+                jpeg: p.bytes,
+                width: p.width,
+                height: p.height,
+                speed: f.gesture.speed,
+                angle: f.gesture.angle,
+                exit_x: f.gesture.exit_x,
+            });
+        }
+    });
+    if r.is_ok() {
+        *session_slot().lock().expect("session lock") = Some(s);
+    }
+    r
+}
+
+/// Tells the thrower that the photo's first frame is on this screen (closes its round trip).
+pub fn shown(id: Vec<u8>) -> Result<()> {
+    let id = vutric_core::FlingId(
+        id.as_slice()
+            .try_into()
+            .context("fling id must be 16 bytes")?,
+    );
+    let mut s = session_slot()
+        .lock()
+        .expect("session lock")
+        .take()
+        .context("no open session")?;
+    let r = runtime().block_on(s.send(&vutric_core::Message::EffectStarted {
+        id,
+        receiver_micros: vutric_net::micros_since(receiver_clock()),
+    }));
+    if r.is_ok() {
+        *session_slot().lock().expect("session lock") = Some(s);
+    }
+    r
+}
+
 /// Waits for a peer to connect (desktop: `vutric-net-spike send --discover`), answers its probes, then
 /// measures this phone → that peer.
 pub fn listen(runs: u32) -> Result<RunReport> {
