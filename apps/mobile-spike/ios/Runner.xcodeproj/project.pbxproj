@@ -393,6 +393,10 @@
 					SystemConfiguration,
 					"-framework",
 					Security,
+					"-framework",
+					Network,
+					"-framework",
+					CoreFoundation,
 					"-lresolv",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike;
@@ -586,6 +590,10 @@
 					SystemConfiguration,
 					"-framework",
 					Security,
+					"-framework",
+					Network,
+					"-framework",
+					CoreFoundation,
 					"-lresolv",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike;
@@ -620,6 +628,10 @@
 					SystemConfiguration,
 					"-framework",
 					Security,
+					"-framework",
+					Network,
+					"-framework",
+					CoreFoundation,
 					"-lresolv",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike;
