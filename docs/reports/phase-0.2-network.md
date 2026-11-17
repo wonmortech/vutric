@@ -37,6 +37,19 @@ cargo build -p vutric-net-spike --release
 Phone side: [apps/mobile-spike/README.md](../../apps/mobile-spike/README.md). Each run sends 3 warm-up and 100
 measured probes one way, then 3 + 100 the other way, on one session.
 
+## Real photos, every direction (built, waiting for the device run)
+
+| Path | Thrower | Catcher | Number reported |
+|---|---|---|---|
+| phone → desktop | phone **Rasmni kompyuterga otish** | `vutric-overlay-spike --listen` (Halqa) | release → desktop first frame, there and back |
+| desktop → desktop | `vutric-net-spike fling --ticket LINK --photo PATH` | `vutric-overlay-spike --listen` | same |
+| desktop → phone | `vutric-net-spike fling --photo PATH` (shows a QR) | phone **Rasm qabul qilish** | arrival → photo on the phone screen |
+| phone → phone | phone A **Rasmni kompyuterga otish** | phone B **Rasm qabul qilish** (its QR) | both of the above |
+
+The catcher answers `EffectStarted` only after the frame that shows the photo was presented, so the thrower's
+round trip is an upper bound of "release → first frame". Latency probes still work against every catcher.
+The phone catch API is covered by `crates/vutric-mobile/tests/catch.rs` (two real peers in one process).
+
 ## Found on the way
 
 - **Windows marks many Wi-Fi networks as Public.** Inbound UDP to the listener is then blocked until the user
