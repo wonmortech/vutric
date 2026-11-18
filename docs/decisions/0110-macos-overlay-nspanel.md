@@ -136,6 +136,10 @@ What this shows:
   Intel) with p50 within 0.04 ms (Apple silicon) and 0.7 ms (Intel) of the refresh period. The 480 ms gap is the first run's cold start on Intel; the
   other stalls are single frames, which these shared VMs show on Windows runners too. No real-Mac claim is made from
   them.
+- **Second run** (44329647191, after the focus fix, `ci-run2-*-summary.md`): all 30 runs on both runners with
+  TextEdit frontmost before and after every frame: focus kept, frontmost never changed, app never active, never key.
+  fps 58.2–60.5 (Apple silicon, 60 Hz) and 23.4–30.6 (Intel, 30 Hz); the low values are again each row's first,
+  cold run.
 - **First frame** from a warm panel: 0.27–7.38 ms, inside the 16 ms target.
 - winit's `NSWindow` passed the same focus checks as the panel on both VMs, so the daemon may keep its winit window
   for now (`make_overlay`); the panel stays the default until a real Mac confirms both.

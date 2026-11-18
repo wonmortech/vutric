@@ -39,6 +39,20 @@ Three ways to hand files to Vutric on macOS, all ending in the same place:
 - **Items that are data, not files** (a photo dragged out of Photos without exporting, text) are refused for now
   ("Yuboriladigan fayl topilmadi"); they would need the extension to write a temporary file into a shared container.
 
+## Seen in CI (`packaging/macos/smoke.sh`, run 44329647191, macOS 15 on the Intel runner)
+
+Raw: [`../measurements/2026-11-18-w5/ci-smoke.txt`](../measurements/2026-11-18-w5/ci-smoke.txt).
+
+- The unsigned, ad-hoc signed agent launches and stays up; `pkill` ends it.
+- `pluginkit` lists `io.wonmor.vutric.share` 0.0.1 from `Vutric.app/Contents/PlugIns` (the Share extension is
+  registered).
+- `pbs -dump_pboard` lists the "Vutric bilan yuborish" Services entry.
+- `open 'vutric://send?path=/etc/hosts&path=/etc/shells'` brings up the question with both names
+  ([screenshot](../measurements/2026-11-18-w5/ci-smoke-send-question.png)), in English because the runner's
+  language is English. The menu bar still showed Finder: macOS 15's cooperative activation did not make the
+  accessory agent frontmost, but the alert was on top. The script's System Events window check printed nothing,
+  because the runner gives System Events no accessibility access; the screenshot is the evidence.
+
 ## Real-Mac checklist (owed)
 
 - [~] Finder → Share → "Vutric bilan yuborish" with 1, 10 and 200 files: the agent asks, then the daemon sends.
