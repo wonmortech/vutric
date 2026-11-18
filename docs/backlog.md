@@ -85,12 +85,12 @@ Sources:
 | # | Item | Status |
 |---|---|---|
 | T1 | On the phone screen: accept mode, gallery + album + keep copy, split by type, subfolder, keep tree, conflicts | [~] |
-| T2 | Save folder of the user's choice: Android SAF (`SafStore`), iPhone Files bookmark, desktop folder dialog; a missing folder falls back to the default and tells the user once | [ ] |
+| T2 | Save folder of the user's choice: Android SAF (`SafStore`), iPhone Files bookmark, desktop folder dialog; a missing folder falls back to the default and tells the user once. Engine: fallback + told once (ADR-0057); SAF/bookmark/dialog = W1/W2 | [~] |
 | T3 | Per-device overrides (`devices`) on the device detail screen | [ ] |
-| T4 | Free-space guard (refuse when < 1 GB would remain), checking app storage too on phones | [ ] |
-| T5 | After receiving: notification / open file / open folder / nothing | [ ] |
-| T6 | Unfinished parts kept 7 days (1–30, "delete now"); history 90 days | [ ] |
-| T7 | "Ask" option for name conflicts | [ ] |
+| T4 | Free-space guard (refuse when < 1 GB would remain), checking app storage too on phones. Engine: guard checks target and app storage (ADR-0057) | [~] |
+| T5 | After receiving: notification / open file / open folder / nothing. Engine: `After::action` (ADR-0057); hosts carry it out | [~] |
+| T6 | Unfinished parts kept 7 days (1–30, "delete now"); history 90 days. Engine: `disk::sweep_parts` (ADR-0057); hosts schedule it, history expiry with the history store | [~] |
+| T7 | "Ask" option for name conflicts. Engine: `Conflict::Ask` + `SaveTo.ask` (ADR-0057); screens = W1/W2 | [~] |
 | T8 | Desktop settings window with the same groups in the same order | [ ] |
 | T9 | Versioned schema with migrations from the first release | [~] (`version` field exists) |
 

@@ -67,6 +67,23 @@ impl std::fmt::Display for NoRoom {
 
 impl std::error::Error for NoRoom {}
 
+/// Asks the user what to do about a file that is already at this path ([`Conflict::Ask`], backlog T7). The
+/// answer is one of the other rules; another `Ask`, or no answer within [`ASK_TIMEOUT`], keeps both.
+/// The answer to one name-clash question.
+pub type AskFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Conflict> + Send>>;
+
+#[derive(Clone)]
+pub struct AskConflict(pub Arc<dyn Fn(PathBuf) -> AskFuture + Send + Sync>);
+
+impl std::fmt::Debug for AskConflict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("AskConflict(..)")
+    }
+}
+
+/// How long a name-clash question waits before both files are kept.
+pub const ASK_TIMEOUT: Duration = Duration::from_secs(300);
+
 /// Where and how received files are saved: the user's rules for this sender, plus what the rules need.
 #[derive(Debug, Clone)]
 pub struct SaveTo {
@@ -79,6 +96,8 @@ pub struct SaveTo {
     pub date: String,
     /// Refuse when less than this would stay free.
     pub min_free_bytes: u64,
+    /// The question for [`Conflict::Ask`]; without it, a clash keeps both files.
+    pub ask: Option<AskConflict>,
 }
 
 impl SaveTo {
@@ -91,6 +110,7 @@ impl SaveTo {
             device: String::new(),
             date: today_utc(),
             min_free_bytes: 0,
+            ask: None,
         }
     }
 
@@ -127,6 +147,7 @@ impl SaveTo {
             device: s.remote_name.clone(),
             date,
             min_free_bytes: settings.min_free_bytes,
+            ask: None,
         }
     }
 }
@@ -265,6 +286,9 @@ pub struct Summary {
     pub failed: Vec<String>,
     /// Receiver only: where the files were saved.
     pub saved: Vec<PathBuf>,
+    /// Receiver only: the chosen folder was missing, so the default was used (tell the user once, T2; see
+    /// `Settings::tell_missing_folder`).
+    pub missing_folder: Option<PathBuf>,
     pub elapsed: Duration,
 }
 
@@ -491,6 +515,7 @@ pub async fn send(s: &mut Session, files: Vec<Outgoing>, on: OnProgress) -> Resu
         bytes: meter.done.load(Ordering::Relaxed),
         failed,
         saved: Vec::new(),
+        missing_folder: None,
         elapsed: meter.started.elapsed(),
     })
 }
@@ -632,6 +657,11 @@ pub async fn receive(
     to: &SaveTo,
     on: OnProgress,
 ) -> Result<Summary> {
+    let (rules, missing_folder) = to.rules.usable(Path::is_dir);
+    let to = &SaveTo {
+        rules,
+        ..to.clone()
+    };
     let base = to
         .rules
         .folder
@@ -644,7 +674,11 @@ pub async fn receive(
     let ticker = meter.ticker(Arc::clone(&on));
     let renames = Arc::new(tokio::sync::Mutex::new(()));
     let mut used: HashSet<PathBuf> = HashSet::new();
-    let mut summary = Summary::default();
+    let mut summary = Summary {
+        missing_folder,
+        ..Summary::default()
+    };
+    let ask = to.ask.clone();
     let mut batch = offer;
     loop {
         let first = batch.first as usize;
@@ -674,9 +708,14 @@ pub async fn receive(
             })
             .collect();
         let needed: u64 = plan.iter().map(|p| p.entry.size - p.held).sum();
+        // The target's volume, and the app's own storage (the default folder) where phones stage files before
+        // handing them to the gallery or a SAF folder (T4): the smaller of the two decides.
         let free = plan
             .first()
-            .and_then(|p| crate::disk::free_bytes(&p.target));
+            .and_then(|p| crate::disk::free_bytes(&p.target))
+            .into_iter()
+            .chain(crate::disk::free_bytes(&to.default_folder))
+            .min();
         if free.is_some_and(|free| free < needed.saturating_add(to.min_free_bytes)) {
             s.send(&Message::FlingFailed {
                 id,
@@ -713,10 +752,11 @@ pub async fn receive(
                         bail!("unexpected data stream");
                     }
                     let (plan, meter, renames) = (Arc::clone(&plan), Arc::clone(&meter), Arc::clone(&renames));
+                    let ask = ask.clone();
                     tasks.spawn(async move {
                         let p = &plan[k];
                         let r = match receive_one(st, p, &meter).await {
-                            Ok(()) => place(&p.part, &p.target, conflict, &renames).await,
+                            Ok(()) => place(&p.part, &p.target, conflict, ask.as_ref(), &renames).await,
                             Err(e) => Err(e),
                         };
                         let counter = if r.is_ok() { &meter.files_done } else { &meter.failed };
@@ -842,14 +882,25 @@ async fn receive_one(mut st: RecvStream, p: &Planned, meter: &Meter) -> Result<(
 }
 
 /// Moves a verified part file to its final name, by the user's conflict rule: `name (2).ext`, replace the old
-/// file, or keep the old file and drop the new one.
+/// file, keep the old file and drop the new one, or ask. Questions come one at a time (the rename lock is held).
 async fn place(
     part: &Path,
     target: &Path,
     conflict: Conflict,
+    ask: Option<&AskConflict>,
     renames: &tokio::sync::Mutex<()>,
 ) -> Result<PathBuf> {
     let _one = renames.lock().await;
+    let conflict = match (conflict, ask) {
+        (Conflict::Ask, Some(q)) if tokio::fs::try_exists(target).await.unwrap_or(false) => {
+            match tokio::time::timeout(ASK_TIMEOUT, (q.0)(target.to_path_buf())).await {
+                Ok(c @ (Conflict::Replace | Conflict::Skip)) => c,
+                _ => Conflict::KeepBoth,
+            }
+        }
+        (Conflict::Ask, _) => Conflict::KeepBoth,
+        (c, _) => c,
+    };
     match conflict {
         Conflict::Replace => {
             tokio::fs::rename(part, target)
@@ -861,7 +912,7 @@ async fn place(
             let _ = tokio::fs::remove_file(part).await;
             return Ok(target.to_path_buf());
         }
-        Conflict::Skip | Conflict::KeepBoth => {}
+        Conflict::Skip | Conflict::KeepBoth | Conflict::Ask => {}
     }
     let dir = target.parent().context("no parent")?;
     let name = target

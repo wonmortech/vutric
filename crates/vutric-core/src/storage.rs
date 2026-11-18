@@ -115,6 +115,8 @@ pub enum Conflict {
     Replace,
     /// The old file stays; the new one is dropped (counted as received).
     Skip,
+    /// Ask the user for each clash (T7). A host that cannot ask, or a question nobody answers, keeps both.
+    Ask,
 }
 
 /// Whether an offer is accepted without asking.
@@ -151,6 +153,46 @@ pub enum After {
     OpenFile,
     OpenFolder,
     Nothing,
+}
+
+/// What the host does after a transfer, worked out from [`After`] and what was saved (T5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AfterAction {
+    /// Show a notification for this many files.
+    Notify(usize),
+    /// Open this file in its app.
+    Open(PathBuf),
+    /// Open this folder.
+    OpenFolder(PathBuf),
+    Nothing,
+}
+
+impl After {
+    /// The action for files saved at `saved`. "Open file" with several files opens the folder they share
+    /// instead of many apps at once; nothing saved means nothing to do.
+    #[must_use]
+    pub fn action(self, saved: &[PathBuf]) -> AfterAction {
+        if saved.is_empty() {
+            return AfterAction::Nothing;
+        }
+        let folder = || {
+            let mut common = saved[0].parent().map(Path::to_path_buf).unwrap_or_default();
+            for p in &saved[1..] {
+                while !p.starts_with(&common) {
+                    if !common.pop() {
+                        break;
+                    }
+                }
+            }
+            common
+        };
+        match self {
+            After::Notify => AfterAction::Notify(saved.len()),
+            After::OpenFile if saved.len() == 1 => AfterAction::Open(saved[0].clone()),
+            After::OpenFile | After::OpenFolder => AfterAction::OpenFolder(folder()),
+            After::Nothing => AfterAction::Nothing,
+        }
+    }
 }
 
 /// The rules for one transfer: the global settings with the sending device's overrides applied.
@@ -205,6 +247,20 @@ pub struct Arrival<'a> {
 }
 
 impl SaveRules {
+    /// These rules with a chosen folder that is gone (an unplugged drive, a deleted folder) replaced by the
+    /// default, and the missing folder, so the host can tell the user (T2). `is_dir` is asked about the folder only.
+    #[must_use]
+    pub fn usable(&self, is_dir: impl Fn(&Path) -> bool) -> (SaveRules, Option<PathBuf>) {
+        match &self.folder {
+            Some(f) if !is_dir(f) => {
+                let mut r = self.clone();
+                r.folder = None;
+                (r, Some(f.clone()))
+            }
+            _ => (self.clone(), None),
+        }
+    }
+
     /// The final path for a received file, before conflict handling. `default_folder` is used when no folder
     /// is set. Every component that came from the peer is sanitized, so the result stays inside the chosen
     /// folder (or inside an absolute type folder the user chose).
@@ -291,6 +347,8 @@ pub struct Settings {
     pub devices: BTreeMap<String, DeviceRules>,
     /// Other apps' protocols (ADR-0010 part 4, backlog C9).
     pub compat: Compat,
+    /// The missing save folder the user was last told about, so it is said once, not on every transfer (T2).
+    pub told_missing_folder: Option<PathBuf>,
 }
 
 /// One foreign protocol adapter.
@@ -399,6 +457,7 @@ impl Default for Settings {
             history_days: Some(90),
             devices: BTreeMap::new(),
             compat: Compat::default(),
+            told_missing_folder: None,
         }
     }
 }
@@ -427,6 +486,22 @@ impl Settings {
             }
         }
         (save, accept)
+    }
+
+    /// Whether to tell the user that `missing` (from [`SaveRules::usable`]) is gone: true the first time for that
+    /// folder, false after; `None` (the folder is back) resets it.
+    pub fn tell_missing_folder(&mut self, missing: Option<&Path>) -> bool {
+        match missing {
+            Some(m) if self.told_missing_folder.as_deref() != Some(m) => {
+                self.told_missing_folder = Some(m.to_path_buf());
+                true
+            }
+            Some(_) => false,
+            None => {
+                self.told_missing_folder = None;
+                false
+            }
+        }
     }
 
     /// Brings a file written by an older version forward and clamps values to sane ranges.
@@ -590,6 +665,50 @@ mod tests {
         assert_eq!(s.version, SETTINGS_VERSION);
         assert_eq!(s.parts_keep_days, 30);
         assert_eq!(s.save.album, "Vutric");
+    }
+
+    #[test]
+    fn after_receive_actions() {
+        let one = [PathBuf::from("D/Vutric/Photos/a.jpg")];
+        let two = [one[0].clone(), PathBuf::from("D/Vutric/Videos/b.mp4")];
+        assert_eq!(
+            After::OpenFile.action(&one),
+            AfterAction::Open(one[0].clone())
+        );
+        assert_eq!(
+            After::OpenFile.action(&two),
+            AfterAction::OpenFolder(PathBuf::from("D/Vutric"))
+        );
+        assert_eq!(
+            After::OpenFolder.action(&one),
+            AfterAction::OpenFolder(PathBuf::from("D/Vutric/Photos"))
+        );
+        assert_eq!(After::Notify.action(&two), AfterAction::Notify(2));
+        assert_eq!(After::Notify.action(&[]), AfterAction::Nothing);
+        assert_eq!(After::Nothing.action(&one), AfterAction::Nothing);
+    }
+
+    #[test]
+    fn missing_folder_falls_back_and_is_told_once() {
+        let rules = SaveRules {
+            folder: Some(PathBuf::from("E:/USB")),
+            ..SaveRules::default()
+        };
+        let (r, missing) = rules.usable(|_| false);
+        assert_eq!(r.folder, None);
+        assert_eq!(missing.as_deref(), Some(Path::new("E:/USB")));
+        let (r, missing) = rules.usable(|_| true);
+        assert_eq!((r.folder, missing), (rules.folder.clone(), None));
+        let mut s = Settings::default();
+        assert!(s.tell_missing_folder(Some(Path::new("E:/USB"))));
+        assert!(!s.tell_missing_folder(Some(Path::new("E:/USB"))), "once");
+        assert!(!s.tell_missing_folder(None));
+        assert!(
+            s.tell_missing_folder(Some(Path::new("E:/USB"))),
+            "again after it came back"
+        );
+        let c: Conflict = serde_json::from_str("\"ask\"").unwrap();
+        assert_eq!(c, Conflict::Ask);
     }
 
     #[test]
