@@ -84,7 +84,7 @@ async fn connect(addr: SocketAddr, name: &str) -> Result<(Link, String)> {
         .context("connect timeout")??;
     let _ = tcp.set_nodelay(true);
     let (r, mut w) = tcp.into_split();
-    let mut rx = conn::reader(r);
+    let (mut rx, gate) = conn::gated_reader(r);
     conn::write_frame(
         &mut w,
         &msg::connection_request(
@@ -97,6 +97,7 @@ async fn connect(addr: SocketAddr, name: &str) -> Result<(Link, String)> {
     conn::write_frame(&mut w, &init).await?;
     let server_init = conn::next(&mut rx).await.context("no server init")?;
     let (keys, finished) = hs.finish(&server_init)?;
+    gate.authenticated();
     conn::write_frame(&mut w, &finished).await?;
     conn::write_frame(&mut w, &msg::connection_response(true)).await?;
     let f = conn::next(&mut rx)

@@ -5,6 +5,8 @@
 //! peer at once without cutting a frame in half.
 
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use tokio::io::{AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _};
@@ -15,6 +17,9 @@ use crate::ukey2::Channel;
 
 /// Largest frame accepted: a 512 KiB chunk plus every wrapper, with room to spare.
 pub const MAX_FRAME: usize = 1 << 20;
+/// Largest frame accepted before UKEY2 has finished (S5): the connection request, client init and finished
+/// messages are each well under 1 KiB, so nothing large is read from a peer that has not been authenticated.
+pub const MAX_PREAUTH_FRAME: usize = 16 * 1024;
 /// Largest `BYTES` payload kept in memory (negotiation frames, shared text).
 pub const MAX_BYTES_PAYLOAD: usize = 64 * 1024;
 /// Most `BYTES` payloads being assembled at once.
@@ -26,10 +31,19 @@ pub const KEEP_ALIVE: Duration = Duration::from_secs(10);
 pub const SILENCE: Duration = Duration::from_secs(45);
 
 pub async fn read_frame<R: AsyncRead + Unpin>(r: &mut R) -> std::io::Result<Vec<u8>> {
+    read_frame_max(r, || MAX_FRAME).await
+}
+
+/// [`read_frame`] with a cap asked for after the length arrives (so a gate opened meanwhile counts), checked
+/// before the body is allocated.
+pub async fn read_frame_max<R: AsyncRead + Unpin>(
+    r: &mut R,
+    max: impl Fn() -> usize,
+) -> std::io::Result<Vec<u8>> {
     let mut len = [0u8; 4];
     r.read_exact(&mut len).await?;
     let n = u32::from_be_bytes(len) as usize;
-    if n == 0 || n > MAX_FRAME {
+    if n == 0 || n > max().min(MAX_FRAME) {
         return Err(std::io::Error::other("frame size"));
     }
     let mut b = vec![0u8; n];
@@ -43,17 +57,39 @@ pub async fn write_frame<W: AsyncWrite + Unpin>(w: &mut W, b: &[u8]) -> std::io:
     w.write_all(b).await
 }
 
-/// Starts the reader task; the channel closes at the end of input or on a bad frame.
-pub fn reader<R: AsyncRead + Unpin + Send + 'static>(mut r: R) -> mpsc::Receiver<Vec<u8>> {
+/// Starts the reader task with the full frame cap; the channel closes at the end of input or on a bad frame.
+pub fn reader<R: AsyncRead + Unpin + Send + 'static>(r: R) -> mpsc::Receiver<Vec<u8>> {
+    let (rx, gate) = gated_reader(r);
+    gate.authenticated();
+    rx
+}
+
+/// Raises a [`gated_reader`]'s cap once the handshake is done.
+#[derive(Debug, Clone)]
+pub struct Gate(Arc<AtomicUsize>);
+
+impl Gate {
+    /// The UKEY2 key exchange has finished: frames up to [`MAX_FRAME`] are read from now on.
+    pub fn authenticated(&self) {
+        self.0.store(MAX_FRAME, Ordering::Release);
+    }
+}
+
+/// Starts the reader task capped at [`MAX_PREAUTH_FRAME`] until [`Gate::authenticated`] (backlog S5).
+pub fn gated_reader<R: AsyncRead + Unpin + Send + 'static>(
+    mut r: R,
+) -> (mpsc::Receiver<Vec<u8>>, Gate) {
     let (tx, rx) = mpsc::channel(4);
+    let max = Arc::new(AtomicUsize::new(MAX_PREAUTH_FRAME));
+    let gate = Gate(Arc::clone(&max));
     tokio::spawn(async move {
-        while let Ok(f) = read_frame(&mut r).await {
+        while let Ok(f) = read_frame_max(&mut r, || max.load(Ordering::Acquire)).await {
             if tx.send(f).await.is_err() {
                 break;
             }
         }
     });
-    rx
+    (rx, gate)
 }
 
 /// Waits for the next frame, at most [`SILENCE`].
@@ -218,5 +254,22 @@ mod tests {
                 .await;
         });
         assert!(read_frame(&mut b).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn preauth_frames_are_small_until_the_gate_opens() {
+        let big = vec![7u8; MAX_PREAUTH_FRAME + 1];
+        let (mut a, b) = tokio::io::duplex(1 << 20);
+        let (mut rx, _gate) = gated_reader(b);
+        write_frame(&mut a, &big).await.unwrap();
+        assert_eq!(rx.recv().await, None, "closed before authentication");
+
+        let (mut a, b) = tokio::io::duplex(1 << 20);
+        let (mut rx, gate) = gated_reader(b);
+        write_frame(&mut a, b"hello").await.unwrap();
+        assert_eq!(rx.recv().await.as_deref(), Some(&b"hello"[..]));
+        gate.authenticated();
+        write_frame(&mut a, &big).await.unwrap();
+        assert_eq!(rx.recv().await.map(|f| f.len()), Some(big.len()));
     }
 }

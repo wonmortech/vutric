@@ -220,6 +220,7 @@ fn random_hex() -> String {
 /// Connection request, UKEY2 and the plaintext connection responses; returns the peer and the secure channel.
 async fn handshake(
     rx: &mut mpsc::Receiver<Vec<u8>>,
+    gate: &conn::Gate,
     w: &mut OwnedWriteHalf,
 ) -> Result<(endpoint::Peer, String, Channel)> {
     let f = conn::next(rx).await.context("no connection request")?;
@@ -238,6 +239,7 @@ async fn handshake(
     conn::write_frame(w, &server_init).await?;
     let fin = conn::next(rx).await.context("no client finished")?;
     let keys = hs.finish(&fin)?;
+    gate.authenticated();
     let f = conn::next(rx).await.context("no connection response")?;
     if msg::parse_offline(&f) != Some(Offline::ConnectionResponse { accepted: true }) {
         bail!("sender did not confirm the connection");
@@ -290,8 +292,8 @@ enum Flow {
 
 async fn connection(tcp: tokio::net::TcpStream, ip: IpAddr, st: &State) -> Result<()> {
     let (r, mut w) = tcp.into_split();
-    let mut rx = conn::reader(r);
-    let (peer, pin, ch) = handshake(&mut rx, &mut w).await?;
+    let (mut rx, gate) = conn::gated_reader(r);
+    let (peer, pin, ch) = handshake(&mut rx, &gate, &mut w).await?;
     let mut s = Session {
         st,
         ip,

@@ -127,6 +127,19 @@ impl Picker {
         !matches!(self, Self::Internet)
     }
 
+    /// The privacy lines under the send button (backlog S6), as i18n keys, in order: `privacy.encrypted`
+    /// ("Fayllar shifrlangan, faqat siz va qabul qiluvchi ko'radi") always; `privacy.nothing_leaves` ("Hech narsa
+    /// internetga chiqmaydi") only when the choice keeps everything off the internet, because only then is it
+    /// true.
+    #[must_use]
+    pub fn privacy_lines(self) -> &'static [&'static str] {
+        if self.uses_internet() {
+            &["privacy.encrypted"]
+        } else {
+            &["privacy.encrypted", "privacy.nothing_leaves"]
+        }
+    }
+
     /// Whether the choice exists on any device yet.
     #[must_use]
     pub fn built(self) -> bool {
@@ -273,6 +286,19 @@ mod tests {
         );
         assert!(!Picker::LanOnly.uses_internet() && !Picker::Offline.uses_internet());
         assert!(!Picker::Internet.uses_lan());
+    }
+
+    #[test]
+    fn privacy_line_only_promises_what_is_true() {
+        for p in Picker::ALL {
+            let lines = p.privacy_lines();
+            assert_eq!(lines[0], "privacy.encrypted");
+            assert_eq!(
+                lines.contains(&"privacy.nothing_leaves"),
+                !p.uses_internet(),
+                "{p:?}"
+            );
+        }
     }
 
     #[test]
