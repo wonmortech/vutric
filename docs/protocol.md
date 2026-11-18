@@ -21,8 +21,38 @@ vutric://pair?v=2&id=<64 hex endpoint id>&n=<percent-encoded device name>&a=<ip:
 - The name is display-only: control characters are stripped and it is cut to 64 characters. It is never
   published to the lookup service.
 
-After the other device connects with the ticket, both sides store each other's endpoint id. Later connections are
-discovered via mDNS, or looked up by key, and authenticated by key.
+After the other device connects with the ticket, both sides store each other's endpoint id in their trust store
+(`PairMethod::Ticket`). Later connections are discovered via mDNS, or looked up by key, and authenticated by key.
+
+### Admission ([ADR-0050](decisions/0050-trust-store-and-pairing-code.md))
+
+A listener decides on every incoming connection as soon as QUIC has authenticated the peer's key, before it reads
+the control stream:
+
+| Visibility | Trusted key | Unknown key |
+|---|---|---|
+| `off` | refused | refused |
+| `trusted_only` (default) | admitted | refused |
+| `everyone(until)`, at most 10 min | admitted | admitted, every offer asked about |
+| `pairing(until)`, at most 10 min | admitted | admitted, to pair |
+
+A refused connection is closed with QUIC application error code `403` ("not trusted"); nothing the peer sent is
+parsed.
+
+### Pairing from the nearby list (no QR)
+
+Commit-then-reveal numeric comparison on the control stream, right after `Hello`. `x` = 32 bytes of TLS exporter
+output with label `EXPORTER-vutric/1 pairing sas` and an empty context; `a`, `b` are 32 random bytes.
+
+| Step | From | Message |
+|---|---|---|
+| 1 | dialer | `PairCommit { commit = BLAKE3-derive-key("vutric/1 2026-11-18 pairing commitment", x ‖ a) }` |
+| 2 | listener | `PairNonce { nonce = b }`, only after step 1 arrived |
+| 3 | dialer | `PairReveal { nonce = a }`; the listener checks it against the commitment |
+| 4 | both | show `code = u64_le(BLAKE3-derive-key("vutric/1 2026-11-18 pairing code", x ‖ a ‖ b)[..8]) mod 10^6`, six digits |
+| 5 | both | `PairResult { confirmed }`; the key is trusted (`PairMethod::Code`) only when both are `true` |
+
+Any other message in steps 1–3, or a reveal that does not open the commitment, aborts the pairing as tampered.
 
 ## Streams
 
@@ -48,6 +78,10 @@ detected from the header, before any allocation. Every decoded message is valida
 | `Offer { id, first, entries, total_files, total_bytes }` | sender | files on offer, ≤ 256 entries per message |
 | `OfferReply { id, accept, have }` | receiver | yes or no; `have[i]` = bytes of entry `i` already held |
 | `OfferDone { id, received, failed }` | receiver | one offer's files are in; `failed` = transfer-wide indices |
+| `PairCommit { commit }` | dialer | pairing step 1 (above) |
+| `PairNonce { nonce }` | listener | pairing step 2 |
+| `PairReveal { nonce }` | dialer | pairing step 3 |
+| `PairResult { confirmed }` | both | pairing step 5 |
 
 `gesture` = `{ speed (px/s ≥ 0), angle (rad, 0 = up, + = clockwise), exit_x (0..=1) }`. `preview` ≤ 96 KiB,
 longest side ≤ 512 px, JPEG/WebP/PNG.

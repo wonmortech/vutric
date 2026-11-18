@@ -72,9 +72,9 @@ Sources:
 
 | # | Item | Phase | Status |
 |---|---|---|---|
-| S1 | Trust store of paired keys: an unknown device needs an explicit OK | 1 | [ ] |
-| S2 | Commit-then-reveal numeric comparison before mDNS pairing is offered (today the 6 digits are shown, not confirmed) | 1 | [ ] |
-| S3 | Default: only trusted devices can send; "everyone" switches off after 10 min | 1 | [ ] |
+| S1 | Trust store of paired keys: an unknown device needs an explicit OK | 1 | [x] ADR-0050, `vutric_core::trust`, `vutric_net::trust`, `tests/trust_gate.rs` |
+| S2 | Commit-then-reveal numeric comparison before mDNS pairing is offered (today the 6 digits are shown, not confirmed) | 1 | [x] ADR-0050, `vutric_core::sas`, `Session::pair_code`/`pair_finish` |
+| S3 | Default: only trusted devices can send; "everyone" switches off after 10 min | 1 | [x] ADR-0050, `Visibility`, `Peer::accept_with` (UI toggles: W1/W2) |
 | S4 | Fuzz the framing and the `Offer` parser in CI (protocol-aware) | 1 | [ ] |
 | S5 | Every route: bounded fixed frames before auth, same encryption for every frame type, 6-digit TLS-exporter code | all | [ ] |
 | S6 | Privacy line on screen A1: "Fayllar shifrlangan, faqat siz va qabul qiluvchi ko'radi"; the Lan-only setting brings back "Hech narsa internetga chiqmaydi" | 1 | [ ] |

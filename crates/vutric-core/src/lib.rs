@@ -10,7 +10,9 @@ pub mod frame;
 pub mod id;
 pub mod message;
 pub mod pairing;
+pub mod sas;
 pub mod storage;
+pub mod trust;
 
 pub use effect::{EffectId, SendZone};
 pub use error::{Error, Result};

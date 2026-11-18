@@ -136,6 +136,23 @@ pub enum Message {
         received: u32,
         failed: Vec<u32>,
     },
+    /// Pairing without a QR code (`crate::sas`), dialer → listener: commitment to the dialer's nonce.
+    PairCommit {
+        commit: [u8; 32],
+    },
+    /// Listener → dialer: the listener's nonce, sent only after the commitment arrived.
+    PairNonce {
+        nonce: [u8; 32],
+    },
+    /// Dialer → listener: the nonce the commitment was made to.
+    PairReveal {
+        nonce: [u8; 32],
+    },
+    /// Both ways: whether this side's user confirmed that the six digits match. Trust is stored only when both
+    /// sides said yes.
+    PairResult {
+        confirmed: bool,
+    },
 }
 
 impl Message {
@@ -151,6 +168,10 @@ impl Message {
             Self::Offer { .. } => "Offer",
             Self::OfferReply { .. } => "OfferReply",
             Self::OfferDone { .. } => "OfferDone",
+            Self::PairCommit { .. } => "PairCommit",
+            Self::PairNonce { .. } => "PairNonce",
+            Self::PairReveal { .. } => "PairReveal",
+            Self::PairResult { .. } => "PairResult",
         }
     }
 }
