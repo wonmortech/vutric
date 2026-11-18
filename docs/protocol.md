@@ -26,6 +26,10 @@ vutric://pair?v=2&id=<64 hex endpoint id>&n=<percent-encoded device name>&a=<ip:
   passphrase (both percent-encoded) and `wh=1` for a hidden network
   ([ADR-0058](decisions/0058-hotspot-in-the-pairing-link.md)). A half hotspot is an error; older apps ignore the
   keys and pair as before.
+- `s` (optional) is a one-time pairing secret, 32 hex characters (16 random bytes), present only while the
+  device's pairing window is open ([ADR-0064](decisions/0064-listener-knows-how-the-dialer-pairs.md)). A dialer
+  that read it proves it right after `Hello` (`PairProof`, below). A malformed or repeated `s` makes the link
+  invalid; older apps ignore the key.
 
 ### Without the QR: typed address or short code ([ADR-0059](decisions/0059-connect-by-typed-address-or-code.md))
 
@@ -67,6 +71,19 @@ output with label `EXPORTER-vutric/1 pairing sas` and an empty context; `a`, `b`
 | 5 | both | `PairResult { confirmed }`; the key is trusted (`PairMethod::Code`) only when both are `true` |
 
 Any other message in steps 1–3, or a reveal that does not open the commitment, aborts the pairing as tampered.
+
+### How the listener knows which check runs ([ADR-0064](decisions/0064-listener-knows-how-the-dialer-pairs.md))
+
+A dialer that pairs sends its first message right after `Hello`:
+
+| Dialer found the device by | First message | Listener stores |
+|---|---|---|
+| the QR or link with `s` | `PairProof { proof = BLAKE3-derive-key("vutric/1 2026-11-18 pairing link proof", x ‖ s) }` | `ticket`, when the proof matches its current secret |
+| mDNS, a typed address or a short code | `PairCommit` (step 1 above) | `code`, when both users confirm |
+| a link without `s`, or nothing | anything else | nothing: a guest, every offer asked about |
+
+The listener waits up to 3 s for that first message (`Session::pair_intent`); a message that is neither proof nor
+commitment is kept for the host. A proof that does not match (an old QR) is not trusted.
 
 ### LAN beacon ([ADR-0052](decisions/0052-lan-finding-beacon-and-diagnosis.md))
 
@@ -114,6 +131,14 @@ detected from the header, before any allocation. Every decoded message is valida
 | `PairNonce { nonce }` | listener | pairing step 2 |
 | `PairReveal { nonce }` | dialer | pairing step 3 |
 | `PairResult { confirmed }` | both | pairing step 5 |
+| `PairProof { proof }` | dialer | it read the listener's pairing link (above) |
+| `Notice { app, title, text, at_ms }` | phone | a mirrored notification: app and title ≤ 80 characters, text ≤ 400, `app` not empty; shown, never acted on |
+| `Clipboard { text }` | either | text for the other device's "copy" prompt, 1 byte to 64 KiB; sent only on a user action, never written to the clipboard without the user |
+
+`Notice` and `Clipboard` are taken only from a trusted (paired) device and shown only after control and bidi
+characters are removed (`vutric_core::companion`); notices are limited to a burst of 10, then one per 500 ms
+([ADR-0065](decisions/0065-companion-messages.md)). One that arrives during a file transfer is kept for the host,
+not dropped.
 
 `gesture` = `{ speed (px/s ≥ 0), angle (rad, 0 = up, + = clockwise), exit_x (0..=1) }`. `preview` ≤ 96 KiB,
 longest side ≤ 512 px, JPEG/WebP/PNG.

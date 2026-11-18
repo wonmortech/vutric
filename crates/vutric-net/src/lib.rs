@@ -75,6 +75,14 @@ pub const PAIR_STEP_TIMEOUT: Duration = Duration::from_secs(8);
 /// Longest wait for the other user to compare the digits in [`Session::pair_finish`].
 pub const PAIR_CONFIRM_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// How long the listener's [`Session::pair_intent`] waits for the dialer's first message by default. A dialer that
+/// pairs sends `PairProof` or `PairCommit` right after `Hello`, one round trip later.
+pub const PAIR_INTENT_WAIT: Duration = Duration::from_secs(3);
+
+/// Most messages [`Session`] holds back for the host (a message read by [`Session::pair_intent`], companion
+/// messages that arrived during a transfer). Beyond it the oldest is dropped.
+const MAX_PENDING: usize = 32;
+
 /// How long a closing side waits for the peer to take its last bytes before it closes anyway.
 const LINGER: Duration = Duration::from_secs(2);
 
@@ -408,6 +416,20 @@ impl Peer {
         self.dial(id, addrs, None).await
     }
 
+    /// Opens a session from the text of a pairing link (plain or with a hotspot, ADR-0058). When the link carries a
+    /// one-time secret (ADR-0064), proves it to the listener at once with [`Session::prove_link`], so the
+    /// listener can trust us as `ticket`; the caller then trusts the listener as `ticket` too (its key came
+    /// from the link).
+    pub async fn connect_link(&self, uri: &str) -> Result<Session> {
+        let ticket = PairingTicket::parse(uri)?;
+        let secret = vutric_core::pairing::secret_in(uri)?;
+        let mut s = self.connect_ticket(&ticket).await?;
+        if let Some(secret) = secret {
+            s.prove_link(&secret).await?;
+        }
+        Ok(s)
+    }
+
     /// Opens a session from a pairing link: its LAN hints first, its relay (and, with [`Reach::Anywhere`], the
     /// lookup server) when the device is on another network.
     pub async fn connect_ticket(&self, t: &PairingTicket) -> Result<Session> {
@@ -533,6 +555,8 @@ pub struct Session {
     send: SendStream,
     recv: RecvStream,
     decoder: Decoder,
+    /// Messages already read from the wire that the host has not seen yet; [`Session::recv`] returns them first.
+    pending: std::collections::VecDeque<Message>,
     /// Read buffer, on the heap so session futures stay small.
     buf: Box<[u8]>,
     pub remote_name: String,
@@ -557,6 +581,19 @@ impl std::fmt::Display for NotAdmitted {
 }
 
 impl std::error::Error for NotAdmitted {}
+
+/// How the dialer of a session pairs, as the listener learns it from [`Session::pair_intent`] (ADR-0064).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PairIntent {
+    /// It proved our link's one-time secret: trust as `ticket`.
+    Link,
+    /// It started the six-digit check: run [`Session::pair_code`].
+    Code,
+    /// It sent a link proof that does not match our secret: not trusted.
+    WrongLink,
+    /// Neither: not trusted, a guest.
+    Neither,
+}
 
 /// The six digits of [`Session::pair_code`] did not come out of an honest exchange: the reveal did not open the
 /// commitment, or the peer broke the order. Treat as an attack; never offer to trust this peer.
@@ -597,13 +634,14 @@ impl Session {
             send,
             recv,
             decoder: Decoder::new(),
+            pending: std::collections::VecDeque::new(),
             buf: vec![0u8; 16 * 1024].into_boxed_slice(),
             remote_name: String::new(),
             remote_platform: platform,
             dialer,
         };
         s.send(&Message::hello(clip(name, 64), platform)).await?;
-        match s.recv().await? {
+        match s.recv_wire().await? {
             Message::Hello {
                 protocol,
                 device_name,
@@ -635,7 +673,27 @@ impl Session {
         Ok(())
     }
 
+    /// The next message: one held back earlier (see [`Session::pair_intent`] and the transfer functions, which
+    /// keep companion messages that arrive mid-transfer), else the next one from the wire.
     pub async fn recv(&mut self) -> Result<Message> {
+        if let Some(m) = self.pending.pop_front() {
+            return Ok(m);
+        }
+        self.recv_wire().await
+    }
+
+    /// Inside a transfer: keeps a companion message for the host's next [`Session::recv`] (past [`MAX_PENDING`]
+    /// the oldest goes) and drops anything else the transfer does not want.
+    pub(crate) fn keep_companion(&mut self, msg: Message) {
+        if matches!(msg, Message::Notice(_) | Message::Clipboard { .. }) {
+            if self.pending.len() >= MAX_PENDING {
+                self.pending.pop_front();
+            }
+            self.pending.push_back(msg);
+        }
+    }
+
+    pub(crate) async fn recv_wire(&mut self) -> Result<Message> {
         loop {
             if let Some(msg) = self.decoder.next_message()? {
                 return Ok(msg);
@@ -729,10 +787,7 @@ impl Session {
     /// when the peer's reveal does not match its commitment.
     pub async fn pair_code(&mut self) -> Result<String> {
         use vutric_core::sas;
-        let mut x = [0u8; sas::EXPORTER_BYTES];
-        self.conn
-            .export_keying_material(&mut x, sas::EXPORTER_LABEL, &[])
-            .map_err(|e| anyhow!("keying material: {e:?}"))?;
+        let x = self.exporter()?;
         let mine: [u8; sas::NONCE_BYTES] = new_identity();
         if self.dialer {
             self.send(&Message::PairCommit {
@@ -755,6 +810,92 @@ impl Session {
             };
             Ok(sas::code(&x, &theirs, &mine))
         }
+    }
+
+    /// Dialer: proves that we read the listener's pairing link (its one-time [`vutric_core::sas::LinkSecret`]),
+    /// bound to this TLS session. Send it right after connecting; [`Peer::connect_link`] does.
+    pub async fn prove_link(&mut self, secret: &vutric_core::sas::LinkSecret) -> Result<()> {
+        let x = self.exporter()?;
+        self.send(&Message::PairProof {
+            proof: vutric_core::sas::link_proof(&x, secret),
+        })
+        .await
+    }
+
+    /// Listener, right after admitting an unknown device in its pairing window: how does the dialer pair?
+    /// Waits up to `wait` (normally [`PAIR_INTENT_WAIT`]) for its first message (ADR-0064, issue #13).
+    ///
+    /// - [`PairIntent::Link`]: it proved the one-time secret of our link (`secret`), so it scanned our QR. Trust
+    ///   it as `ticket`.
+    /// - [`PairIntent::Code`]: it started the six-digit check. Call [`Self::pair_code`] now (the commitment is
+    ///   kept for it), then [`Self::pair_finish`]; trust as `code` only when both said yes.
+    /// - [`PairIntent::WrongLink`]: a link proof that does not match (an old QR, or a forgery). Not trusted.
+    /// - [`PairIntent::Neither`]: anything else, or silence. Not trusted: the session stays a guest whose offers
+    ///   are asked about. A message read here is kept for the next [`Self::recv`].
+    pub async fn pair_intent(
+        &mut self,
+        secret: Option<&vutric_core::sas::LinkSecret>,
+        wait: Duration,
+    ) -> Result<PairIntent> {
+        ensure!(!self.dialer, "pair_intent is for the listening side");
+        let msg = match self.pending.pop_front() {
+            Some(m) => m,
+            None => match tokio::time::timeout(wait, self.recv_wire()).await {
+                Err(_) => return Ok(PairIntent::Neither),
+                Ok(m) => m?,
+            },
+        };
+        match msg {
+            Message::PairProof { proof } => {
+                let x = self.exporter()?;
+                Ok(match secret {
+                    Some(s) if vutric_core::sas::link_proof_ok(&proof, &x, s) => PairIntent::Link,
+                    _ => PairIntent::WrongLink,
+                })
+            }
+            m @ Message::PairCommit { .. } => {
+                self.pending.push_front(m);
+                Ok(PairIntent::Code)
+            }
+            other => {
+                self.pending.push_front(other);
+                Ok(PairIntent::Neither)
+            }
+        }
+    }
+
+    fn exporter(&self) -> Result<[u8; vutric_core::sas::EXPORTER_BYTES]> {
+        let mut x = [0u8; vutric_core::sas::EXPORTER_BYTES];
+        self.conn
+            .export_keying_material(&mut x, vutric_core::sas::EXPORTER_LABEL, &[])
+            .map_err(|e| anyhow!("keying material: {e:?}"))?;
+        Ok(x)
+    }
+
+    /// Mirrors one phone notification to the other device (ADR-0064). Text over the caps of
+    /// [`vutric_core::message`] is cut here, on the sender, so a long notification never kills the session.
+    pub async fn send_notice(
+        &mut self,
+        app: &str,
+        title: &str,
+        text: &str,
+        at_ms: u64,
+    ) -> Result<()> {
+        use vutric_core::message::{MAX_NOTICE_LINE_CHARS, MAX_NOTICE_TEXT_CHARS};
+        let cut = |s: &str, n: usize| s.chars().take(n).collect::<String>();
+        self.send(&Message::Notice(vutric_core::Notice {
+            app: cut(app, MAX_NOTICE_LINE_CHARS),
+            title: cut(title, MAX_NOTICE_LINE_CHARS),
+            text: cut(text, MAX_NOTICE_TEXT_CHARS),
+            at_ms,
+        }))
+        .await
+    }
+
+    /// Sends text for the other device's clipboard prompt; only on an explicit user action. Errors when the text
+    /// is empty or over [`vutric_core::message::MAX_CLIPBOARD_BYTES`] (the UI says it is too long).
+    pub async fn send_clipboard(&mut self, text: &str) -> Result<()> {
+        self.send(&Message::Clipboard { text: text.into() }).await
     }
 
     async fn recv_step(&mut self) -> Result<Message> {

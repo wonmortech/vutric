@@ -138,3 +138,11 @@ test = false
 doc = false
 bench = false
 required-features = ["libfuzzer"]
+
+[[bin]]
+name = "companion"
+path = "fuzz_targets/companion.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]

@@ -5,6 +5,7 @@
 
 pub mod beacon;
 pub mod code;
+pub mod companion;
 pub mod effect;
 pub mod error;
 pub mod filename;
@@ -21,7 +22,9 @@ pub mod trust;
 pub use effect::{EffectId, SendZone};
 pub use error::{Error, Result};
 pub use id::{EndpointId, FlingId};
-pub use message::{FlingStart, Gesture, Message, OfferEntry, Platform, Preview, PreviewFormat};
+pub use message::{
+    FlingStart, Gesture, Message, Notice, OfferEntry, Platform, Preview, PreviewFormat,
+};
 pub use pairing::PairingTicket;
 
 /// QUIC ALPN identifier. Bumped only on a wire-incompatible change.

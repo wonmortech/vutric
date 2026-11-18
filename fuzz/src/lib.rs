@@ -96,6 +96,14 @@ pub fn pairing_ticket(data: &[u8]) {
         let qr = w.to_wifi_qr();
         assert!(qr.starts_with("WIFI:T:") && qr.ends_with(";;"));
     }
+    if let Ok(Some(secret)) = vutric_core::pairing::secret_in(text) {
+        let again = vutric_core::pairing::with_secret("vutric://pair?v=2", &secret);
+        assert_eq!(
+            vutric_core::pairing::secret_in(&again),
+            Ok(Some(secret)),
+            "link secret round-trips"
+        );
+    }
     let Ok(t) = PairingTicket::parse(text) else {
         return;
     };
@@ -121,6 +129,63 @@ pub fn pairing_ticket(data: &[u8]) {
     let uri = t.to_uri();
     assert!(uri.is_ascii(), "QR payload must stay ASCII");
     assert_eq!(PairingTicket::parse(&uri).expect("own link parses"), t);
+}
+
+/// Companion messages from a paired phone (ADR-0064, issue #12): a notice or clipboard text. What validation
+/// accepts must round-trip and stay inside the caps; what `companion::shown` returns must be safe to print.
+pub fn companion(data: &[u8]) {
+    use vutric_core::companion::shown;
+    use vutric_core::message::{MAX_CLIPBOARD_BYTES, MAX_NOTICE_LINE_CHARS, MAX_NOTICE_TEXT_CHARS};
+    let Some((&pick, rest)) = data.split_first() else {
+        return;
+    };
+    let mut u = Unstructured::new(rest);
+    let msg = if pick & 1 == 0 {
+        let Ok(n) = vutric_core::Notice::arbitrary(&mut u) else {
+            return;
+        };
+        Message::Notice(n)
+    } else {
+        let Ok(text) = String::arbitrary(&mut u) else {
+            return;
+        };
+        Message::Clipboard { text }
+    };
+    let Ok(wire) = frame::encode(&msg) else {
+        return;
+    };
+    let Ok(got) = frame::decode(&wire[HEADER..]) else {
+        assert!(msg.validate().is_err(), "valid companion message refused");
+        return;
+    };
+    assert_eq!(got, msg);
+    let bad = |s: &str| {
+        s.chars().any(|c| {
+            (c.is_control() && c != '\n')
+                || matches!(c, '\u{200E}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')
+        })
+    };
+    match got {
+        Message::Notice(n) => {
+            assert!(n.app.chars().count() <= MAX_NOTICE_LINE_CHARS);
+            assert!(n.title.chars().count() <= MAX_NOTICE_LINE_CHARS);
+            assert!(n.text.chars().count() <= MAX_NOTICE_TEXT_CHARS);
+            for (line, max) in [
+                (&n.app, MAX_NOTICE_LINE_CHARS),
+                (&n.title, MAX_NOTICE_LINE_CHARS),
+            ] {
+                let shown = shown(line, max, false);
+                assert!(!bad(&shown) && !shown.contains('\n'));
+            }
+            assert!(!bad(&shown(&n.text, MAX_NOTICE_TEXT_CHARS, true)));
+        }
+        Message::Clipboard { text } => {
+            assert!(!text.is_empty() && text.len() <= MAX_CLIPBOARD_BYTES);
+            let preview = shown(&text, 200, true);
+            assert!(preview.chars().count() <= 200 && !bad(&preview));
+        }
+        other => panic!("decoded into {}", other.kind()),
+    }
 }
 
 #[derive(Debug, Arbitrary)]
@@ -482,6 +547,16 @@ mod smoke {
             },
             Message::PairCommit { commit: [9; 32] },
             Message::PairResult { confirmed: true },
+            Message::PairProof { proof: [4; 32] },
+            Message::Notice(vutric_core::Notice {
+                app: "Telegram".into(),
+                title: "Ali".into(),
+                text: "salom".into(),
+                at_ms: 1,
+            }),
+            Message::Clipboard {
+                text: "nusxa".into(),
+            },
         ];
         msgs.iter()
             .flat_map(|m| frame::encode(m).unwrap())
@@ -537,6 +612,13 @@ mod smoke {
                 pairing_ticket(&v);
             }
         }
+    }
+
+    #[test]
+    fn companion_structured() {
+        run(companion, 1024, 23);
+        companion(b"\x00\x08Telegram\x03Ali\x05salom\x2a");
+        companion(b"\x01\x04\xe2\x80\xaeab");
     }
 
     #[test]

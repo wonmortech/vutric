@@ -424,7 +424,7 @@ pub async fn send(s: &mut Session, files: Vec<Outgoing>, on: OnProgress) -> Resu
         .await?;
         let wait = if first == 0 { ASK } else { IDLE };
         let have = loop {
-            match tokio::time::timeout(wait, s.recv())
+            match tokio::time::timeout(wait, s.recv_wire())
                 .await
                 .map_err(|_| anyhow!("no answer to the offer"))??
             {
@@ -444,7 +444,7 @@ pub async fn send(s: &mut Session, files: Vec<Outgoing>, on: OnProgress) -> Resu
                     }
                     bail!("the other device cancelled")
                 }
-                _ => {}
+                other => s.keep_companion(other),
             }
         };
 
@@ -480,7 +480,7 @@ pub async fn send(s: &mut Session, files: Vec<Outgoing>, on: OnProgress) -> Resu
         }
 
         let refused = loop {
-            match tokio::time::timeout(IDLE, s.recv())
+            match tokio::time::timeout(IDLE, s.recv_wire())
                 .await
                 .map_err(|_| anyhow!("no word from the receiver after the files"))??
             {
@@ -488,7 +488,7 @@ pub async fn send(s: &mut Session, files: Vec<Outgoing>, on: OnProgress) -> Resu
                 Message::FlingFailed { id: r, .. } if r == id => {
                     bail!("the other device cancelled")
                 }
-                _ => {}
+                other => s.keep_companion(other),
             }
         };
         bad.extend(
@@ -798,7 +798,7 @@ pub async fn receive(
             break;
         }
         batch = loop {
-            let msg = tokio::time::timeout(IDLE, s.recv())
+            let msg = tokio::time::timeout(IDLE, s.recv_wire())
                 .await
                 .map_err(|_| anyhow!("the sender went quiet"))??;
             match msg {
@@ -818,7 +818,7 @@ pub async fn receive(
                     };
                 }
                 Message::FlingFailed { id: r, .. } if r == id => bail!("the sender cancelled"),
-                _ => {}
+                other => s.keep_companion(other),
             }
         };
     }

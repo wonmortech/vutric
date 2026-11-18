@@ -80,6 +80,7 @@ Sources:
 | S5 | Every route: bounded fixed frames before auth, same encryption for every frame type, 6-digit TLS-exporter code | all | [x] ADR-0061 audit of every route; Quick Share pre-auth frames capped at 16 KiB (`conn::tests::preauth_frames_are_small_until_the_gate_opens`); LocalSend and Quick Share have no 6-digit code by protocol (deviation in ADR-0061) |
 | S6 | Privacy line on screen A1: "Fayllar shifrlangan, faqat siz va qabul qiluvchi ko'radi"; the Lan-only setting brings back "Hech narsa internetga chiqmaydi" | 1 | [~] engine: `Picker::privacy_lines` (ADR-0061, test `privacy_line_only_promises_what_is_true`); the line on screen A1 is W1 · phone (W1): on the home screen, connect sheet and under the picker (ADR-0013 #5, test `the S6 lines say exactly what ADR-0061 says`); device step: checklist 15 |
 | S7 | The device name is never published to lookup | 0.2 | [x] |
+| S8 | (W3) The listener knows how the dialer pairs: one-time secret in the QR proven by `PairProof`, or the six digits; nothing else is trusted (#13) | 1 | [x] engine: ADR-0064, `sas::link_proof`, `pairing::with_secret`/`secret_in`, `Peer::connect_link`, `Session::pair_intent`; tests `tests/pair_intent.rs` (5), fuzz `pairing_ticket`. Phone and daemon wiring: W1/W2 (steps in ADR-0064) |
 
 ## 4. Storage settings (ADR-0007 §4, ADR-0008)
 
@@ -168,6 +169,7 @@ Sources:
 | F17 | LocalSend compatibility | C1 | [~] |
 | F18 | "Wow" throw effect (Canopy Portal, Mac only) | overlay | [x] Windows |
 | F19 | Simple first screen with no setup (LocalSend lesson) | A1, A2 | [~] |
+| F20 | (W3) Wire for F12/F13: `Message::Notice` and `Message::Clipboard`, caps, trusted-only, rate limit, kept across transfers (#12) | ADR-0065 | [x] engine: `vutric_core::companion`, `Session::send_notice`/`send_clipboard`; tests `message.rs::companion_bounds`, `companion.rs`, `tests/pair_intent.rs` (2), fuzz `companion`. Phone/desktop screens: W1/W2 |
 
 ## 9. Effects (effects.md)
 
