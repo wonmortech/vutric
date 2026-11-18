@@ -81,6 +81,44 @@ jobs:
           name: gnome-extension
           path: vutric@wonmor.io.shell-extension.zip
 
+  deb:
+    name: .deb (dpkg-deb, lintian)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: linux-w4-release-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: linux-w4-release-
+      - name: Build
+        run: cargo build --release --locked -p vutric-host-linux --bin vutric-surface
+      - name: Package
+        run: bash packaging/linux/build-deb.sh target/deb
+      - name: lintian (report only)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends lintian
+          lintian --info --display-info target/deb/*.deb | tee target/deb/lintian.txt || true
+      - name: Install and remove on the runner
+        run: |
+          sudo apt-get install -y ./target/deb/*.deb
+          test -x /usr/libexec/vutric/vutric-surface
+          test -f /usr/share/gnome-shell/extensions/vutric@wonmor.io/metadata.json
+          systemd-analyze --user verify /usr/lib/systemd/user/vutric.service || true
+          desktop-file-validate /usr/share/applications/io.wonmor.Vutric.desktop || true
+          sudo apt-get remove -y vutric
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vutric-deb
+          path: target/deb/
+
   overlay-sway:
     name: overlay on headless sway (layer-shell)
     runs-on: ubuntu-24.04

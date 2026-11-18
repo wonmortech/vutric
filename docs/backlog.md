@@ -110,8 +110,12 @@ Sources:
 | D7 | MSIX + winget; installer firewall rule for the Private profile; first-run hint for Public networks | 1 | [ ] |
 | D8 | Overlay checks: NVIDIA and AMD dGPU, multi-monitor with mixed DPI, Windows 11; choose the monitor | 1 | [ ] |
 | D9 | GPU needing over 2 s to start: the first fling must not be refused | 1 | [ ] |
-| D10 | Linux: `vutric-host-wlr` (KDE, wlroots, COSMIC), GNOME 46/50 extension + D-Bus, systemd user unit, one-time extension checklist, Nautilus/Dolphin scripts, StatusNotifier, `.deb` + PPA, extensions.gnome.org | 2 | [ ] |
+| D10 | Linux: `vutric-host-wlr` (KDE, wlroots, COSMIC), GNOME 46/50 extension + D-Bus, systemd user unit, one-time extension checklist, Nautilus/Dolphin scripts, StatusNotifier, `.deb` + PPA, extensions.gnome.org | 2 | (W4) [~] built: `crates/vutric-host-wlr` (layer-shell + GNOME surfaces, cards), `crates/vutric-host-linux` (`vutric-surface`, SNI tray, notifications, GNOME client, unit/Nautilus/Dolphin files), `apps/gnome-extension/`, `packaging/linux/` (.deb); ADR-0090/0091/0092; CI `linux-desktop.yml`: overlay under headless sway and headless GNOME Shell 46, D-Bus tests, .deb install. Left: daemon wiring (needs-w2), real machines (checklist `docs/checklists/linux-desktop.md`), PPA or own APT repo (owner), EGO upload |
 | D11 | macOS: `NSPanel` overlay, notarised `.dmg` | 5 | [ ] |
+| DL1 | (W4) Spike 0.3: the Halqa overlay on a layer-shell compositor and on GNOME through the extension, frame stats recorded | 0 | [~] CI only (headless sway + lavapipe, headless GNOME 46); real GPUs: checklist rows 1-9 |
+| DL2 | (W4) Linux X11 sessions (override-redirect + XShape overlay) | 2 | [ ] owner question; today: files received, no effect |
+| DL3 | (W4) Fractional scaling (`wp_fractional_scale_v1` + viewporter) for the Linux surfaces | 2 | [ ] after a 125 % Plasma measurement |
+| DL4 | (W4) `.rpm` for Fedora from the same staging tree; Flatpak for layer-shell desktops reconsidered | 2 | [ ] ADR-0092 |
 
 ## 6. Android (ADR-0009 §2, roadmap Phase 1)
 
