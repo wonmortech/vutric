@@ -97,14 +97,18 @@ async fn unknown_refused_then_paired_by_code_then_trusted() {
     // 3. Back to the default: the paired phone is let in as Trusted.
     let accept = tokio::spawn({
         let (desktop, f) = (desktop.clone(), gate_fn(&gate));
-        async move { desktop.accept_with(f).await.expect("accept trusted").1 }
+        // The task hands its session back: dropping it here closed the connection under the phone's
+        // handshake on Windows CI.
+        async move { desktop.accept_with(f).await.expect("accept trusted") }
     });
     let s = phone
         .connect(ticket.endpoint, &ticket.addrs)
         .await
         .expect("trusted connect");
-    assert_eq!(accept.await.unwrap(), Admission::Trusted);
+    let (desktop_s, admission) = accept.await.unwrap();
+    assert_eq!(admission, Admission::Trusted);
     s.close();
+    desktop_s.close();
     phone.close().await;
     desktop.close().await;
 }

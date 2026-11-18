@@ -87,7 +87,11 @@ async fn accept_two_files_with_many_chunks() {
     println!(
         "3.2 MB over loopback Quick Share (UKEY2 + AES-CBC + HMAC) in {took:?} ({:.0} MB/s, {})",
         3.2 / took.as_secs_f64(),
-        if cfg!(debug_assertions) { "debug" } else { "release" }
+        if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        }
     );
     let _ = std::fs::remove_dir_all(dir);
 }
