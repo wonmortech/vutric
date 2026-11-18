@@ -50,9 +50,17 @@ fi
 cat "$out/ping.txt"
 gnome-extensions info "$uuid" | tee "$out/extension-info.txt" || true
 
+# 1. The surface as an ordinary Wayland client of Mutter (no extension): proves wgpu on GNOME's compositor.
+direct=0
+WAYLAND_DISPLAY=wayland-0 "$bin/vutric-surface" --backend gnome --self-test 3 --cards 0 \
+    --out "$out/self-test.json" > "$out/self-test.txt" 2>&1 || direct=$?
+cat "$out/self-test.txt"
+echo "direct self-test exit: $direct"
+# 2. Launched by the extension as a trusted client and driven over the daemon protocol.
 "$bin/examples/surface_driver" --gnome --runs 3 --out "$out/driver.json" || {
     sleep 1
-    echo "--- surface stderr"; cat "$out/surface.log" 2>/dev/null || true
+    echo "--- surface stderr"; ls -la "$out"; cat "$out/surface.log" 2>/dev/null || true
+    echo "--- Vutric lines in the shell log"; grep -F 'Vutric' "$out/gnome-shell.log" || true
     echo "--- shell log (tail)"; tail -n 40 "$out/gnome-shell.log"
     exit 1
 }

@@ -79,7 +79,11 @@ class Surface {
             this._client = Meta.WaylandClient.new(global.context, launcher);
             this._proc = this._client.spawnv(global.display, argv);
         }
-        this._proc.wait_async(null, () => {
+        this._proc.wait_async(null, proc => {
+            const how = proc.get_if_signaled()
+                ? `signal ${proc.get_term_sig()}`
+                : `status ${proc.get_exit_status()}`;
+            console.log(`Vutric: surface exited (${how})`);
             this._proc = null;
             this._client = null;
             this._windows.clear();
