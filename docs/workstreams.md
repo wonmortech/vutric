@@ -24,6 +24,7 @@ done. An open question for the owner never blocks a stream. It goes into
 | **W2 · Desktop** | Rust daemon (tray, toast, IPC, autostart), overlay cards, Halqa and the other effects, Explorer menu, installer; desktop settings UI after the M1 spike; Linux hosts later | `crates/vutric-overlay/**`, `crates/vutric-host-*/**`, new `crates/vutric-daemon/**`, `apps/overlay-spike/**`, new `apps/desktop/**`, new `packaging/**` | D1–D11, E1–E5, M1, T8 |
 | **W3 · Network and interop** | routes R1–R10, our own relay, trust store and security, storage engine, every adapter of ADR-0010, fuzzing, interop tests | `crates/vutric-core/**`, `crates/vutric-net/**`, new `crates/vutric-compat-*/**`, new `crates/vutric-relay/**`, `apps/net-spike/**`, new `fuzz/**`, `docs/protocol.md` | R*, C*, S*, T2/T4–T7 engine, M2–M5 |
 | **W5 · macOS** (from 2026-11-18) | Roadmap Phase 5: the `NSPanel` overlay host, the menu-bar agent (the daemon role on macOS: login item, notifications), the Swift Share extension and Finder Quick Action, the signed and notarised `.dmg`, macOS CI, and the macOS host side of LocalSend and Quick Share. Carved out of W2's `crates/vutric-host-*/**` and `packaging/**` for macOS only | new `crates/vutric-host-mac/**`, new `apps/macos/**` (Swift), new `packaging/macos/**`, new `.github/workflows/macos-*.yml`; inside W2's `apps/desktop/**` only a new `apps/desktop/macos/` runner directory | D11, macOS parts of C1, C3 and F1 |
+| **W4 · Linux desktop** | Spike 0.3 and Phase 2 Linux: the layer-shell host (KDE Plasma, wlroots, COSMIC), the GNOME Shell extension and its D-Bus API, the Linux daemon pieces (systemd user unit, StatusNotifierItem, notifications, XDG autostart, Nautilus/Dolphin "Vutric bilan yuborish"), `.deb`/PPA/extensions.gnome.org packaging, Linux CI. Started 2026-11-18. Takes `crates/vutric-host-wlr` and `crates/vutric-host-gnome` out of W2's `crates/vutric-host-*/**`; W2 keeps `vutric-overlay`, `vutric-host-win` and `vutric-daemon`. W5 is macOS, W6 the Android native extras | `crates/vutric-host-wlr/**`, `crates/vutric-host-linux/**`, `crates/vutric-host-gnome/**`, `apps/gnome-extension/**`, `docs/checklists/linux-desktop.md`, `packaging/linux/**`, `.github/workflows/linux-*.yml` | D10 (from W2), Linux parts of D1/D2/D5, F-rows on Linux |
 
 **Shared files.** These have rules instead of a single owner:
 
@@ -37,6 +38,7 @@ done. An open question for the owner never blocks a stream. It goes into
 | `.github/workflows/**` | Add new workflow files, or add a new job. Never rewrite another stream's job. |
 | ADR numbers | W1 uses 0011–0029, W2 0030–0049, W3 0050–0069, so numbers never collide. |
 | ADR numbers (W5) | W5 uses 0110–0129. |
+| ADR numbers (W4) | W4 uses 0090–0109. |
 
 ## The interface between streams
 
@@ -62,6 +64,7 @@ done. An open question for the owner never blocks a stream. It goes into
   | W2 | `D:\Projects\wonmortech\vutric-w2` | `w2/desktop` |
   | W3 | `D:\Projects\wonmortech\vutric-w3` | `w3/net` |
   | W5 | `C:\vutric-w5` | `w5/macos-*` |
+  | W4 | `C:\vutric-w4` | `w4/linux-1` |
 
 - **Commits are small and finished.**
   - Every commit leaves the stream's crates green: `cargo clippy --all-targets -- -D warnings` and the tests, plus

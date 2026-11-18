@@ -1,0 +1,6 @@
+vutric (0.0.1) unstable; urgency=medium
+
+  * First Linux package: vutric-surface, the GNOME Shell extension, the
+    systemd user unit, the KIO service menu and the icons (ADR-0092).
+
+ -- Vutric maintainers <283333996+xnosir@users.noreply.github.com>  Wed, 18 Nov 2026 12:00:00 +0000

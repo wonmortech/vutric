@@ -1,0 +1,183 @@
+# SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# W4 · Linux desktop (ADR-0090..0092): the Linux crates, the overlay on headless sway (layer-shell) and headless
+# GNOME Shell (extension), the extension's lint and tests, and the .deb.
+
+name: Linux desktop
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "crates/vutric-host-wlr/**"
+      - "crates/vutric-host-linux/**"
+      - "crates/vutric-overlay/**"
+      - "crates/vutric-core/**"
+      - "apps/gnome-extension/**"
+      - "packaging/linux/**"
+      - ".github/workflows/linux-*.yml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  crates:
+    name: crates (clippy, tests, D-Bus)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: linux-w4-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: linux-w4-
+      - name: Format
+        run: cargo fmt -p vutric-host-wlr -p vutric-host-linux --check
+      - name: Clippy
+        run: cargo clippy -p vutric-host-wlr -p vutric-host-linux --all-targets --locked -- -D warnings
+      - name: Unit tests
+        run: cargo test -p vutric-host-wlr -p vutric-host-linux --locked
+      - name: D-Bus tests (tray, notifications) on a private session bus
+        run: dbus-run-session -- cargo test -p vutric-host-linux --test dbus --locked -- --nocapture
+
+  extension:
+    name: GNOME extension (eslint, node tests, zip)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Unit tests (pure helpers, D-Bus contract)
+        run: node --test apps/gnome-extension/tests/lib.test.mjs
+      - name: ESLint
+        working-directory: apps/gnome-extension
+        run: npx --yes eslint@9.39.1 .
+      - name: Pack for extensions.gnome.org
+        run: |
+          cd "apps/gnome-extension/vutric@wonmor.io"
+          zip -r -X "$GITHUB_WORKSPACE/vutric@wonmor.io.shell-extension.zip" . -x '*.md'
+          unzip -l "$GITHUB_WORKSPACE/vutric@wonmor.io.shell-extension.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gnome-extension
+          path: vutric@wonmor.io.shell-extension.zip
+
+  deb:
+    name: .deb (dpkg-deb, lintian)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: linux-w4-release-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: linux-w4-release-
+      - name: Build
+        run: cargo build --release --locked -p vutric-host-linux --bin vutric-surface
+      - name: Package
+        run: bash packaging/linux/build-deb.sh target/deb
+      - name: lintian (report only)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends lintian
+          lintian --info --display-info target/deb/*.deb | tee target/deb/lintian.txt || true
+      - name: Install and remove on the runner
+        run: |
+          sudo apt-get install -y ./target/deb/*.deb
+          test -x /usr/libexec/vutric/vutric-surface
+          test -f /usr/share/gnome-shell/extensions/vutric@wonmor.io/metadata.json
+          systemd-analyze --user verify /usr/lib/systemd/user/vutric.service || true
+          desktop-file-validate /usr/share/applications/io.wonmor.Vutric.desktop || true
+          sudo apt-get remove -y vutric
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vutric-deb
+          path: target/deb/
+
+  overlay-sway:
+    name: overlay on headless sway (layer-shell)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: linux-w4-release-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: linux-w4-release-
+      - name: sway, Mesa lavapipe (software Vulkan)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends sway mesa-vulkan-drivers libvulkan1 vulkan-tools
+      - name: Build
+        run: cargo build --release --locked -p vutric-host-linux --bin vutric-surface --example surface_driver
+      - name: Run the overlay and record frames
+        run: bash packaging/linux/ci/sway-headless.sh linux-overlay-sway
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-overlay-sway
+          path: linux-overlay-sway/
+
+  overlay-gnome:
+    name: overlay on headless GNOME Shell (extension)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: linux-w4-release-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: linux-w4-release-
+      - name: GNOME Shell, Mesa
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends gnome-shell gnome-shell-extension-prefs \
+            dbus-daemon dconf-service mesa-vulkan-drivers libvulkan1 libegl-mesa0 libgl1-mesa-dri
+      - name: Build
+        run: cargo build --release --locked -p vutric-host-linux --bin vutric-surface --example surface_driver
+      - name: Run the extension and the surface
+        run: dbus-run-session -- bash packaging/linux/ci/gnome-headless.sh linux-overlay-gnome
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-overlay-gnome
+          path: linux-overlay-gnome/

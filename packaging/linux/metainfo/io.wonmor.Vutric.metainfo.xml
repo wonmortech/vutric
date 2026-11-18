@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<component type="desktop-application">
+  <id>io.wonmor.Vutric</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <name>Vutric</name>
+  <summary>Receive photos and files flung from your phone</summary>
+  <summary xml:lang="uz">Telefondan otilgan rasm va fayllarni qabul qilish</summary>
+  <description>
+    <p>Flick a photo, video or file off the edge of your phone and watch it fly onto this screen. Same Wi-Fi, no
+      cables, no cloud.</p>
+    <p xml:lang="uz">Telefon chetidan rasm, video yoki faylni otib yuboring, u shu ekranga uchib tushadi. Bitta
+      Wi-Fi, simsiz, bulutsiz.</p>
+  </description>
+  <launchable type="desktop-id">io.wonmor.Vutric.desktop</launchable>
+  <url type="homepage">https://github.com/wonmortech/vutric</url>
+  <url type="bugtracker">https://github.com/wonmortech/vutric/issues</url>
+  <developer id="io.wonmor">
+    <name>Wonmor</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>vutric-daemon</binary>
+  </provides>
+  <releases>
+    <release version="0.0.1" date="2026-11-18"/>
+  </releases>
+</component>

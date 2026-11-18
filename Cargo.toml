@@ -13,6 +13,8 @@ members = [
     "crates/vutric-mobile",
     "apps/overlay-spike",
     "crates/vutric-compat-wormhole",
+    "crates/vutric-host-wlr",
+    "crates/vutric-host-linux",
     "crates/vutric-host-mac",
 ]
 

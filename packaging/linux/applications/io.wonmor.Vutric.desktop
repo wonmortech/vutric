@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Vutric
+GenericName=Telefondan fayl qabul qilish
+GenericName[en]=Receive files from your phone
+Comment=Telefondan otilgan rasm va fayllarni shu kompyuterga qabul qiladi
+Comment[en]=Receives photos and files flung from your phone
+Exec=vutric-daemon
+Icon=io.wonmor.Vutric
+Terminal=false
+Categories=Network;FileTransfer;Utility;
+Keywords=phone;share;transfer;send;receive;telefon;yuborish;qabul;
+StartupNotify=false
+SingleMainWindow=true
+X-GNOME-UsesNotifications=true

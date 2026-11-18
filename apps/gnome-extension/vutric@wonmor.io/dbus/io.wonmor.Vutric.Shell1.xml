@@ -1,0 +1,44 @@
+<!--
+  SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors
+  SPDX-License-Identifier: Apache-2.0
+
+  The D-Bus API the Vutric GNOME Shell extension exports on the Shell's own connection (service org.gnome.Shell,
+  object /io/wonmor/Vutric/Shell). The daemon is the only intended caller. ADR-0090 §2.
+  `crates/vutric-host-linux/src/gnome.rs` is the Rust side; a test keeps the two in step.
+-->
+<node>
+  <interface name="io.wonmor.Vutric.Shell1">
+    <!-- API level and the running GNOME Shell version. -->
+    <method name="Ping">
+      <arg type="u" name="api" direction="out"/>
+      <arg type="s" name="shell_version" direction="out"/>
+    </method>
+    <!-- Launch the surface process as a trusted Wayland client. The socket must be a *.sock file directly inside
+         $XDG_RUNTIME_DIR/vutric/; anything else is refused. Returns the surface's process id. -->
+    <method name="SpawnSurface">
+      <arg type="s" name="socket" direction="in"/>
+      <arg type="i" name="pid" direction="out"/>
+    </method>
+    <!-- Show a card raster (premultiplied BGRA, rendered at `scale`) at the bottom-right of the primary monitor.
+         `hits` are (id, x0, y0, x1, y1) in buffer pixels. -->
+    <method name="ShowCard">
+      <arg type="u" name="width" direction="in"/>
+      <arg type="u" name="height" direction="in"/>
+      <arg type="i" name="scale" direction="in"/>
+      <arg type="ay" name="bgra" direction="in"/>
+      <arg type="a(sdddd)" name="hits" direction="in"/>
+    </method>
+    <method name="HideCard"/>
+    <!-- Show the panel indicator for the calling daemon; it disappears when the caller leaves the bus. -->
+    <method name="SetStatus">
+      <arg type="b" name="paused" direction="in"/>
+      <arg type="s" name="lang" direction="in"/>
+    </method>
+    <signal name="CardClicked">
+      <arg type="s" name="id"/>
+    </signal>
+    <signal name="MenuActivated">
+      <arg type="s" name="id"/>
+    </signal>
+  </interface>
+</node>

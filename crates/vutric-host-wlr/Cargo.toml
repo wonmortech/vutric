@@ -1,0 +1,20 @@
+[package]
+name = "vutric-host-wlr"
+description = "Wayland surfaces for the Vutric overlay and cards: wlr-layer-shell (KDE Plasma, wlroots, COSMIC) and an xdg toplevel for GNOME."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2.191"
+raw-window-handle.workspace = true
+smithay-client-toolkit = { version = "0.19.2", default-features = false }
+wayland-backend = { version = "0.3.17", features = ["client_system", "dlopen"] }
+wayland-client = "0.31.15"
+
+[lints]
+workspace = true
