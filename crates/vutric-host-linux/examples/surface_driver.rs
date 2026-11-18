@@ -84,7 +84,9 @@ mod imp {
         }
     }
 
-    async fn gnome(socket: &str, report: &mut Report) -> Result<(), String> {
+    /// Returns the bus connection: the extension ties the surface to its caller's bus name and kills it when that
+    /// name goes away, so the connection must live as long as the daemon would.
+    async fn gnome(socket: &str, report: &mut Report) -> Result<zbus::Connection, String> {
         use vutric_host_linux::gnome::ShellProxy;
         let conn = zbus::Connection::session()
             .await
@@ -118,7 +120,8 @@ mod imp {
             .await
             .map_err(|e| format!("SpawnSurface: {e}"))?;
         println!("extension spawned vutric-surface, pid {pid}");
-        Ok(())
+        drop(shell);
+        Ok(conn)
     }
 
     #[allow(clippy::too_many_lines, reason = "a linear test script")]
@@ -153,12 +156,15 @@ mod imp {
             let listener = UnixListener::bind(&path).map_err(|e| e.to_string())?;
             let socket = path.to_string_lossy().into_owned();
             let mut child = None;
+            // Kept until the run ends: the bus name is what keeps the extension's surface alive.
+            let mut _bus = None;
             if use_gnome {
-                tokio::runtime::Builder::new_current_thread()
+                let rt = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()
-                    .map_err(|e| e.to_string())?
-                    .block_on(gnome(&socket, &mut report))?;
+                    .map_err(|e| e.to_string())?;
+                let conn = rt.block_on(gnome(&socket, &mut report))?;
+                _bus = Some((rt, conn));
             } else {
                 let exe = spawn.clone().ok_or("--spawn PATH or --gnome")?;
                 child = Some(
