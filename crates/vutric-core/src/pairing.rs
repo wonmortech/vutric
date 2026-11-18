@@ -8,6 +8,7 @@
 use core::fmt::Write as _;
 use std::net::SocketAddr;
 
+use crate::sas::LinkSecret;
 use crate::{EndpointId, Error, PROTOCOL_VERSION, Result};
 
 const PREFIX: &str = "vutric://pair?";
@@ -99,6 +100,30 @@ impl PairingTicket {
     }
 }
 
+/// The pairing link `uri` (plain or with a hotspot) with the one-time [`LinkSecret`] added as `s=` (ADR-0064).
+/// Shown only while the pairing window is open; older apps ignore the key.
+#[must_use]
+pub fn with_secret(uri: &str, secret: &LinkSecret) -> String {
+    format!("{uri}&s={}", secret.to_hex())
+}
+
+/// The [`LinkSecret`] in a pairing link, if it carries one. A malformed or repeated `s=` is an error, so a
+/// damaged QR is never mistaken for a link without a secret.
+pub fn secret_in(uri: &str) -> Result<Option<LinkSecret>> {
+    let query = uri
+        .strip_prefix(PREFIX)
+        .ok_or(Error::InvalidTicket("not a vutric pairing link"))?;
+    let mut found = None;
+    for value in query.split('&').filter_map(|p| p.strip_prefix("s=")) {
+        if found.is_some() {
+            return Err(Error::InvalidTicket("two pairing secrets"));
+        }
+        found =
+            Some(LinkSecret::from_hex(value).ok_or(Error::InvalidTicket("bad pairing secret"))?);
+    }
+    Ok(found)
+}
+
 pub(crate) fn percent_encode(input: &str, out: &mut String) {
     for byte in input.bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
@@ -181,6 +206,18 @@ mod tests {
         assert_eq!(PairingTicket::parse(&old).unwrap().relay, None);
         let bad = format!("{old}&r=http%3A%2F%2Fevil.example%2F");
         assert!(PairingTicket::parse(&bad).is_err());
+    }
+
+    #[test]
+    fn secret_rides_along_and_old_parsers_ignore_it() {
+        let s = LinkSecret([0x3c; 16]);
+        let uri = with_secret(&ticket().to_uri(), &s);
+        assert_eq!(PairingTicket::parse(&uri).unwrap(), ticket());
+        assert_eq!(secret_in(&uri).unwrap(), Some(s));
+        assert_eq!(secret_in(&ticket().to_uri()).unwrap(), None);
+        assert!(secret_in(&format!("{uri}&s=00")).is_err());
+        assert!(secret_in(&with_secret(&uri, &s)).is_err());
+        assert!(secret_in("https://x/?s=00").is_err());
     }
 
     #[test]

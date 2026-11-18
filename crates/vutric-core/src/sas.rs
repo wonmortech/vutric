@@ -62,9 +62,94 @@ pub fn code(
     format!("{:06}", n % 1_000_000)
 }
 
+const PROOF_CONTEXT: &str = "vutric/1 2026-11-18 pairing link proof";
+
+/// Bytes of a [`LinkSecret`].
+pub const LINK_SECRET_BYTES: usize = 16;
+
+/// A one-time secret that rides in the pairing link (`s=` in the QR, ADR-0064). The dialer that scanned the QR
+/// proves it knows the secret with [`link_proof`]; the listener then knows the dialer read its screen, so the
+/// key may be trusted as `ticket` without the six digits. A dialer that cannot prove it runs the six-digit check
+/// or stays an untrusted guest.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct LinkSecret(pub [u8; LINK_SECRET_BYTES]);
+
+impl core::fmt::Debug for LinkSecret {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("LinkSecret(..)")
+    }
+}
+
+impl LinkSecret {
+    /// Lower-case hex, as it goes into the link.
+    #[must_use]
+    pub fn to_hex(&self) -> String {
+        use core::fmt::Write as _;
+        let mut s = String::with_capacity(LINK_SECRET_BYTES * 2);
+        for b in self.0 {
+            write!(s, "{b:02x}").expect("writing to a String cannot fail");
+        }
+        s
+    }
+
+    /// Exactly 32 hex characters (either case); anything else is `None`.
+    #[must_use]
+    pub fn from_hex(s: &str) -> Option<Self> {
+        if s.len() != LINK_SECRET_BYTES * 2 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
+        let mut out = [0u8; LINK_SECRET_BYTES];
+        for (i, b) in out.iter_mut().enumerate() {
+            *b = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
+        }
+        Some(Self(out))
+    }
+}
+
+/// `H(x, s)`: proof that the dialer knows the link secret `s`, bound to this TLS session (`x` as in
+/// [`commitment`]), so it cannot be replayed on another connection or relayed by a man in the middle.
+#[must_use]
+pub fn link_proof(exporter: &[u8; EXPORTER_BYTES], secret: &LinkSecret) -> [u8; 32] {
+    let mut h = blake3::Hasher::new_derive_key(PROOF_CONTEXT);
+    h.update(exporter);
+    h.update(&secret.0);
+    *h.finalize().as_bytes()
+}
+
+/// Whether `proof` was made with `secret` on this session. Constant time.
+#[must_use]
+pub fn link_proof_ok(
+    proof: &[u8; 32],
+    exporter: &[u8; EXPORTER_BYTES],
+    secret: &LinkSecret,
+) -> bool {
+    blake3::Hash::from_bytes(link_proof(exporter, secret)) == blake3::Hash::from_bytes(*proof)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn link_proof_binds_secret_and_session() {
+        let (x, s) = ([7u8; 32], LinkSecret([1; 16]));
+        let p = link_proof(&x, &s);
+        assert!(link_proof_ok(&p, &x, &s));
+        assert!(!link_proof_ok(&p, &[8u8; 32], &s));
+        assert!(!link_proof_ok(&p, &x, &LinkSecret([2; 16])));
+        assert_ne!(p, commitment(&x, &[1u8; 32]), "contexts are separate");
+    }
+
+    #[test]
+    fn link_secret_hex() {
+        let s = LinkSecret([0xab; 16]);
+        assert_eq!(s.to_hex(), "ab".repeat(16));
+        assert_eq!(LinkSecret::from_hex(&"AB".repeat(16)), Some(s));
+        assert_eq!(LinkSecret::from_hex(&"ab".repeat(15)), None);
+        assert_eq!(LinkSecret::from_hex(&"zz".repeat(16)), None);
+        assert_eq!(LinkSecret::from_hex(&"+a".repeat(16)), None);
+        assert_eq!(format!("{s:?}"), "LinkSecret(..)");
+    }
 
     #[test]
     fn honest_run_agrees() {

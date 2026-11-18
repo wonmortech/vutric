@@ -7,13 +7,17 @@
 //! - other Unix: no core dumps;
 //! - everywhere: no inherited handles besides its pipes, and every path it reports must be a plain file directly
 //!   inside the staging folder ([`checked_path`]).
+//!
+//! On Android the adapters cannot be a child process; the app starts them in its own `:compat` process
+//! ([`crate::serve::serve_socket_fd`]) and talks to them through [`Adapter::attach`] on the other end of a socket
+//! pair (ADR-0066). The same defensive reading and [`checked_path`] apply.
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use anyhow::{Context as _, Result, bail};
-use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
-use tokio::process::{Child, ChildStdin, Command};
+use tokio::io::{AsyncBufReadExt as _, AsyncRead, AsyncWrite, AsyncWriteExt as _, BufReader};
+use tokio::process::{Child, Command};
 use tokio::sync::mpsc;
 
 use crate::ipc::{self, FromAdapter, Start, ToAdapter};
@@ -21,14 +25,23 @@ use crate::ipc::{self, FromAdapter, Start, ToAdapter};
 /// Memory cap of the adapter process (Windows job object).
 pub const MEMORY_LIMIT: usize = 512 * 1024 * 1024;
 
-/// A running adapter process. Dropping it kills the process.
-#[derive(Debug)]
+/// A running adapter: a child process ([`Adapter::spawn`]; dropping it kills the process) or a loop in another
+/// process reached over a stream ([`Adapter::attach`]).
 pub struct Adapter {
-    child: Child,
-    stdin: ChildStdin,
+    child: Option<Child>,
+    stdin: Box<dyn AsyncWrite + Send + Unpin>,
     staging: PathBuf,
     #[cfg(windows)]
-    _job: Job,
+    _job: Option<Job>,
+}
+
+impl std::fmt::Debug for Adapter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Adapter")
+            .field("child", &self.child)
+            .field("staging", &self.staging)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Whether `path`, reported by the adapter, is a file name directly inside `staging` (no `..`, no other
@@ -69,14 +82,73 @@ impl Adapter {
             .with_context(|| format!("start {}", exe.display()))?;
         #[cfg(windows)]
         let job = Job::confine(&child)?;
-        let mut stdin = child.stdin.take().context("adapter stdin")?;
+        let stdin = child.stdin.take().context("adapter stdin")?;
         let stdout = child.stdout.take().context("adapter stdout")?;
-        stdin
-            .write_all(&ipc::line(&ToAdapter::Start(start)))
-            .await?;
+        let mut me = Self {
+            child: Some(child),
+            stdin: Box::new(stdin),
+            staging,
+            #[cfg(windows)]
+            _job: Some(job),
+        };
+        let rx = me.begin(stdout, start).await?;
+        Ok((me, rx))
+    }
+
+    /// Talks to an adapter loop that already runs elsewhere ([`crate::serve::serve`]), over `reader` and
+    /// `writer`: on Android, the app process's end of the socket pair whose other end the `:compat` process
+    /// serves (ADR-0066). Sends `start` first. The adapter is as untrusted as a spawned one: lines are capped and
+    /// parsed into closed enums, and received files go through [`checked_path`].
+    pub async fn attach<R, W>(
+        reader: R,
+        writer: W,
+        start: Start,
+    ) -> Result<(Self, mpsc::Receiver<FromAdapter>)>
+    where
+        R: AsyncRead + Unpin + Send + 'static,
+        W: AsyncWrite + Unpin + Send + 'static,
+    {
+        let staging = start.staging.clone();
+        std::fs::create_dir_all(&staging)?;
+        let mut me = Self {
+            child: None,
+            stdin: Box::new(writer),
+            staging,
+            #[cfg(windows)]
+            _job: None,
+        };
+        let rx = me.begin(reader, start).await?;
+        Ok((me, rx))
+    }
+
+    /// [`Self::attach`] on a connected Unix stream socket: the app process's end of the Android socket pair whose
+    /// other end went to the `:compat` service (ADR-0066). Call inside a Tokio runtime.
+    ///
+    /// # Safety
+    ///
+    /// `fd` must be an open, connected stream socket that nothing else uses or closes; this takes ownership.
+    #[cfg(unix)]
+    pub async unsafe fn attach_socket_fd(
+        fd: std::os::fd::RawFd,
+        start: Start,
+    ) -> Result<(Self, mpsc::Receiver<FromAdapter>)> {
+        use std::os::fd::FromRawFd as _;
+        // SAFETY: the caller hands over an open, connected stream socket it no longer uses.
+        let std = unsafe { std::os::unix::net::UnixStream::from_raw_fd(fd) };
+        std.set_nonblocking(true)?;
+        let (r, w) = tokio::net::UnixStream::from_std(std)?.into_split();
+        Self::attach(r, w, start).await
+    }
+
+    async fn begin<R: AsyncRead + Unpin + Send + 'static>(
+        &mut self,
+        out: R,
+        start: Start,
+    ) -> Result<mpsc::Receiver<FromAdapter>> {
+        self.tell(&ToAdapter::Start(start)).await?;
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(async move {
-            let mut lines = BufReader::with_capacity(64 * 1024, stdout);
+            let mut lines = BufReader::with_capacity(64 * 1024, out);
             let mut buf = Vec::new();
             // A line longer than MAX_LINE, or the end of output, ends the adapter's turn to talk.
             while let Ok(true) = read_line(&mut lines, &mut buf, ipc::MAX_LINE).await {
@@ -87,23 +159,35 @@ impl Adapter {
                 }
             }
         });
-        Ok((
-            Self {
-                child,
-                stdin,
-                staging,
-                #[cfg(windows)]
-                _job: job,
-            },
-            rx,
-        ))
+        Ok(rx)
     }
 
     async fn tell(&mut self, m: &ToAdapter) -> Result<()> {
         self.stdin
             .write_all(&ipc::line(m))
             .await
-            .context("adapter gone")
+            .context("adapter gone")?;
+        self.stdin.flush().await.context("adapter gone")
+    }
+
+    /// Sends a file, text or link to a paired KDE Connect device; the answer is a `FromAdapter` sent/failed event
+    /// with `request_id`.
+    pub async fn kde_send(&mut self, cmd: ToAdapter) -> Result<()> {
+        if !matches!(cmd, ToAdapter::KdeSend { .. }) {
+            bail!("not a KDE Connect send");
+        }
+        self.tell(&cmd).await
+    }
+
+    /// Starts a magic-wormhole send or receive (`ToAdapter::WormholeSend` / `WormholeReceive`, ADR-0067).
+    pub async fn wormhole(&mut self, cmd: ToAdapter) -> Result<()> {
+        if !matches!(
+            cmd,
+            ToAdapter::WormholeSend { .. } | ToAdapter::WormholeReceive { .. }
+        ) {
+            bail!("not a magic-wormhole command");
+        }
+        self.tell(&cmd).await
     }
 
     pub async fn decide(&mut self, session_id: &str, accept: Vec<String>) -> Result<()> {
@@ -164,14 +248,19 @@ impl Adapter {
         checked_path(&self.staging, path)
     }
 
-    /// Asks the adapter to stop, then makes sure it is gone.
+    /// Asks the adapter to stop, then makes sure it is gone. An attached adapter is only asked; its host process
+    /// (the Android service) ends when its loop returns.
     pub async fn stop(mut self) -> Result<()> {
         let _ = self.tell(&ToAdapter::Stop).await;
-        if tokio::time::timeout(std::time::Duration::from_secs(3), self.child.wait())
+        let Some(child) = self.child.as_mut() else {
+            let _ = self.stdin.shutdown().await;
+            return Ok(());
+        };
+        if tokio::time::timeout(std::time::Duration::from_secs(3), child.wait())
             .await
             .is_err()
         {
-            self.child.kill().await?;
+            child.kill().await?;
             bail!("adapter did not stop; killed");
         }
         Ok(())

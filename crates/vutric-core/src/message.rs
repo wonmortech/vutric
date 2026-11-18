@@ -160,6 +160,40 @@ pub enum Message {
     PairResult {
         confirmed: bool,
     },
+    /// Dialer → listener, right after `Hello`, when the dialer used a pairing link with a secret (ADR-0064):
+    /// `crate::sas::link_proof` over this session. The listener then trusts the key as `ticket`.
+    PairProof {
+        proof: [u8; 32],
+    },
+    /// A phone notification mirrored to a paired device (ADR-0064, backlog A12/F13). Shown, never acted on.
+    Notice(Notice),
+    /// Text the user chose to send to the other device's clipboard. The receiver offers it ("Nusxalash"), it never
+    /// writes the clipboard by itself.
+    Clipboard {
+        text: String,
+    },
+}
+
+/// Most characters of [`Notice::app`] and [`Notice::title`].
+pub const MAX_NOTICE_LINE_CHARS: usize = 80;
+
+/// Most characters of [`Notice::text`].
+pub const MAX_NOTICE_TEXT_CHARS: usize = 400;
+
+/// Longest [`Message::Clipboard`] text, in bytes.
+pub const MAX_CLIPBOARD_BYTES: usize = 64 * 1024;
+
+/// One mirrored notification. All text is the other device's and hostile until passed through
+/// `crate::companion::shown`.
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Notice {
+    /// The app's label on the phone ("Telegram").
+    pub app: String,
+    pub title: String,
+    pub text: String,
+    /// When the phone posted it, Unix milliseconds of the phone's clock (display only).
+    pub at_ms: u64,
 }
 
 impl Message {
@@ -179,6 +213,9 @@ impl Message {
             Self::PairNonce { .. } => "PairNonce",
             Self::PairReveal { .. } => "PairReveal",
             Self::PairResult { .. } => "PairResult",
+            Self::PairProof { .. } => "PairProof",
+            Self::Notice(_) => "Notice",
+            Self::Clipboard { .. } => "Clipboard",
         }
     }
 }
@@ -251,6 +288,20 @@ impl Message {
             }
             Self::OfferDone { failed, .. } if failed.len() > MAX_OFFER_ENTRIES => {
                 Err(Error::Malformed("offer done length".into()))
+            }
+            Self::Notice(n) => {
+                let over = |s: &str, max| s.chars().nth(max).is_some();
+                if n.app.is_empty()
+                    || over(&n.app, MAX_NOTICE_LINE_CHARS)
+                    || over(&n.title, MAX_NOTICE_LINE_CHARS)
+                    || over(&n.text, MAX_NOTICE_TEXT_CHARS)
+                {
+                    return Err(Error::Malformed("notice length".into()));
+                }
+                Ok(())
+            }
+            Self::Clipboard { text } if text.is_empty() || text.len() > MAX_CLIPBOARD_BYTES => {
+                Err(Error::Malformed("clipboard length".into()))
             }
             _ => Ok(()),
         }
@@ -363,6 +414,44 @@ mod tests {
         assert!(offer(0, vec![entry(&long)], 1).validate().is_err());
         let many = vec![entry("a"); MAX_OFFER_ENTRIES + 1];
         assert!(offer(0, many, 1000).validate().is_err());
+    }
+
+    #[test]
+    fn companion_bounds() {
+        let notice = |app: &str, title: &str, text: &str| {
+            Message::Notice(Notice {
+                app: app.into(),
+                title: title.into(),
+                text: text.into(),
+                at_ms: 1,
+            })
+        };
+        notice("Telegram", "", "").validate().unwrap();
+        let line = "ʻ".repeat(MAX_NOTICE_LINE_CHARS);
+        let text = "ʻ".repeat(MAX_NOTICE_TEXT_CHARS);
+        notice(&line, &line, &text).validate().unwrap();
+        assert!(notice("", "t", "x").validate().is_err());
+        assert!(notice(&format!("{line}a"), "", "").validate().is_err());
+        assert!(notice("a", &format!("{line}a"), "").validate().is_err());
+        assert!(notice("a", "", &format!("{text}a")).validate().is_err());
+        let clip = |n| Message::Clipboard {
+            text: "x".repeat(n),
+        };
+        clip(1).validate().unwrap();
+        clip(MAX_CLIPBOARD_BYTES).validate().unwrap();
+        assert!(clip(0).validate().is_err());
+        assert!(clip(MAX_CLIPBOARD_BYTES + 1).validate().is_err());
+    }
+
+    #[test]
+    fn appended_variants_keep_old_wire_indices() {
+        // postcard writes the variant index first; the variants added later must not move the older ones.
+        let wire = crate::frame::encode(&Message::PairResult { confirmed: true }).unwrap();
+        assert_eq!(wire[4], 11);
+        let wire = crate::frame::encode(&Message::PairProof { proof: [0; 32] }).unwrap();
+        assert_eq!(wire[4], 12);
+        let wire = crate::frame::encode(&Message::Clipboard { text: "a".into() }).unwrap();
+        assert_eq!(wire[4], 14);
     }
 
     #[test]

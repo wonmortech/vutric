@@ -1,0 +1,73 @@
+# SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# ADR-0010 rule 6: each adapter is tested against the real app it speaks to. Here: the C7 magic-wormhole adapter
+# against the reference Python `wormhole` tool and its own mailbox server and transit relay, all on the runner
+# (ADR-0067). Versions are pinned so an upstream release shows up as a deliberate bump, not a surprise.
+
+name: Interop
+
+on:
+  pull_request:
+    paths:
+      - "crates/vutric-core/**"
+      - "crates/vutric-compat-*/**"
+      - ".github/workflows/interop.yml"
+  schedule:
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  wormhole:
+    name: magic-wormhole 0.24.0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Reference tool and servers
+        run: |
+          python -m pip install --quiet "magic-wormhole==0.24.0" "magic-wormhole-mailbox-server==0.8.0" \
+            "magic-wormhole-transit-relay==0.5.0" "twisted==24.11.0"
+          mkdir -p "$RUNNER_TEMP/wh" && cd "$RUNNER_TEMP/wh"
+          nohup twist wormhole-mailbox --port=tcp:14000:interface=127.0.0.1 > mailbox.log 2>&1 &
+          nohup twist transitrelay --port=tcp:14001:interface=127.0.0.1 > relay.log 2>&1 &
+          for i in $(seq 1 30); do
+            if (exec 3<>/dev/tcp/127.0.0.1/14000) 2>/dev/null && (exec 3<>/dev/tcp/127.0.0.1/14001) 2>/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat mailbox.log relay.log
+          exit 1
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: interop-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: interop-
+      - name: Against the real tool
+        env:
+          VUTRIC_WORMHOLE_BIN: wormhole
+          VUTRIC_WORMHOLE_MAILBOX: ws://127.0.0.1:14000/v1
+          VUTRIC_WORMHOLE_RELAY: tcp:127.0.0.1:14001
+        run: |
+          cargo test --locked -p vutric-compat-wormhole --test interop -- --test-threads=1 --nocapture
+          cargo test --locked -p vutric-compat-localsend --test wormhole_process -- --nocapture

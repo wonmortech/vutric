@@ -96,6 +96,14 @@ pub fn pairing_ticket(data: &[u8]) {
         let qr = w.to_wifi_qr();
         assert!(qr.starts_with("WIFI:T:") && qr.ends_with(";;"));
     }
+    if let Ok(Some(secret)) = vutric_core::pairing::secret_in(text) {
+        let again = vutric_core::pairing::with_secret("vutric://pair?v=2", &secret);
+        assert_eq!(
+            vutric_core::pairing::secret_in(&again),
+            Ok(Some(secret)),
+            "link secret round-trips"
+        );
+    }
     let Ok(t) = PairingTicket::parse(text) else {
         return;
     };
@@ -121,6 +129,121 @@ pub fn pairing_ticket(data: &[u8]) {
     let uri = t.to_uri();
     assert!(uri.is_ascii(), "QR payload must stay ASCII");
     assert_eq!(PairingTicket::parse(&uri).expect("own link parses"), t);
+}
+
+/// Companion messages from a paired phone (ADR-0064, issue #12): a notice or clipboard text. What validation
+/// accepts must round-trip and stay inside the caps; what `companion::shown` returns must be safe to print.
+pub fn companion(data: &[u8]) {
+    use vutric_core::companion::shown;
+    use vutric_core::message::{MAX_CLIPBOARD_BYTES, MAX_NOTICE_LINE_CHARS, MAX_NOTICE_TEXT_CHARS};
+    let Some((&pick, rest)) = data.split_first() else {
+        return;
+    };
+    let mut u = Unstructured::new(rest);
+    let msg = if pick & 1 == 0 {
+        let Ok(n) = vutric_core::Notice::arbitrary(&mut u) else {
+            return;
+        };
+        Message::Notice(n)
+    } else {
+        let Ok(text) = String::arbitrary(&mut u) else {
+            return;
+        };
+        Message::Clipboard { text }
+    };
+    let Ok(wire) = frame::encode(&msg) else {
+        return;
+    };
+    let Ok(got) = frame::decode(&wire[HEADER..]) else {
+        assert!(msg.validate().is_err(), "valid companion message refused");
+        return;
+    };
+    assert_eq!(got, msg);
+    let bad = |s: &str| {
+        s.chars().any(|c| {
+            (c.is_control() && c != '\n')
+                || matches!(c, '\u{200E}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')
+        })
+    };
+    match got {
+        Message::Notice(n) => {
+            assert!(n.app.chars().count() <= MAX_NOTICE_LINE_CHARS);
+            assert!(n.title.chars().count() <= MAX_NOTICE_LINE_CHARS);
+            assert!(n.text.chars().count() <= MAX_NOTICE_TEXT_CHARS);
+            for (line, max) in [
+                (&n.app, MAX_NOTICE_LINE_CHARS),
+                (&n.title, MAX_NOTICE_LINE_CHARS),
+            ] {
+                let shown = shown(line, max, false);
+                assert!(!bad(&shown) && !shown.contains('\n'));
+            }
+            assert!(!bad(&shown(&n.text, MAX_NOTICE_TEXT_CHARS, true)));
+        }
+        Message::Clipboard { text } => {
+            assert!(!text.is_empty() && text.len() <= MAX_CLIPBOARD_BYTES);
+            let preview = shown(&text, 200, true);
+            assert!(preview.chars().count() <= 200 && !bad(&preview));
+        }
+        other => panic!("decoded into {}", other.kind()),
+    }
+}
+
+/// Everything a magic-wormhole peer or server sends us before and after the key exchange (C7, ADR-0067): mailbox
+/// server frames, the `pake` body, transit hints and file-transfer offers. Bounded output, no panic.
+pub fn wormhole_messages(data: &[u8]) {
+    use vutric_compat_wormhole::{mailbox, transfer, transit, wormhole};
+    if let Some(m) = mailbox::parse(data) {
+        if let mailbox::ServerMsg::Message { side, phase, body } = &m {
+            assert!(side.len() <= mailbox::MAX_ID && phase.len() <= mailbox::MAX_ID);
+            assert!(body.len() <= mailbox::MAX_BODY);
+        }
+        if let mailbox::ServerMsg::Allocated { nameplate } = &m {
+            assert!(nameplate.bytes().all(|b| b.is_ascii_digit()));
+        }
+    }
+    if let Some(p) = wormhole::pake_message(data) {
+        assert!(p.len() <= 128);
+    }
+    let Ok(v) = serde_json::from_slice::<serde_json::Value>(data) else {
+        return;
+    };
+    if let Some(h) = transit::Hints::parse(&v) {
+        assert!(h.direct.len() <= transit::MAX_HINTS && h.relays.len() <= transit::MAX_RELAYS);
+        assert_eq!(
+            transit::Hints::parse(&h.to_json()),
+            Some(h),
+            "hints round-trip"
+        );
+    }
+    match transfer::parse_offer(&v) {
+        Some(transfer::Offer::Text(t)) => assert!(t.len() <= transfer::MAX_TEXT),
+        Some(transfer::Offer::File { name, .. }) => {
+            assert_eq!(filename::sanitize(&name), name, "offered name is sanitized");
+        }
+        None => {}
+    }
+    if let Some(code) = data
+        .get(..data.len().min(200))
+        .and_then(|d| std::str::from_utf8(d).ok())
+        && let Some(c) = vutric_compat_wormhole::code::Code::parse(code)
+    {
+        assert_eq!(
+            vutric_compat_wormhole::code::Code::parse(c.as_str()),
+            Some(c.clone())
+        );
+        assert!(c.nameplate().bytes().all(|b| b.is_ascii_digit()));
+    }
+}
+
+/// A captive-portal check answer from an untrusted network (R1a, ADR-0068): never panics, and a login URL it
+/// passes on is short, `http(s)` and printable.
+pub fn captive_answer(data: &[u8]) {
+    use vutric_core::captive::{MAX_LOGIN_URL, Portal, classify};
+    if let Portal::Captive { login: Some(url) } = classify(data) {
+        assert!(url.len() <= MAX_LOGIN_URL);
+        assert!(url.starts_with("http://") || url.starts_with("https://"));
+        assert!(url.bytes().all(|b| b.is_ascii_graphic()));
+    }
 }
 
 #[derive(Debug, Arbitrary)]
@@ -482,6 +605,16 @@ mod smoke {
             },
             Message::PairCommit { commit: [9; 32] },
             Message::PairResult { confirmed: true },
+            Message::PairProof { proof: [4; 32] },
+            Message::Notice(vutric_core::Notice {
+                app: "Telegram".into(),
+                title: "Ali".into(),
+                text: "salom".into(),
+                at_ms: 1,
+            }),
+            Message::Clipboard {
+                text: "nusxa".into(),
+            },
         ];
         msgs.iter()
             .flat_map(|m| frame::encode(m).unwrap())
@@ -535,6 +668,65 @@ mod smoke {
                 let pool = b"%&=,:.[]0aZ\x00\xff";
                 v[i] = pool[(r.next() as usize) % pool.len()];
                 pairing_ticket(&v);
+            }
+        }
+    }
+
+    #[test]
+    fn companion_structured() {
+        run(companion, 1024, 23);
+        companion(b"\x00\x08Telegram\x03Ali\x05salom\x2a");
+        companion(b"\x01\x04\xe2\x80\xaeab");
+    }
+
+    #[test]
+    fn wormhole_random_and_near_valid() {
+        run(wormhole_messages, 1024, 29);
+        let seeds = [
+            r#"{"type":"message","side":"0a1b2c3d4e","phase":"pake","body":"7b7d","id":"x"}"#,
+            r#"{"type":"welcome","welcome":{"motd":"hi","permission-required":{"none":{}}}}"#,
+            r#"{"pake_v1":"00112233"}"#,
+            r#"{"hints-v1":[{"type":"direct-tcp-v1","hostname":"10.0.0.2","port":4000},{"type":"relay-v1","hints":[{"type":"direct-tcp-v1","hostname":"r.example","port":4001}]}]}"#,
+            r#"{"file":{"filename":"../a.txt","filesize":12}}"#,
+            r#"{"directory":{"mode":"zipfile/deflated","dirname":"CON","zipsize":9}}"#,
+            "7-guitarist-revenge",
+        ];
+        let mut r = Rng(31);
+        for seed in seeds {
+            wormhole_messages(seed.as_bytes());
+            for _ in 0..RUNS {
+                let mut v = seed.as_bytes().to_vec();
+                let i = (r.next() as usize) % v.len();
+                let pool = b"\"{}[]:,0-9aZ\\\x00\xff";
+                v[i] = pool[(r.next() as usize) % pool.len()];
+                wormhole_messages(&v);
+            }
+        }
+    }
+
+    #[test]
+    fn captive_random_and_near_valid() {
+        run(captive_answer, 2048, 37);
+        let seeds = [
+            "HTTP/1.1 204 No Content
+
+",
+            "HTTP/1.1 302 Found
+Location: https://wifi.example/login?a=1
+
+",
+            "HTTP/1.0 200 OK
+Content-Length: 0
+
+",
+        ];
+        let mut r = Rng(41);
+        for seed in seeds {
+            for _ in 0..RUNS {
+                let mut v = seed.as_bytes().to_vec();
+                let i = (r.next() as usize) % v.len();
+                v[i] = (r.next() & 0xff) as u8;
+                captive_answer(&v);
             }
         }
     }

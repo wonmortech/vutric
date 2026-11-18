@@ -10,13 +10,15 @@
 //! - [`discovery`], multicast announce and answer;
 //! - [`web`], the browser page for devices with no app (C2, ADR-0055);
 //! - the [`ipc`] and [`host`] modules: everything above runs in its own low-privilege process (`vutric-compat`
-//!   binary); the daemon talks to it over JSON lines on stdin/stdout (ADR-0010 §3.4).
+//!   binary); the daemon talks to it over JSON lines on stdin/stdout (ADR-0010 §3.4);
+//! - [`serve`], that process's loop as a library, which the phone runs in a separate process (ADR-0066).
 
 pub mod client;
 pub mod discovery;
 pub mod host;
 pub mod ipc;
 pub mod proto;
+pub mod serve;
 pub mod server;
 pub mod tls;
 pub mod web;

@@ -95,3 +95,50 @@ async fn per_key_cap_refuses_the_extra_connection() {
     twin.close().await;
     relay.shutdown().await.unwrap();
 }
+
+/// Backlog Rb (ADR-0068) on real iroh: a session that starts with only the relay's address turns direct on one
+/// host; `wait_direct` sees it, and a batch above `RELAY_MAX_BYTES` is then allowed. (The refusal itself needs a
+/// relay-only network; it is tested in `transfer::tests::relay_guard_waits_for_a_direct_path_then_refuses`.)
+#[tokio::test(flavor = "multi_thread")]
+async fn bulk_verdict_follows_the_live_path() {
+    use vutric_core::route::{Bulk, RELAY_MAX_BYTES};
+
+    let relay = Relay::spawn(&relay_config()).await.unwrap();
+    let url = format!("http://{}/", relay.http_addr().unwrap());
+    let a = peer(5, &url).await;
+    let b = peer(6, &url).await;
+    assert!(a.wait_online(Duration::from_secs(10)).await);
+    assert!(b.wait_online(Duration::from_secs(10)).await);
+    let mut ticket = b.ticket();
+    ticket.addrs.clear();
+    let accept = tokio::spawn(async move {
+        let s = b.accept().await.unwrap();
+        (b, s)
+    });
+    let s = a.connect_ticket(&ticket).await.unwrap();
+    let (b, sb) = accept.await.unwrap();
+    let started_relayed = s.is_relayed();
+    assert!(
+        s.wait_direct(Duration::from_secs(10)).await,
+        "loopback turns direct"
+    );
+    assert!(!s.is_relayed());
+    assert_eq!(s.bulk(RELAY_MAX_BYTES * 3), Bulk::Go);
+    println!("started relayed: {started_relayed}");
+
+    drop((s, sb));
+    a.close().await;
+    b.close().await;
+    relay.shutdown().await.unwrap();
+}
+
+/// Backlog R1a (ADR-0068): our relay is the captive-portal check host; `iroh-relay` answers `/generate_204`.
+#[tokio::test(flavor = "multi_thread")]
+async fn our_relay_answers_the_captive_check() {
+    use vutric_net::captive::{Portal, check, host_for_relay};
+    let relay = Relay::spawn(&relay_config()).await.unwrap();
+    let url = format!("http://{}/", relay.http_addr().unwrap());
+    let host = host_for_relay(&url).unwrap();
+    assert_eq!(check(&host, Duration::from_secs(5)).await, Portal::Open);
+    relay.shutdown().await.unwrap();
+}

@@ -44,6 +44,7 @@ pub enum Via {
     Localsend,
     Quickshare,
     Kdeconnect,
+    Wormhole,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,7 +80,37 @@ pub enum ToAdapter {
         device_id: String,
         paths: Vec<PathBuf>,
     },
+    /// Send one file, or a text, by magic-wormhole (C7). The code to show arrives as `WormholeCode`, the result as
+    /// `Sent` or `SendFailed`.
+    WormholeSend {
+        request_id: u64,
+        #[serde(default)]
+        paths: Vec<PathBuf>,
+        #[serde(default)]
+        text: Option<String>,
+        #[serde(default)]
+        servers: WormholeServers,
+    },
+    /// Receive by a code the user typed (C7). A file comes as `Offer` (session `wh-<request_id>`, answer with
+    /// `Decide`), a text as `Text`; a failure as `WormholeFailed`.
+    WormholeReceive {
+        request_id: u64,
+        code: String,
+        #[serde(default)]
+        servers: WormholeServers,
+    },
     Stop,
+}
+
+/// Which magic-wormhole servers to use (C7, ADR-0067). Empty fields mean the public servers of the reference tool.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WormholeServers {
+    /// Mailbox server, `ws://…/v1`.
+    #[serde(default)]
+    pub mailbox: Option<String>,
+    /// Transit relay, `tcp:host:port`.
+    #[serde(default)]
+    pub relay: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -191,6 +222,16 @@ pub enum FromAdapter {
     },
     Error {
         message: String,
+    },
+    /// The code for a `WormholeSend`, to show to the user (it is the password: never log it).
+    WormholeCode {
+        request_id: u64,
+        code: String,
+    },
+    /// A `WormholeReceive` that did not finish (wrong code, the sender left, refused).
+    WormholeFailed {
+        request_id: u64,
+        reason: String,
     },
 }
 

@@ -26,6 +26,7 @@ serde_json = "1"
 vutric-compat-localsend = { path = "../crates/vutric-compat-localsend" }
 vutric-compat-quickshare = { path = "../crates/vutric-compat-quickshare" }
 vutric-compat-kdeconnect = { path = "../crates/vutric-compat-kdeconnect" }
+vutric-compat-wormhole = { path = "../crates/vutric-compat-wormhole" }
 
 [[bin]]
 name = "frame_stream"
@@ -134,6 +135,30 @@ required-features = ["libfuzzer"]
 [[bin]]
 name = "kdeconnect_packet"
 path = "fuzz_targets/kdeconnect_packet.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "companion"
+path = "fuzz_targets/companion.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "wormhole_messages"
+path = "fuzz_targets/wormhole_messages.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "captive_answer"
+path = "fuzz_targets/captive_answer.rs"
 test = false
 doc = false
 bench = false

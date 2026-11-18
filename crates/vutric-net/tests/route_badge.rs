@@ -54,3 +54,66 @@ async fn lan_session_shows_the_lan_badge() {
     phone.close().await;
     desktop.close().await;
 }
+
+/// Backlog R5a: two computers on one cable have only self-assigned addresses, and the QR carries link-local IPv6
+/// without its zone. Here the ticket has only zone-less `fe80::` hints; the dialer expands them to its own
+/// interfaces and connects. Skipped (with a note) on a host with no link-local IPv6 address.
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "on Linux a host dialing its own fe80:: address stalls the QUIC handshake (CI 2026-11-18); ADR-0068"
+)]
+async fn zone_less_link_local_hint_connects() {
+    let desktop = Peer::bind([33; 32], "Laptop A", Platform::Windows, Reach::Lan)
+        .await
+        .expect("bind");
+    let other = Peer::bind([34; 32], "Laptop B", Platform::Linux, Reach::Lan)
+        .await
+        .expect("bind");
+    // What the QR carries for a cable-only link: every self-assigned IPv6 address, zone stripped. Built from all
+    // interfaces here, since this host has no cable (the ticket itself only adds cable-only links).
+    let mut ticket = desktop.ticket();
+    ticket.addrs = lan::self_assigned_addrs(&desktop.bound_sockets(), &lan::local_addrs())
+        .into_iter()
+        .filter_map(|a| match a {
+            std::net::SocketAddr::V6(v6) => Some(std::net::SocketAddr::V6(
+                std::net::SocketAddrV6::new(*v6.ip(), v6.port(), 0, 0),
+            )),
+            std::net::SocketAddr::V4(_) => None,
+        })
+        .collect();
+    if ticket.addrs.is_empty() {
+        eprintln!("skipped: no link-local IPv6 address on this host");
+        desktop.close().await;
+        other.close().await;
+        return;
+    }
+    let accept = tokio::spawn({
+        let desktop = desktop.clone();
+        async move { desktop.accept().await.expect("accept") }
+    });
+    let s = tokio::time::timeout(Duration::from_secs(15), other.connect_ticket(&ticket))
+        .await
+        .expect("in time")
+        .expect("connect over link-local IPv6");
+    let desktop_s = accept.await.unwrap();
+    let mut badge = Badge::Connecting;
+    for _ in 0..50 {
+        badge = s.badge();
+        if badge != Badge::Connecting {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let remote = s.remote_ip();
+    println!("hints {:?}, badge {badge:?}, path {remote:?}", ticket.addrs);
+    assert!(
+        matches!(remote, Some(std::net::IpAddr::V6(v6)) if lan::is_link_local_v6(v6)),
+        "the path is the link-local hint, not something mDNS found"
+    );
+    assert!(!badge.crosses_internet());
+    s.close();
+    desktop_s.close();
+    other.close().await;
+    desktop.close().await;
+}
