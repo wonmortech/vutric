@@ -14,6 +14,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV6};
 
 use vutric_core::pairing::PairingTicket;
+use vutric_core::route::Badge;
 
 /// What kind of link an address sits on; lower ranks first in the QR.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -387,6 +388,60 @@ pub fn is_denied_error(e: &std::io::Error) -> bool {
         || (cfg!(target_os = "ios") && matches!(e.raw_os_error(), Some(1 | 13 | 65)))
 }
 
+/// The badge for a live path (backlog Rx, ADR-0060): `relayed` is `None` while no path is chosen. Pure, so it is
+/// tested without the OS.
+///
+/// - A relayed path is "Relay orqali".
+/// - A direct path to an address on one of our links is LAN, unless that link is a hotspot or tethering link
+///   ("Hotspot"), a USB tether ("Kabel"), or a wired link where both ends only have self-assigned addresses
+///   (`169.254/16`, `fe80::/10`: two computers on one cable, R5a, also "Kabel").
+/// - A direct path to another private address (another VLAN of the same office) is still LAN; anything else is
+///   a hole-punched internet path.
+#[must_use]
+pub fn badge(relayed: Option<bool>, remote: Option<IpAddr>, locals: &[LocalAddr]) -> Badge {
+    match relayed {
+        None => return Badge::Connecting,
+        Some(true) => return Badge::Relay,
+        Some(false) => {}
+    }
+    let Some(ip) = remote else {
+        return Badge::Connecting;
+    };
+    if ip.is_loopback() {
+        return Badge::DirectLan;
+    }
+    if let Some(link) = locals
+        .iter()
+        .find(|l| same_network(ip, std::slice::from_ref(l)))
+    {
+        let name = link.iface_name.to_ascii_lowercase();
+        return match link.medium {
+            Medium::Tether
+                if ["usb", "ndis", "iphone", "apple mobile"]
+                    .iter()
+                    .any(|h| name.contains(h)) =>
+            {
+                Badge::Cable
+            }
+            Medium::Tether => Badge::Hotspot,
+            Medium::Wired if self_assigned(ip) && self_assigned(link.ip) => Badge::Cable,
+            _ => Badge::DirectLan,
+        };
+    }
+    if is_lan_scope(ip) && !matches!(ip, IpAddr::V4(v4) if is_cgnat(v4)) {
+        Badge::DirectLan
+    } else {
+        Badge::DirectInternet
+    }
+}
+
+fn self_assigned(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => v4.is_link_local(),
+        IpAddr::V6(v6) => is_link_local_v6(v6),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -573,5 +628,62 @@ mod tests {
             a.windows(2)
                 .all(|w| (w[0].medium, addr_class(w[0].ip)) <= (w[1].medium, addr_class(w[1].ip)))
         );
+    }
+
+    #[test]
+    fn badges_follow_the_link() {
+        let named = |ip: &str, prefix, name: &str, medium| LocalAddr {
+            ip: ip.parse().unwrap(),
+            prefix,
+            iface: 1,
+            iface_name: name.into(),
+            medium,
+        };
+        let locals = [
+            named("192.168.1.20", 24, "Wi-Fi", Medium::WiFi),
+            named("192.168.43.10", 24, "wlan0-ap", Medium::Tether),
+            named(
+                "192.168.42.129",
+                24,
+                "Remote NDIS based Internet Sharing Device",
+                Medium::Tether,
+            ),
+            named("169.254.10.2", 16, "Ethernet 2", Medium::Wired),
+        ];
+        let ip = |s: &str| Some(s.parse().unwrap());
+        assert_eq!(badge(None, None, &locals), Badge::Connecting);
+        assert_eq!(badge(Some(true), ip("1.2.3.4"), &locals), Badge::Relay);
+        assert_eq!(
+            badge(Some(false), ip("192.168.1.7"), &locals),
+            Badge::DirectLan
+        );
+        assert_eq!(
+            badge(Some(false), ip("192.168.43.1"), &locals),
+            Badge::Hotspot
+        );
+        assert_eq!(
+            badge(Some(false), ip("192.168.42.1"), &locals),
+            Badge::Cable
+        );
+        assert_eq!(
+            badge(Some(false), ip("169.254.99.1"), &locals),
+            Badge::Cable
+        );
+        assert_eq!(
+            badge(Some(false), ip("10.0.7.3"), &locals),
+            Badge::DirectLan,
+            "another VLAN"
+        );
+        assert_eq!(
+            badge(Some(false), ip("100.70.1.1"), &locals),
+            Badge::DirectInternet,
+            "CGNAT"
+        );
+        assert_eq!(
+            badge(Some(false), ip("81.95.230.1"), &locals),
+            Badge::DirectInternet
+        );
+        assert_eq!(badge(Some(false), None, &locals), Badge::Connecting);
+        assert_eq!(badge(Some(false), ip("127.0.0.1"), &[]), Badge::DirectLan);
     }
 }

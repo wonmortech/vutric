@@ -381,6 +381,9 @@ pub struct Settings {
     pub compat: Compat,
     /// The missing save folder the user was last told about, so it is said once, not on every transfer (T2).
     pub told_missing_folder: Option<PathBuf>,
+    /// The route choice ("Avtomatik" by default, backlog Rx, ADR-0060).
+    #[serde(deserialize_with = "crate::route::lenient")]
+    pub route: crate::route::Picker,
 }
 
 /// One foreign protocol adapter.
@@ -490,6 +493,7 @@ impl Default for Settings {
             devices: BTreeMap::new(),
             compat: Compat::default(),
             told_missing_folder: None,
+            route: crate::route::Picker::Auto,
         }
     }
 }

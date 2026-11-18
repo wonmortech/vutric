@@ -13,6 +13,7 @@ pub mod hotspot;
 pub mod id;
 pub mod message;
 pub mod pairing;
+pub mod route;
 pub mod sas;
 pub mod storage;
 pub mod trust;

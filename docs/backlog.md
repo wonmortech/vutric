@@ -49,7 +49,7 @@ Sources:
 | R9 | Animated QR (libcimbar, ≤ 33 MB, ~106 KB/s); TXQR as a lighter option | opt-in | [ ] |
 | R9a | Pairing code by sound (ggwave, 8–16 B/s), code only | idea | [ ] |
 | R10 | iPhone ⇄ Android Wi-Fi Aware, re-checked every quarter | watched | [ ] |
-| Rx | "Avtomatik" order: same network → internet direct → our relay → offer hotspot, Aware or cable; plus a route picker (Avtomatik, Faqat shu tarmoq, Internet orqali, Tarmoqsiz, Bluetooth) | ADR-0006 §2 | [ ] |
+| Rx | "Avtomatik" order: same network → internet direct → our relay → offer hotspot, Aware or cable; plus a route picker (Avtomatik, Faqat shu tarmoq, Internet orqali, Tarmoqsiz, Bluetooth) | ADR-0006 §2 | [x] engine: ADR-0060, `vutric_core::route` (`Picker::plan`, `Badge`), `Settings.route`, `Reach::for_picker`, `Session::badge`; tests `route.rs`, `lan::tests::badges_follow_the_link`, `tests/route_badge.rs`. Picker screens are W1/W2; Bluetooth answers `NotBuilt` until R4 |
 | Rb | Big files: consider `iroh-blobs` for verified streaming; never push 10–100 GB through the relay | TM §2.6 | [ ] |
 | R11 | (W3) Connect without the QR: typed IPv4 address or 8-character short code, resolved through the beacon, always confirmed with the 6-digit code (#9) | 1 | [~] ADR-0059, `vutric_core::code`, `vutric_net::find`, tests `find_typed.rs`, `code.rs`; the code over multicast on a real LAN is left (multicast does not loop back on one host) |
 | Rn | Not built, on purpose: Bluetooth Classic, NFC P2P, LoRa, bulk data over ultrasound | ADR-0007 | — |

@@ -89,6 +89,19 @@ pub enum Reach {
     Anywhere,
 }
 
+impl Reach {
+    /// The endpoint reach for the user's route choice (backlog Rx, ADR-0060): internet only for "Avtomatik" and
+    /// "Internet orqali".
+    #[must_use]
+    pub fn for_picker(p: vutric_core::route::Picker) -> Self {
+        if p.uses_internet() {
+            Self::Anywhere
+        } else {
+            Self::Lan
+        }
+    }
+}
+
 /// How a session's packets travel right now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Route {
@@ -650,6 +663,28 @@ impl Session {
             Route::Direct
         };
         (route, Some(p.rtt()))
+    }
+
+    /// The route badge for this session right now (backlog Rx, ADR-0060), against this device's addresses.
+    /// [`lan::local_addrs`] asks the OS, so a UI refreshing the badge passes a list it re-reads every few
+    /// seconds.
+    #[must_use]
+    pub fn badge_with(&self, locals: &[lan::LocalAddr]) -> vutric_core::route::Badge {
+        let paths = self.conn.paths();
+        let Some(p) = paths.iter().find(iroh::endpoint::Path::is_selected) else {
+            return lan::badge(None, None, locals);
+        };
+        let remote = match p.remote_addr() {
+            iroh::TransportAddr::Ip(a) => Some(a.ip()),
+            _ => None,
+        };
+        lan::badge(Some(p.is_relay()), remote, locals)
+    }
+
+    /// [`Self::badge_with`] with a fresh [`lan::local_addrs`].
+    #[must_use]
+    pub fn badge(&self) -> vutric_core::route::Badge {
+        self.badge_with(&lan::local_addrs())
     }
 
     /// The relay this session goes through right now, if it is relayed (for the route badge: "via relay.x").
