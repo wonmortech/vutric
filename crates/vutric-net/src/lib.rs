@@ -16,14 +16,16 @@
 //! Every network wait is bounded ([`HANDSHAKE_TIMEOUT`], [`probe::ROUND_TRIP_TIMEOUT`]), so a silent peer can
 //! stall a caller for seconds, never forever.
 
+pub mod beacon;
 pub mod disk;
+pub mod lan;
 pub mod preview;
 pub mod probe;
 pub mod settings;
 pub mod transfer;
 pub mod trust;
 
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context as _, Result, anyhow, bail, ensure};
@@ -210,20 +212,12 @@ impl Peer {
     /// The QR payload: our key plus every LAN address we listen on (for networks that drop multicast).
     #[must_use]
     pub fn ticket(&self) -> PairingTicket {
-        let mut addrs: Vec<SocketAddr> = self
-            .endpoint
-            .addr()
-            .ip_addrs()
-            .copied()
-            .filter(|a| is_lan(a.ip()))
-            // A link-local IPv6 address carries this machine's interface index, meaningless on the other device.
-            .filter(
-                |a| !matches!(a, SocketAddr::V6(v6) if v6.ip().segments()[0] & 0xffc0 == 0xfe80),
-            )
-            .collect();
-        addrs.sort_by_key(|a| (a.is_ipv6(), *a));
-        addrs.dedup();
-        addrs.truncate(8);
+        // Ranked by interface (wired, Wi-Fi, tethering, virtual last); link-local IPv6 goes in without its zone and
+        // the dialer expands it to its own interfaces (`lan::expand_link_local`).
+        let addrs = lan::ticket_addrs(
+            self.endpoint.addr().ip_addrs().copied(),
+            &lan::local_addrs(),
+        );
         PairingTicket {
             endpoint: self.id(),
             device_name: self.name.clone(),
@@ -303,8 +297,8 @@ impl Peer {
     ) -> Result<Session> {
         let key = iroh::PublicKey::from_bytes(&id.0).context("peer key")?;
         let mut target = EndpointAddr::new(key);
-        for a in addrs {
-            target = target.with_ip_addr(*a);
+        for a in lan::expand_link_local(addrs, &lan::local_addrs()) {
+            target = target.with_ip_addr(a);
         }
         if self.reach == Reach::Anywhere
             && let Some(url) = relay
@@ -711,17 +705,6 @@ pub fn new_fling_id() -> vutric_core::FlingId {
 #[must_use]
 pub fn micros_since(start: Instant) -> u64 {
     u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX)
-}
-
-fn is_lan(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => v4.is_private() || v4.is_link_local(),
-        // Unique local (fc00::/7) and link local (fe80::/10) only: a global address would leave the LAN.
-        IpAddr::V6(v6) => {
-            let first = v6.segments()[0];
-            (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
-        }
-    }
 }
 
 fn clip(s: &str, max_bytes: usize) -> String {

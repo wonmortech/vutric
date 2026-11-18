@@ -16,7 +16,9 @@ vutric://pair?v=2&id=<64 hex endpoint id>&n=<percent-encoded device name>&a=<ip:
 ```
 
 - `v` must equal the protocol version; other versions are rejected, not guessed.
-- `a` (optional, ≤ 8 entries) are LAN address hints for networks where mDNS/multicast is blocked.
+- `a` (optional, ≤ 8 entries) are LAN address hints for networks where mDNS/multicast is blocked, best first
+  (wired, Wi-Fi, tethering, other, virtual adapters last). A link-local IPv6 hint is written without a zone
+  (`[fe80::1]:4000`); the dialer tries it on each of its own interfaces ([ADR-0052](decisions/0052-lan-finding-beacon-and-diagnosis.md)).
 - `r` (optional) is the `https://` relay the device is reachable through from other networks.
 - The name is display-only: control characters are stripped and it is cut to 64 characters. It is never
   published to the lookup service.
@@ -53,6 +55,24 @@ output with label `EXPORTER-vutric/1 pairing sas` and an empty context; `a`, `b`
 | 5 | both | `PairResult { confirmed }`; the key is trusted (`PairMethod::Code`) only when both are `true` |
 
 Any other message in steps 1–3, or a reveal that does not open the commitment, aborts the pairing as tampered.
+
+### LAN beacon ([ADR-0052](decisions/0052-lan-finding-beacon-and-diagnosis.md))
+
+A UDP datagram of exactly 41 bytes, to `224.0.0.167:53319` (multicast) or to one host on port 53319 (probe,
+opt-in scan):
+
+| Bytes | Field |
+|---|---|
+| 0-3 | `VTRC` |
+| 4 | version, `1` |
+| 5 | kind: `0` announce ("I am here"), `1` query ("who is here?") |
+| 6-37 | endpoint id |
+| 38-39 | QUIC port, little-endian, never 0 |
+| 40 | flags: bit 0 phone; other bits 0 when sent, ignored when read |
+
+A visible device answers a query with a unicast announce to the sender, at most once per source per 500 ms. The
+address to dial is the datagram's source IP with the announced port; the key is then checked by QUIC as always.
+Any other datagram is dropped unread.
 
 ## Streams
 

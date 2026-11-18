@@ -79,3 +79,11 @@ test = false
 doc = false
 bench = false
 required-features = ["libfuzzer"]
+
+[[bin]]
+name = "beacon"
+path = "fuzz_targets/beacon.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]

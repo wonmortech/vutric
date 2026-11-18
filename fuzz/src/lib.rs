@@ -227,6 +227,18 @@ pub fn trust_json(data: &[u8]) {
     assert_eq!(again.migrate(), s);
 }
 
+/// The LAN beacon: anything but one exact beacon is `None`; a decoded beacon re-encodes to the same bytes, up to
+/// the reserved flag bits it must carry through unchanged.
+pub fn beacon(data: &[u8]) {
+    use vutric_core::beacon::{Beacon, LEN};
+    let Some(b) = Beacon::decode(data) else {
+        return;
+    };
+    assert_eq!(data.len(), LEN);
+    assert_ne!(b.port, 0);
+    assert_eq!(&b.encode()[..], data);
+}
+
 #[cfg(test)]
 mod smoke {
     //! Deterministic stand-in for libFuzzer on stable: random inputs plus valid frames with bytes flipped.
@@ -353,6 +365,26 @@ mod smoke {
         filename(b"CON .txt");
         filename(b"com1 .tar.gz");
         filename(format!("{} .jpg", "a".repeat(119)).as_bytes());
+    }
+
+    #[test]
+    fn beacon_random_and_near_valid() {
+        use vutric_core::beacon::{Beacon, Kind};
+        run(beacon, 64, 23);
+        let ok = Beacon {
+            kind: Kind::Query,
+            id: vutric_core::EndpointId([9; 32]),
+            port: 53_319,
+            flags: 0,
+        }
+        .encode();
+        let mut r = Rng(29);
+        for _ in 0..RUNS {
+            let mut v = ok.to_vec();
+            let i = (r.next() as usize) % v.len();
+            v[i] = r.next() as u8;
+            beacon(&v);
+        }
     }
 
     #[test]
