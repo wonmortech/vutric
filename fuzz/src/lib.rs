@@ -131,8 +131,9 @@ pub fn pairing_ticket(data: &[u8]) {
     assert_eq!(PairingTicket::parse(&uri).expect("own link parses"), t);
 }
 
-/// Companion messages from a paired phone (ADR-0064, issue #12): a notice or clipboard text. What validation
-/// accepts must round-trip and stay inside the caps; what `companion::shown` returns must be safe to print.
+/// Companion messages from a paired phone (ADR-0064, issue #12; ring: ADR-0069): a notice, clipboard text or a
+/// ring. What validation accepts must round-trip and stay inside the caps; what `companion::shown` returns must be
+/// safe to print; a ring is never taken from a guest.
 pub fn companion(data: &[u8]) {
     use vutric_core::companion::shown;
     use vutric_core::message::{MAX_CLIPBOARD_BYTES, MAX_NOTICE_LINE_CHARS, MAX_NOTICE_TEXT_CHARS};
@@ -140,7 +141,12 @@ pub fn companion(data: &[u8]) {
         return;
     };
     let mut u = Unstructured::new(rest);
-    let msg = if pick & 1 == 0 {
+    let msg = if pick % 3 == 2 {
+        let Ok(r) = vutric_core::ring::Ring::arbitrary(&mut u) else {
+            return;
+        };
+        Message::Ring(r)
+    } else if pick & 1 == 0 {
         let Ok(n) = vutric_core::Notice::arbitrary(&mut u) else {
             return;
         };
@@ -183,6 +189,17 @@ pub fn companion(data: &[u8]) {
             assert!(!text.is_empty() && text.len() <= MAX_CLIPBOARD_BYTES);
             let preview = shown(&text, 200, true);
             assert!(preview.chars().count() <= 200 && !bad(&preview));
+        }
+        Message::Ring(r) => {
+            assert!(r.is_valid());
+            assert!(
+                r.duration()
+                    .is_none_or(|d| d.as_secs() <= u64::from(vutric_core::ring::MAX_RING_SECS))
+            );
+            assert!(!vutric_core::ring::accepts(
+                &Message::Ring(r),
+                vutric_core::trust::Admission::Unknown
+            ));
         }
         other => panic!("decoded into {}", other.kind()),
     }
@@ -677,6 +694,8 @@ mod smoke {
         run(companion, 1024, 23);
         companion(b"\x00\x08Telegram\x03Ali\x05salom\x2a");
         companion(b"\x01\x04\xe2\x80\xaeab");
+        companion(b"\x02\x00\x1e");
+        companion(b"\x02\x01");
     }
 
     #[test]

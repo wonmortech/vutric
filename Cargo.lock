@@ -5529,6 +5529,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "qrcode",
+ "serde_json",
  "tokio",
  "vutric-core",
  "vutric-net",

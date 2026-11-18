@@ -134,11 +134,15 @@ detected from the header, before any allocation. Every decoded message is valida
 | `PairProof { proof }` | dialer | it read the listener's pairing link (above) |
 | `Notice { app, title, text, at_ms }` | phone | a mirrored notification: app and title ≤ 80 characters, text ≤ 400, `app` not empty; shown, never acted on |
 | `Clipboard { text }` | either | text for the other device's "copy" prompt, 1 byte to 64 KiB; sent only on a user action, never written to the clipboard without the user |
+| `Ring(Start { secs })` / `Ring(Stop)` | either | "ring my phone": ring loudly for 1–60 s; `Stop` ends it, and the ringing device sends `Stop` back when its user found it |
 
 `Notice` and `Clipboard` are taken only from a trusted (paired) device and shown only after control and bidi
 characters are removed (`vutric_core::companion`); notices are limited to a burst of 10, then one per 500 ms
 ([ADR-0065](decisions/0065-companion-messages.md)). One that arrives during a file transfer is kept for the host,
 not dropped.
+
+`Ring` is taken only from a trusted device, at most a burst of 3 starts and then one per 20 s per peer; a `Stop`
+always passes. The ringing device stops by itself after `secs` ([ADR-0069](decisions/0069-ring-my-phone-and-the-command-line.md)).
 
 `gesture` = `{ speed (px/s ≥ 0), angle (rad, 0 = up, + = clockwise), exit_x (0..=1) }`. `preview` ≤ 96 KiB,
 longest side ≤ 512 px, JPEG/WebP/PNG.

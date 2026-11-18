@@ -160,11 +160,11 @@ Sources:
 | F7 | Background transfer with the app closed (Quick Share) | A4, D1 | [ ] |
 | F8 | One-tap tile or button | A5, I2, D1 | [~] |
 | F9 | Progress on the lock screen | A4 notification, I2 | [~] |
-| F10 | Siri, Shortcuts, automation; desktop CLI | I3, `net-spike` CLI | [ ] |
+| F10 | Siri, Shortcuts, automation; desktop CLI | I3, `net-spike` CLI | [~] desktop CLI (W3, ADR-0069): `vutric-net-spike` `send`/`receive --json`/`ring`/`clipboard`/`notice`/`devices`, JSON events on stdout, exit codes, own trust file, pairs by the QR secret; test `apps/net-spike/tests/cli.rs` (2, two processes); daemon IPC later (W2 #19); Siri/Shortcuts = I3 |
 | F11 | PIN mode and auto-accept (LocalSend, Quick Share) | S1, S3, ADR-0007 | [~] (auto-accept setting) |
 | F12 | Clipboard sharing (KDE Connect, Apple) | A12 | [~] both ways as `Message::Clipboard` on a trusted session (ADR-0014 #4); device steps: checklist 31, 33 |
 | F13 | Notifications mirrored to the PC (KDE Connect, Phone Link) | A12 | [~] opt-in, per-app allowlist, sent as `Message::Notice` to a trusted peer (ADR-0014 #4, #5); device step: checklist 32 |
-| F14 | Ring my phone (KDE Connect) | Kotlin + Swift module, after Phase 1 | [ ] |
+| F14 | Ring my phone (KDE Connect) | Kotlin + Swift module, after Phase 1 | [~] wire and engine (W3, ADR-0069): `Message::Ring` (start 1–60 s / stop both ways), `vutric_core::ring` (trusted only, burst 3 then 1 per 20 s), `Session::ring`/`stop_ring`, CLI `ring`; tests `ring::tests`, `crates/vutric-net/tests/ring.rs` (3), `cli.rs`, fuzz `companion`; phone W1 #18, daemon W2 #19 |
 | F15 | Phone as a mouse for the PC (KDE Connect) | Flutter + daemon input, later | [ ] |
 | F16 | Receive with no app, from a browser link (LocalSend, PairDrop) | C2 | [~] |
 | F17 | LocalSend compatibility | C1 | [~] |

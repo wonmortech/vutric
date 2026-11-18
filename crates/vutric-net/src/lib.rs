@@ -694,10 +694,13 @@ impl Session {
         self.recv_wire().await
     }
 
-    /// Inside a transfer: keeps a companion message for the host's next [`Session::recv`] (past [`MAX_PENDING`]
+    /// Inside a transfer: keeps a companion message (or a ring) for the host's next [`Session::recv`] (past [`MAX_PENDING`]
     /// the oldest goes) and drops anything else the transfer does not want.
     pub(crate) fn keep_companion(&mut self, msg: Message) {
-        if matches!(msg, Message::Notice(_) | Message::Clipboard { .. }) {
+        if matches!(
+            msg,
+            Message::Notice(_) | Message::Clipboard { .. } | Message::Ring(_)
+        ) {
             if self.pending.len() >= MAX_PENDING {
                 self.pending.pop_front();
             }
@@ -954,6 +957,21 @@ impl Session {
     /// is empty or over [`vutric_core::message::MAX_CLIPBOARD_BYTES`] (the UI says it is too long).
     pub async fn send_clipboard(&mut self, text: &str) -> Result<()> {
         self.send(&Message::Clipboard { text: text.into() }).await
+    }
+
+    /// "Ring my phone" (ADR-0069): asks the other device to ring for `secs` seconds (clamped to
+    /// 1 ..= [`vutric_core::ring::MAX_RING_SECS`]). It rings only if it trusts us, and at most as often as
+    /// [`vutric_core::ring::RingLimit`] allows; when its user stops it, a [`vutric_core::ring::Ring::Stop`] comes
+    /// back on [`Self::recv`].
+    pub async fn ring(&mut self, secs: u16) -> Result<()> {
+        self.send(&Message::Ring(vutric_core::ring::Ring::start(secs)))
+            .await
+    }
+
+    /// Stops a ring started with [`Self::ring`] (or, on the ringing device, tells the other side it was found).
+    pub async fn stop_ring(&mut self) -> Result<()> {
+        self.send(&Message::Ring(vutric_core::ring::Ring::Stop))
+            .await
     }
 
     async fn recv_step(&mut self) -> Result<Message> {

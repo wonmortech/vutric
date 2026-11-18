@@ -34,7 +34,7 @@ done. An open question for the owner never blocks a stream. It goes into
 | `docs/roadmap.md` | Only the "Status" line and rows of your own stream. |
 | `docs/owner-questions.md` | Append only, prefixed with the stream tag. |
 | `.github/workflows/**` | Add new workflow files, or add a new job. Never rewrite another stream's job. |
-| ADR numbers | W1 uses 0011–0029, W2 0030–0049, W3 0050–0069, so numbers never collide. |
+| ADR numbers | W1 uses 0011–0029, W2 0030–0049, W3 0050–0069, so numbers never collide. W3 filled its range and continues at 0070–0089 (2026-11-18, unassigned before); 0090+ is free. |
 
 ## The interface between streams
 
