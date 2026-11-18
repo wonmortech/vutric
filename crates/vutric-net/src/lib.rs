@@ -99,6 +99,103 @@ pub enum Route {
     Unknown,
 }
 
+/// Which relays a [`Reach::Anywhere`] peer uses (backlog R2, ADR-0053).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Relays {
+    /// Our own relays (`https://relay.example.org/`), from settings or the build.
+    pub urls: Vec<String>,
+    /// Also use n0's public relays and lookup service. iroh picks the home relay by latency among all of them,
+    /// so an n0 relay is used only where it is closer or ours is down. `false`: nothing third-party at all
+    /// (peers are then dialed by ticket or mDNS, not looked up by key).
+    pub n0_fallback: bool,
+}
+
+impl Default for Relays {
+    /// n0 only, until a Vutric relay is deployed.
+    fn default() -> Self {
+        Self {
+            urls: Vec::new(),
+            n0_fallback: true,
+        }
+    }
+}
+
+impl Relays {
+    fn mode(&self) -> Result<RelayMode> {
+        if self.urls.is_empty() {
+            return if self.n0_fallback {
+                Ok(RelayMode::Default)
+            } else {
+                Err(anyhow!(
+                    "no relay: give a relay url or allow the n0 fallback"
+                ))
+            };
+        }
+        let ours = self
+            .urls
+            .iter()
+            .map(|u| {
+                u.parse::<RelayUrl>()
+                    .with_context(|| format!("relay url {u}"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let map = iroh::RelayMap::empty();
+        for u in ours {
+            map.insert(u.clone(), std::sync::Arc::new(iroh::RelayConfig::from(u)));
+        }
+        if self.n0_fallback {
+            map.extend(&iroh::defaults::prod::default_relay_map());
+        }
+        Ok(RelayMode::Custom(map))
+    }
+}
+
+/// Bytes a session has moved so far (all paths, QUIC overhead included); [`Speed`] turns samples into a rate.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Traffic {
+    pub sent: u64,
+    pub received: u64,
+}
+
+/// Live speed for the route badge: feed [`Session::traffic`] samples, read bytes per second over the last
+/// window (default 2 s).
+#[derive(Debug, Clone)]
+pub struct Speed {
+    window: Duration,
+    samples: std::collections::VecDeque<(Instant, Traffic)>,
+}
+
+impl Default for Speed {
+    fn default() -> Self {
+        Self::new(Duration::from_secs(2))
+    }
+}
+
+impl Speed {
+    #[must_use]
+    pub fn new(window: Duration) -> Self {
+        Self {
+            window,
+            samples: std::collections::VecDeque::new(),
+        }
+    }
+
+    /// Adds a sample taken at `at`; returns `(sent, received)` bytes per second over the window.
+    pub fn push(&mut self, at: Instant, t: Traffic) -> (u64, u64) {
+        self.samples.push_back((at, t));
+        while self.samples.len() > 2 && at.duration_since(self.samples[1].0) >= self.window {
+            self.samples.pop_front();
+        }
+        let (t0, first) = self.samples[0];
+        let secs = at.duration_since(t0).as_secs_f64();
+        if secs <= 0.0 {
+            return (0, 0);
+        }
+        let rate = |a: u64, b: u64| (a.saturating_sub(b) as f64 / secs) as u64;
+        (rate(t.sent, first.sent), rate(t.received, first.received))
+    }
+}
+
 /// Publishes through `B` without the device name: the name is for nearby devices (mDNS), not for a public
 /// lookup server.
 #[derive(Debug)]
@@ -152,11 +249,23 @@ pub struct Nearby {
 
 impl Peer {
     /// Binds an endpoint. `secret` is the device's persistent identity (32 random bytes kept by the app).
+    /// [`Reach::Anywhere`] uses the default relays ([`Relays::default`]).
     pub async fn bind(
         secret: [u8; 32],
         name: &str,
         platform: Platform,
         reach: Reach,
+    ) -> Result<Self> {
+        Self::bind_with(secret, name, platform, reach, &Relays::default()).await
+    }
+
+    /// [`Self::bind`] with our own relays (backlog R2, ADR-0053). Ignored for [`Reach::Lan`].
+    pub async fn bind_with(
+        secret: [u8; 32],
+        name: &str,
+        platform: Platform,
+        reach: Reach,
+        relays: &Relays,
     ) -> Result<Self> {
         let user_data: UserData = clip(name, UserData::MAX_LENGTH)
             .parse()
@@ -164,11 +273,13 @@ impl Peer {
         let builder = match reach {
             Reach::Lan => Endpoint::builder(presets::Minimal).relay_mode(RelayMode::Disabled),
             // presets::N0 minus its publisher, which would put the device name on a public server.
-            Reach::Anywhere => Endpoint::builder(presets::Minimal)
-                .relay_mode(RelayMode::Default)
+            Reach::Anywhere if relays.n0_fallback => Endpoint::builder(presets::Minimal)
+                .relay_mode(relays.mode()?)
                 .address_lookup(Nameless(PkarrPublisher::n0_dns()))
                 .address_lookup(PkarrResolver::n0_dns())
                 .address_lookup(DnsAddressLookup::n0_dns()),
+            // Self-hosted only: nothing reaches a third-party server, peers are dialed by ticket or mDNS.
+            Reach::Anywhere => Endpoint::builder(presets::Minimal).relay_mode(relays.mode()?),
         };
         let endpoint = builder
             .secret_key(SecretKey::from_bytes(&secret))
@@ -538,6 +649,27 @@ impl Session {
             Route::Direct
         };
         (route, Some(p.rtt()))
+    }
+
+    /// The relay this session goes through right now, if it is relayed (for the route badge: "via relay.x").
+    #[must_use]
+    pub fn relay_url(&self) -> Option<String> {
+        let paths = self.conn.paths();
+        let p = paths.iter().find(iroh::endpoint::Path::is_selected)?;
+        match p.remote_addr() {
+            iroh::TransportAddr::Relay(u) => Some(u.to_string()),
+            _ => None,
+        }
+    }
+
+    /// Bytes moved so far, for [`Speed`].
+    #[must_use]
+    pub fn traffic(&self) -> Traffic {
+        let s = self.conn.stats();
+        Traffic {
+            sent: s.udp_tx.bytes,
+            received: s.udp_rx.bytes,
+        }
     }
 
     /// Six digits both screens show while pairing (Bluetooth-style numeric comparison).

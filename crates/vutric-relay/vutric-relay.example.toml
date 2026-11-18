@@ -1,0 +1,29 @@
+# vutric-relay config. Every key is optional except where noted; values shown are the defaults.
+
+[http]
+# Captive-portal probe and the ACME HTTP challenge. Must be port 80 for ACME.
+bind = "[::]:80"
+
+# Remove this table to serve plain HTTP only (tests, or behind a TLS-terminating proxy).
+[tls]
+bind = "[::]:443"
+mode = "acme"                       # "acme" (Let's Encrypt) or "manual"
+domain = "relay.example.org"        # required
+contact = "mailto:ops@example.org"  # required for acme
+cache_dir = "/var/lib/vutric-relay/acme"
+staging = false
+# mode = "manual":
+# cert = "/etc/vutric-relay/fullchain.pem"
+# key = "/etc/vutric-relay/privkey.pem"
+
+# QUIC address discovery (devices learn their public address). Needs [tls]; open UDP 7842.
+[quic]
+bind = "0.0.0.0:7842"
+
+[limits]
+client_bytes_per_second = 12582912  # 12 MiB/s per client into the relay
+client_burst_bytes = 33554432
+max_connections_per_key = 8
+max_connections = 20000
+
+# metrics_bind = "127.0.0.1:9090"
