@@ -4,6 +4,7 @@
 //! client own the I/O and feed bytes through [`frame`]. See `docs/protocol.md` for the normative description.
 
 pub mod beacon;
+pub mod code;
 pub mod effect;
 pub mod error;
 pub mod filename;

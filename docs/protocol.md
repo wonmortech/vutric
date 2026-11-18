@@ -27,6 +27,14 @@ vutric://pair?v=2&id=<64 hex endpoint id>&n=<percent-encoded device name>&a=<ip:
   ([ADR-0058](decisions/0058-hotspot-in-the-pairing-link.md)). A half hotspot is an error; older apps ignore the
   keys and pair as before.
 
+### Without the QR: typed address or short code ([ADR-0059](decisions/0059-connect-by-typed-address-or-code.md))
+
+Next to the QR the device shows its LAN address and a short code: the first 40 bits of its endpoint id in
+Crockford base32, `ABCD-EFGH` (`vutric_core::code::ShortCode`; typing forgives case, dashes, `O`/`0`, `I`/`L`/`1`).
+The other device sends beacon queries (unicast to a typed IPv4 address; multicast plus the opt-in scan for a code)
+and takes the first answer from that address, or whose id starts with the code. That answer is unauthenticated,
+so the connection must finish the 6-digit comparison below and is stored as `PairMethod::Code`, never `Ticket`.
+
 After the other device connects with the ticket, both sides store each other's endpoint id in their trust store
 (`PairMethod::Ticket`). Later connections are discovered via mDNS, or looked up by key, and authenticated by key.
 

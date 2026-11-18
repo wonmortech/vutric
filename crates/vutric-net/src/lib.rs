@@ -18,6 +18,7 @@
 
 pub mod beacon;
 pub mod disk;
+pub mod find;
 pub mod lan;
 pub mod preview;
 pub mod probe;

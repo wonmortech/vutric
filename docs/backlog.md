@@ -51,6 +51,7 @@ Sources:
 | R10 | iPhone ⇄ Android Wi-Fi Aware, re-checked every quarter | watched | [ ] |
 | Rx | "Avtomatik" order: same network → internet direct → our relay → offer hotspot, Aware or cable; plus a route picker (Avtomatik, Faqat shu tarmoq, Internet orqali, Tarmoqsiz, Bluetooth) | ADR-0006 §2 | [ ] |
 | Rb | Big files: consider `iroh-blobs` for verified streaming; never push 10–100 GB through the relay | TM §2.6 | [ ] |
+| R11 | (W3) Connect without the QR: typed IPv4 address or 8-character short code, resolved through the beacon, always confirmed with the 6-digit code (#9) | 1 | [~] ADR-0059, `vutric_core::code`, `vutric_net::find`, tests `find_typed.rs`, `code.rs`; the code over multicast on a real LAN is left (multicast does not loop back on one host) |
 | Rn | Not built, on purpose: Bluetooth Classic, NFC P2P, LoRa, bulk data over ultrasound | ADR-0007 | — |
 
 ## 2. Other apps' protocols (ADR-0010)
@@ -85,7 +86,7 @@ Sources:
 | # | Item | Status |
 |---|---|---|
 | T1 | On the phone screen: accept mode, gallery + album + keep copy, split by type, subfolder, keep tree, conflicts | [~] |
-| T2 | Save folder of the user's choice: Android SAF (`SafStore`), iPhone Files bookmark, desktop folder dialog; a missing folder falls back to the default and tells the user once. Engine: fallback + told once (ADR-0057); SAF/bookmark/dialog = W1/W2 | [~] |
+| T2 | Save folder of the user's choice: Android SAF (`SafStore`), iPhone Files bookmark, desktop folder dialog; a missing folder falls back to the default and tells the user once. Engine: fallback + told once (ADR-0057); `SaveRules.android_tree` keeps the SAF tree URI + label (#8, test `android_tree_is_kept_and_checked`); SAF/bookmark/dialog = W1/W2 | [~] |
 | T3 | Per-device overrides (`devices`) on the device detail screen | [ ] |
 | T4 | Free-space guard (refuse when < 1 GB would remain), checking app storage too on phones. Engine: guard checks target and app storage (ADR-0057) | [~] |
 | T5 | After receiving: notification / open file / open folder / nothing. Engine: `After::action` (ADR-0057); hosts carry it out | [~] |

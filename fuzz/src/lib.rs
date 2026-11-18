@@ -12,6 +12,7 @@
 use std::path::{Component, Path, PathBuf};
 
 use arbitrary::{Arbitrary, Unstructured};
+use vutric_core::code::ShortCode;
 use vutric_core::frame::{self, Decoder, MAX_FRAME_BYTES};
 use vutric_core::hotspot::{HotspotTicket, MAX_SSID_BYTES, Security, Wifi};
 use vutric_core::storage::{Arrival, Kind, SaveRules, Settings, Subfolder};
@@ -75,11 +76,18 @@ pub fn message(data: &[u8]) {
     }
 }
 
-/// A scanned QR code or a pasted link.
+/// A scanned QR code, a pasted link or a typed short code.
 pub fn pairing_ticket(data: &[u8]) {
     let Ok(text) = std::str::from_utf8(data) else {
         return;
     };
+    if let Some(c) = ShortCode::parse(text) {
+        assert_eq!(
+            ShortCode::parse(&c.to_string()),
+            Some(c),
+            "typed code round-trips"
+        );
+    }
     let wifi = Wifi::in_link(text).ok().flatten();
     if let Some(w) = &wifi {
         assert!((1..=MAX_SSID_BYTES).contains(&w.ssid().len()));
