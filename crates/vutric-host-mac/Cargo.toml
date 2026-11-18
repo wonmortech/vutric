@@ -1,0 +1,56 @@
+[package]
+name = "vutric-host-mac"
+description = "AppKit side of the Vutric overlay on macOS: a non-activating, click-through NSPanel on every Space, plus the frame-pacing probe."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+serde.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+anyhow.workspace = true
+objc2 = "0.6.5"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "objc2-core-foundation",
+    "NSApplication",
+    "NSColor",
+    "NSGraphics",
+    "libc",
+    "NSPanel",
+    "NSResponder",
+    "NSRunningApplication",
+    "NSScreen",
+    "NSView",
+    "NSWindow",
+    "NSWorkspace",
+] }
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFCGTypes"] }
+objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGWindowLevel"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "NSGeometry",
+    "NSObject",
+    "NSProcessInfo",
+    "NSString",
+    "NSArray",
+] }
+pollster.workspace = true
+raw-window-handle.workspace = true
+serde_json = "1"
+vutric-core.workspace = true
+vutric-overlay.workspace = true
+wgpu.workspace = true
+winit.workspace = true
+
+[[bin]]
+name = "vutric-mac-probe"
+path = "src/bin/probe/main.rs"
+
+[lints]
+workspace = true
