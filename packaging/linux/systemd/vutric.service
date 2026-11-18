@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# The Vutric daemon as a systemd user service (ADR-0091). Enabled per user by the daemon's autostart switch
+# (`systemctl --user enable vutric.service`), never by the package.
+
+[Unit]
+Description=Vutric: receive files flung from your phone
+Documentation=https://github.com/wonmortech/vutric
+PartOf=graphical-session.target
+After=graphical-session.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/vutric-daemon --autostart
+Restart=on-failure
+RestartSec=2
+Slice=app.slice
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+MemoryHigh=256M
+
+[Install]
+WantedBy=graphical-session.target
