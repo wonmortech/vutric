@@ -7,39 +7,55 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `as_initiator`, `bump`, `cancellable`, `drop_session`, `epoch`, `finished`, `forget_on_error`, `keep`, `load_settings`, `ms`, `now_epoch`, `open`, `pause_flag`, `pause_signal`, `peer_slot`, `peer`, `pending_slot`, `progress_of`, `receiver_clock`, `report`, `reporter`, `retire`, `route_name`, `runtime`, `sent_of`, `session_slot`, `session`, `settings_path`, `take_offer`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Sent`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `admit_peer`, `as_initiator`, `beacon_slot`, `beacon`, `bump`, `cancellable`, `drop_session`, `edit_trust`, `epoch`, `finished`, `forget_on_error`, `keep`, `load_settings`, `load_trust`, `method_key`, `ms`, `net_of`, `now_epoch`, `open`, `pause_flag`, `pause_signal`, `peer_slot`, `peer`, `pending_slot`, `picker_name`, `picker_of`, `platform_key`, `progress_of`, `receiver_clock`, `report`, `reporter`, `retire`, `route_name`, `runtime`, `save_settings`, `sent_of`, `session_slot`, `session`, `settings_dir_slot`, `settings_dir`, `settings_path`, `step_name`, `take_offer`, `trust_path`, `visibility_now`, `visibility_slot`, `visibility_state_of`, `wifi_of`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Pairing`, `Sent`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// 32 random bytes to keep forever as this device's identity.
 Future<Uint8List> newIdentity() => RustLib.instance.api.crateApiNewIdentity();
 
-/// Starts (or restarts, e.g. after a rename) this device's peer; returns its pairing link for the QR code.
-/// `lan_only` keeps it off the internet; otherwise it is reachable on this network first and, failing that,
-/// over the internet (direct through NAT where possible, else an encrypted relay). Cancels whatever was
-/// running and closes the open session. Returns at once: the link carries this network's addresses, and
-/// [`wait_online`] then [`current_link`] give the one that also carries the internet relay.
-Future<String> start({
-  required String name,
-  required List<int> identity,
-  required bool lanOnly,
-}) => RustLib.instance.api.crateApiStart(
-  name: name,
-  identity: identity,
-  lanOnly: lanOnly,
-);
+/// Starts (or restarts, after a rename or a new route choice) this device's peer; returns its pairing link for
+/// the QR code. The route choice in the settings (ADR-0060) decides the reach: "Avtomatik" and "Internet orqali"
+/// can use the internet (direct through NAT, else the encrypted relay); every other choice keeps everything on
+/// the local network. Also starts the LAN beacon, so this phone can be found by its address or short code.
+/// Cancels whatever was running and closes the open session. Returns at once: the link carries this network's
+/// addresses, and [`wait_online`] then [`current_link`] give the one that also carries the internet relay.
+Future<String> start({required String name, required List<int> identity}) =>
+    RustLib.instance.api.crateApiStart(name: name, identity: identity);
+
+/// This phone's short connect code (`ABCD-EFGH`, ADR-0059), shown under its QR for typing on another device.
+Future<String> myCode() => RustLib.instance.api.crateApiMyCode();
+
+/// Sets who may connect: `off` (pause), `trusted_only` (the default), `everyone` (10 minutes, every offer asked
+/// about) or `pairing` (10 minutes, while this phone's QR or code is on screen).
+Future<VisibilityState> setVisibility({required String mode}) => RustLib.instance.api.crateApiSetVisibility(mode: mode);
+
+/// The visibility in force now (an expired window reads as `trusted_only`).
+Future<VisibilityState> visibility() => RustLib.instance.api.crateApiVisibility();
+
+/// The paired devices, the one seen most recently first.
+Future<List<DeviceInfo>> devices() => RustLib.instance.api.crateApiDevices();
+
+/// Forgets a device and its overrides; it has to pair again.
+Future<bool> forgetDevice({required String id}) => RustLib.instance.api.crateApiForgetDevice(id: id);
+
+/// One device's overrides as JSON (`{"folder":null,"split_by_type":null,"subfolder":null,"accept":null,
+/// "gallery":null}`; `null` follows the general setting).
+Future<String> deviceRules({required String id}) => RustLib.instance.api.crateApiDeviceRules(id: id);
+
+/// Saves one device's overrides (all `null` removes the entry). Invalid JSON is refused whole.
+Future<void> putDeviceRules({required String id, required String json}) =>
+    RustLib.instance.api.crateApiPutDeviceRules(id: id, json: json);
 
 /// Waits up to `max_ms` for the internet relay (about 3 s on a good line). True: devices on other networks
 /// can reach this one too. False at once in LAN-only mode.
-Future<bool> waitOnline({required int maxMs}) =>
-    RustLib.instance.api.crateApiWaitOnline(maxMs: maxMs);
+Future<bool> waitOnline({required int maxMs}) => RustLib.instance.api.crateApiWaitOnline(maxMs: maxMs);
 
 /// This device's pairing link as of now; once online it also carries the relay.
 Future<String> currentLink() => RustLib.instance.api.crateApiCurrentLink();
 
 /// Finds a peer over mDNS, then measures both directions. Cancelled by [`disconnect`].
-Future<RunReport> runDiscovered({required int runs}) =>
-    RustLib.instance.api.crateApiRunDiscovered(runs: runs);
+Future<RunReport> runDiscovered({required int runs}) => RustLib.instance.api.crateApiRunDiscovered(runs: runs);
 
 /// Connects with a pairing link (scanned or pasted), then measures both directions. Cancelled by [`disconnect`].
 Future<RunReport> runLink({required String link, required int runs}) =>
@@ -47,63 +63,74 @@ Future<RunReport> runLink({required String link, required int runs}) =>
 
 /// Waits for a peer to connect (desktop: `vutric-net-spike send --discover`), answers its probes, then
 /// measures this phone → that peer. Cancelled by [`disconnect`].
-Future<RunReport> listen({required int runs}) =>
-    RustLib.instance.api.crateApiListen(runs: runs);
+Future<RunReport> listen({required int runs}) => RustLib.instance.api.crateApiListen(runs: runs);
 
 /// How the open session's packets travel right now (it can move from "relay" to "direct" a moment after
 /// connecting); "" when not connected.
 Future<String> currentRoute() => RustLib.instance.api.crateApiCurrentRoute();
 
-/// Opens the session with a pairing link (scanned or pasted). Cancelled by [`disconnect`].
-Future<Connected> connectLink({required String link}) =>
-    RustLib.instance.api.crateApiConnectLink(link: link);
+/// The open session's route badge (ADR-0060) as its i18n key (`route.badge.direct_lan`, `route.badge.relay`,
+/// `route.badge.hotspot`, …); "" when not connected.
+Future<String> currentBadge() => RustLib.instance.api.crateApiCurrentBadge();
 
-/// Opens the session with the first device found over mDNS (not on iPhone: no multicast there). Cancelled by
-/// [`disconnect`].
-Future<Connected> connectDiscovered() =>
-    RustLib.instance.api.crateApiConnectDiscovered();
+/// Opens the session with a pairing link (scanned or pasted). With the "Internet orqali" route the link's LAN
+/// hints are skipped (ADR-0060). Cancelled by [`disconnect`].
+Future<Connected> connectLink({required String link}) => RustLib.instance.api.crateApiConnectLink(link: link);
 
-/// Waits for another device to connect to this phone (it scanned our QR code) and keeps that session.
-/// Cancelled by [`disconnect`].
-Future<Connected> acceptSession() =>
-    RustLib.instance.api.crateApiAcceptSession();
+/// Opens the session with the first device found over mDNS (not on iPhone: no multicast there). An unpaired
+/// device comes back with `trusted: false`. Cancelled by [`disconnect`].
+Future<Connected> connectDiscovered() => RustLib.instance.api.crateApiConnectDiscovered();
+
+/// What a typed text is: `link`, `address`, `code` or "" (nothing we can use), for the field's hint as the
+/// user types.
+Future<String> typedKind({required String text}) => RustLib.instance.api.crateApiTypedKind(text: text);
+
+/// Connects with whatever the user typed (issue #9, ADR-0059): a pairing link, an IPv4 address (with or
+/// without a port) or a short code. An address or code is looked up through the LAN beacon (`scan` also sweeps
+/// this phone's /24 for a code); the device found is not authenticated, so unless it is already paired it comes
+/// back with `trusted: false` and the six digits must be compared. Errors carry an i18n key: `find.silent`,
+/// `find.denied` or `find.unreadable`. Cancelled by [`disconnect`].
+Future<Connected> connectTyped({required String text, required bool scan}) =>
+    RustLib.instance.api.crateApiConnectTyped(text: text, scan: scan);
+
+/// Waits for another device to connect to this phone and keeps that session. Who gets in follows the trust
+/// list and the visibility (ADR-0050): a paired device always (unless paused); an unknown one only while the
+/// pairing window (this phone's QR on screen) or "everyone" is open. A device let in through the pairing
+/// window read our key from the QR, so it is paired as `ticket`; one let in through "everyone" stays unknown
+/// (`trusted: false`) and its offers are always asked about. Cancelled by [`disconnect`].
+Future<Connected> acceptSession() => RustLib.instance.api.crateApiAcceptSession();
+
+/// Pairing without a QR (ADR-0050): the commit-then-reveal exchange on the open session, run by both devices at
+/// once. Returns the six digits both screens show. Call it right after a connect that returned
+/// `trusted: false`, before anything else uses the session. Cancelled by [`disconnect`].
+Future<String> pairStart() => RustLib.instance.api.crateApiPairStart();
+
+/// Sends this user's answer to the six digits and waits for the other user's (up to two minutes). True only when
+/// both said yes: the device is then paired (`code`). Otherwise the session is closed.
+Future<bool> pairConfirm({required bool matches}) => RustLib.instance.api.crateApiPairConfirm(matches: matches);
 
 /// Closes the open session and cancels every call still waiting (on it or on opening one). Returns at once.
 Future<void> disconnect() => RustLib.instance.api.crateApiDisconnect();
 
 /// Any picked image (JPEG, PNG or WebP) → the preview the receiver plays.
-Future<Photo> preparePhoto({
-  required String fileName,
-  required List<int> bytes,
-}) =>
+Future<Photo> preparePhoto({required String fileName, required List<int> bytes}) =>
     RustLib.instance.api.crateApiPreparePhoto(fileName: fileName, bytes: bytes);
 
 /// Throws the photo; returns milliseconds from the call until the receiver reported its first frame on screen
 /// (there and back, so an upper bound of "release → first frame"). Fails after
 /// [`probe::ROUND_TRIP_TIMEOUT`] without an answer, and then the session is closed.
-Future<double> fling({
-  required Photo photo,
-  required double speed,
-  required double angle,
-  required double exitX,
-}) => RustLib.instance.api.crateApiFling(
-  photo: photo,
-  speed: speed,
-  angle: angle,
-  exitX: exitX,
-);
+Future<double> fling({required Photo photo, required double speed, required double angle, required double exitX}) =>
+    RustLib.instance.api.crateApiFling(photo: photo, speed: speed, angle: angle, exitX: exitX);
 
-/// Where this phone keeps its settings file (the app's support folder). Call once at start.
-Future<void> setSettingsDir({required String dir}) =>
-    RustLib.instance.api.crateApiSetSettingsDir(dir: dir);
+/// Where this phone keeps its settings and trust files (the app's support folder). Call once at start.
+Future<void> setSettingsDir({required String dir}) => RustLib.instance.api.crateApiSetSettingsDir(dir: dir);
 
 /// The settings as JSON (every field present, defaults filled in), for the Settings screen.
 Future<String> getSettings() => RustLib.instance.api.crateApiGetSettings();
 
 /// Saves settings edited on the Settings screen. Invalid JSON is rejected whole, never half-applied; values out of
 /// range are clamped.
-Future<void> putSettings({required String json}) =>
-    RustLib.instance.api.crateApiPutSettings(json: json);
+Future<void> putSettings({required String json}) => RustLib.instance.api.crateApiPutSettings(json: json);
 
 /// Makes a waiting [`next_incoming`] return an empty [`Incoming`] at once and let go of the session, so this side
 /// can throw or send on the same session; calls made while paused return empty at once too. Nothing is lost:
@@ -121,32 +148,68 @@ Future<Incoming> nextIncoming() => RustLib.instance.api.crateApiNextIncoming();
 
 /// Tells the thrower this phone could not show the photo after all (its round trip ends with a refusal, at
 /// once, instead of a timeout).
-Future<void> refuse({required List<int> id}) =>
-    RustLib.instance.api.crateApiRefuse(id: id);
+Future<void> refuse({required List<int> id}) => RustLib.instance.api.crateApiRefuse(id: id);
 
 /// Tells the thrower that the photo's first frame is on this screen (closes its round trip).
-Future<void> shown({required List<int> id}) =>
-    RustLib.instance.api.crateApiShown(id: id);
+Future<void> shown({required List<int> id}) => RustLib.instance.api.crateApiShown(id: id);
 
 /// Sends files on the open session. `names[i]` is what the receiver sees for `paths[i]` (pickers hand out
 /// temporary copies with made-up names); an empty or missing name keeps the file's own. Progress goes to
 /// `sink`; its last event has `done`. A "no" from the other side is the error "declined" and keeps the
 /// session. Cancelled by [`disconnect`].
-Stream<TransferProgress> sendFiles({
-  required List<String> paths,
-  required List<String> names,
-}) => RustLib.instance.api.crateApiSendFiles(paths: paths, names: names);
+Stream<TransferProgress> sendFiles({required List<String> paths, required List<String> names}) =>
+    RustLib.instance.api.crateApiSendFiles(paths: paths, names: names);
 
 /// Accepts the offer [`next_incoming`] returned and saves it under `dir` (folders kept). Each file appears
 /// only once its hash matched; an interrupted transfer resumes where it stopped when sent again. Progress goes
 /// to `sink`; its last event has `done` and `saved`. Cancelled by [`disconnect`].
-Stream<TransferProgress> receiveFiles({
-  required String dir,
-  required String date,
-}) => RustLib.instance.api.crateApiReceiveFiles(dir: dir, date: date);
+Stream<TransferProgress> receiveFiles({required String dir, required String date}) =>
+    RustLib.instance.api.crateApiReceiveFiles(dir: dir, date: date);
 
 /// Says no to the offer [`next_incoming`] returned.
 Future<void> declineFiles() => RustLib.instance.api.crateApiDeclineFiles();
+
+/// Every route choice, in the order the picker lists them (`auto`, `lan_only`, `internet`, `offline`,
+/// `bluetooth`); the i18n key of each is `route.picker.<choice>`.
+Future<List<String>> routeChoices() => RustLib.instance.api.crateApiRouteChoices();
+
+/// Whether the choice works on any device yet (`bluetooth` waits for R4).
+Future<bool> routeBuilt({required String choice}) => RustLib.instance.api.crateApiRouteBuilt(choice: choice);
+
+/// The privacy lines for the choice, as i18n keys: `privacy.encrypted` always, `privacy.nothing_leaves` only
+/// when nothing can leave the local network (ADR-0061).
+Future<List<String>> privacyLines({required String choice}) =>
+    RustLib.instance.api.crateApiPrivacyLines(choice: choice);
+
+/// The "Avtomatik" order and the forced choices (ADR-0060) for what this phone can do now: `lan` (it has a
+/// local network address, see [`has_lan`]), `internet` (the relay answered) and `hotspot` (it can open one).
+Future<RoutePlan> routePlan({
+  required String choice,
+  required bool lan,
+  required bool internet,
+  required bool hotspot,
+}) => RustLib.instance.api.crateApiRoutePlan(choice: choice, lan: lan, internet: internet, hotspot: hotspot);
+
+/// Whether this phone has a local network address another device could reach (Wi-Fi, Ethernet, a hotspot);
+/// VPN and virtual adapters do not count.
+Future<bool> hasLan() => RustLib.instance.api.crateApiHasLan();
+
+/// This phone's pairing link with its hotspot in it: one QR both joins the network and pairs (R3). Refuses a
+/// network another phone could not join.
+Future<String> hotspotLink({required String ssid, required String password, required String security}) =>
+    RustLib.instance.api.crateApiHotspotLink(ssid: ssid, password: password, security: security);
+
+/// The standard `WIFI:` payload for a phone's camera app (no Vutric needed to join).
+Future<String> wifiQr({
+  required String ssid,
+  required String password,
+  required String security,
+  required bool hidden,
+}) => RustLib.instance.api.crateApiWifiQr(ssid: ssid, password: password, security: security, hidden: hidden);
+
+/// The hotspot a scanned link carries, if any. A half or broken hotspot part is an error, so the user is not
+/// sent to a network that cannot work.
+Future<HotspotNet?> hotspotOfLink({required String link}) => RustLib.instance.api.crateApiHotspotOfLink(link: link);
 
 /// A photo thrown at this phone; its preview has been checked (a real JPEG, preview-sized, as announced).
 class Caught {
@@ -208,12 +271,25 @@ class Connected {
   /// the path is still being chosen.
   final String route;
 
+  /// The peer's endpoint id (64 hex): the key of its overrides on the device screen.
+  final String peerId;
+
+  /// Its short code (`ABCD-EFGH`).
+  final String peerCode;
+
+  /// In this phone's trust list (paired before, or by the QR just scanned). False: run [`pair_start`] and
+  /// [`pair_confirm`] before anything else, or close the session.
+  final bool trusted;
+
   const Connected({
     required this.peerName,
     required this.peerPlatform,
     required this.checkCode,
     required this.connectMs,
     required this.route,
+    required this.peerId,
+    required this.peerCode,
+    required this.trusted,
   });
 
   @override
@@ -222,7 +298,10 @@ class Connected {
       peerPlatform.hashCode ^
       checkCode.hashCode ^
       connectMs.hashCode ^
-      route.hashCode;
+      route.hashCode ^
+      peerId.hashCode ^
+      peerCode.hashCode ^
+      trusted.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -233,7 +312,67 @@ class Connected {
           peerPlatform == other.peerPlatform &&
           checkCode == other.checkCode &&
           connectMs == other.connectMs &&
-          route == other.route;
+          route == other.route &&
+          peerId == other.peerId &&
+          peerCode == other.peerCode &&
+          trusted == other.trusted;
+}
+
+/// A paired device, for the device list and the device detail screen (T3).
+class DeviceInfo {
+  /// The endpoint id, 64 hex: the key of its overrides.
+  final String id;
+  final String name;
+
+  /// `android`, `ios`, `windows`, `linux`, `macos` or "".
+  final String platform;
+
+  /// `ticket` (QR or link), `code` (six digits compared) or `pinned` (a foreign app).
+  final String method;
+  final BigInt pairedAt;
+  final BigInt lastSeen;
+
+  /// Its short code (`ABCD-EFGH`), to tell two devices with one name apart.
+  final String code;
+
+  /// Whether any override is set for it.
+  final bool hasRules;
+
+  const DeviceInfo({
+    required this.id,
+    required this.name,
+    required this.platform,
+    required this.method,
+    required this.pairedAt,
+    required this.lastSeen,
+    required this.code,
+    required this.hasRules,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      platform.hashCode ^
+      method.hashCode ^
+      pairedAt.hashCode ^
+      lastSeen.hashCode ^
+      code.hashCode ^
+      hasRules.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DeviceInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          platform == other.platform &&
+          method == other.method &&
+          pairedAt == other.pairedAt &&
+          lastSeen == other.lastSeen &&
+          code == other.code &&
+          hasRules == other.hasRules;
 }
 
 /// Files another device offers this phone: answer with [`receive_files`] or [`decline_files`].
@@ -247,16 +386,10 @@ class FilesOffer {
   /// The user's settings say yes without asking (accept rule and this device's override).
   final bool autoAccept;
 
-  const FilesOffer({
-    required this.files,
-    required this.bytes,
-    required this.names,
-    required this.autoAccept,
-  });
+  const FilesOffer({required this.files, required this.bytes, required this.names, required this.autoAccept});
 
   @override
-  int get hashCode =>
-      files.hashCode ^ bytes.hashCode ^ names.hashCode ^ autoAccept.hashCode;
+  int get hashCode => files.hashCode ^ bytes.hashCode ^ names.hashCode ^ autoAccept.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -267,6 +400,33 @@ class FilesOffer {
           bytes == other.bytes &&
           names == other.names &&
           autoAccept == other.autoAccept;
+}
+
+/// A Wi-Fi network carried by a pairing link.
+class HotspotNet {
+  final String ssid;
+
+  /// "" for an open network.
+  final String password;
+
+  /// `wpa2`, `wpa3` or `open`.
+  final String security;
+  final bool hidden;
+
+  const HotspotNet({required this.ssid, required this.password, required this.security, required this.hidden});
+
+  @override
+  int get hashCode => ssid.hashCode ^ password.hashCode ^ security.hashCode ^ hidden.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HotspotNet &&
+          runtimeType == other.runtimeType &&
+          ssid == other.ssid &&
+          password == other.password &&
+          security == other.security &&
+          hidden == other.hidden;
 }
 
 /// What arrived on the open session: a photo thrown at this phone, or files offered to it.
@@ -282,10 +442,7 @@ class Incoming {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Incoming &&
-          runtimeType == other.runtimeType &&
-          photo == other.photo &&
-          files == other.files;
+      other is Incoming && runtimeType == other.runtimeType && photo == other.photo && files == other.files;
 }
 
 /// A photo ready to throw: an upright JPEG, longest side at most 512 px, small enough for one frame. Prepared
@@ -296,16 +453,10 @@ class Photo {
   final int width;
   final int height;
 
-  const Photo({
-    required this.fileName,
-    required this.jpeg,
-    required this.width,
-    required this.height,
-  });
+  const Photo({required this.fileName, required this.jpeg, required this.width, required this.height});
 
   @override
-  int get hashCode =>
-      fileName.hashCode ^ jpeg.hashCode ^ width.hashCode ^ height.hashCode;
+  int get hashCode => fileName.hashCode ^ jpeg.hashCode ^ width.hashCode ^ height.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -316,6 +467,25 @@ class Photo {
           jpeg == other.jpeg &&
           width == other.width &&
           height == other.height;
+}
+
+/// The routes to try for a choice, best first.
+class RoutePlan {
+  /// `same_network`, `internet_direct`, `relay`, `offer_hotspot`, `offer_wifi_aware`, `offer_cable`.
+  final List<String> steps;
+
+  /// When `steps` is empty: why, as an i18n key (`route.none.not_built`, `route.none.unavailable`).
+  final String none;
+
+  const RoutePlan({required this.steps, required this.none});
+
+  @override
+  int get hashCode => steps.hashCode ^ none.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RoutePlan && runtimeType == other.runtimeType && steps == other.steps && none == other.none;
 }
 
 /// What one spike run measured, both directions, for the screen and the report.
@@ -440,4 +610,24 @@ class TransferProgress {
           failedNames == other.failedNames &&
           saved == other.saved &&
           seconds == other.seconds;
+}
+
+/// What the visibility switch shows: `mode` is `off`, `trusted_only`, `everyone` or `pairing`, and
+/// `remaining_secs` the countdown of a window (0 otherwise).
+class VisibilityState {
+  final String mode;
+  final int remainingSecs;
+
+  const VisibilityState({required this.mode, required this.remainingSecs});
+
+  @override
+  int get hashCode => mode.hashCode ^ remainingSecs.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is VisibilityState &&
+          runtimeType == other.runtimeType &&
+          mode == other.mode &&
+          remainingSecs == other.remainingSecs;
 }

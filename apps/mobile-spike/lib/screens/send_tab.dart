@@ -240,7 +240,10 @@ class SendTabState extends State<SendTab> {
                     _HeroPanel(
                       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ThrowPage())),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 10),
+                    // S6 (ADR-0061): only the promise the route choice makes true.
+                    PrivacyLine(keys: _s.privacy),
+                    const SizedBox(height: 16),
                     VSegmented(
                       labels: const ['Rasmlar', 'Fayllar'],
                       index: _tab,
@@ -315,7 +318,10 @@ class SendTabState extends State<SendTab> {
     if (p == null) {
       return [
         const SliverToBoxAdapter(
-          child: Padding(padding: EdgeInsets.all(48), child: Center(child: CircularProgressIndicator())),
+          child: Padding(
+            padding: EdgeInsets.all(48),
+            child: Center(child: CircularProgressIndicator()),
+          ),
         ),
       ];
     }
@@ -347,7 +353,11 @@ class SendTabState extends State<SendTab> {
                 await PhotoManager.presentLimited();
                 await _open();
               },
-              child: VNotice(error: false, title: 'Faqat tanlangan rasmlar koʻrinadi', body: 'Koʻproq ruxsat berish uchun bosing'),
+              child: VNotice(
+                error: false,
+                title: 'Faqat tanlangan rasmlar koʻrinadi',
+                body: 'Koʻproq ruxsat berish uchun bosing',
+              ),
             ),
           ),
         ),
@@ -446,13 +456,16 @@ class SendTabState extends State<SendTab> {
             const SizedBox(height: 20),
             Text('TANLANGAN', style: v.text(12, FontWeight.w600, color: v.muted, tracking: 0.06)),
             const SizedBox(height: 6),
-            for (final e in _files.entries) _FileRow(name: e.value, picked: true, onTap: () => _toggleFile(e.key, e.value)),
+            for (final e in _files.entries)
+              _FileRow(name: e.value, picked: true, onTap: () => _toggleFile(e.key, e.value)),
           ],
           const SizedBox(height: 20),
           Text('VUTRIC ORQALI KELGANLAR', style: v.text(12, FontWeight.w600, color: v.muted, tracking: 0.06)),
           const SizedBox(height: 2),
           Text(
-            Platform.isIOS ? 'Fayllar ilovasida: Mening iPhone’im → Vutric' : 'Telefon xotirasida: Android/data/…/Vutric',
+            Platform.isIOS
+                ? 'Fayllar ilovasida: Mening iPhone’im → Vutric'
+                : 'Telefon xotirasida: Android/data/…/Vutric',
             style: v.caption,
           ),
           const SizedBox(height: 6),
@@ -674,7 +687,11 @@ class _Cell extends StatelessWidget {
             ),
             if (asset.type == AssetType.video)
               Positioned(left: 6, bottom: 6, child: _Badge(text: _clock(asset.duration))),
-            Positioned(right: 6, top: 6, child: _Check(on: picked, order: order)),
+            Positioned(
+              right: 6,
+              top: 6,
+              child: _Check(on: picked, order: order),
+            ),
           ],
         ),
       ),

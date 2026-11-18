@@ -14,12 +14,15 @@ import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:photo_manager/photo_manager.dart';
 
+import '../companion.dart';
 import '../design/tokens.dart';
 import '../design/widgets.dart';
+import '../i18n.dart';
 import '../session.dart';
 import '../src/rust/api.dart' as vutric;
 import '../ui.dart';
 import 'connect.dart';
+import 'device_page.dart';
 
 enum _Phase { idle, flying, arrived, rejected, timeout }
 
@@ -260,7 +263,9 @@ class _ThrowPageState extends State<ThrowPage> with SingleTickerProviderStateMix
       _Pose.rest,
       _reduced ? VMotion.reduced : VMotion.returnDuration,
       VMotion.returnBack,
-      from: _reduced ? const _Pose(Offset.zero, opacity: 0) : _Pose(Offset(0, _stage.height * 0.9), rot: 4, scale: 0.92),
+      from: _reduced
+          ? const _Pose(Offset.zero, opacity: 0)
+          : _Pose(Offset(0, _stage.height * 0.9), rot: 4, scale: 0.92),
     );
   }
 
@@ -370,7 +375,10 @@ class _ThrowPageState extends State<ThrowPage> with SingleTickerProviderStateMix
           ),
         ),
         if (_error != null)
-          Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 12), child: VNotice(title: _error!)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: VNotice(title: _error!),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: Column(
@@ -549,7 +557,10 @@ class _ThrowPageState extends State<ThrowPage> with SingleTickerProviderStateMix
         children: [
           AnimatedSwitcher(
             duration: VMotion.fast,
-            child: KeyedSubtree(key: ValueKey('${_phase.name}$lost$_dragging${_error != null}${_photo != null}'), child: status),
+            child: KeyedSubtree(
+              key: ValueKey('${_phase.name}$lost$_dragging${_error != null}${_photo != null}'),
+              child: status,
+            ),
           ),
           const SizedBox(height: 12),
           buttons,
@@ -559,33 +570,116 @@ class _ThrowPageState extends State<ThrowPage> with SingleTickerProviderStateMix
   }
 }
 
-/// The connected device's details, its check code in large type, and "Uzish".
+/// The connected device's details: the route badge (ADR-0060, live), its check code in large type, its own
+/// settings (T3), the clipboard action when turned on (A12), and "Uzish".
 Future<void> showPeerSheet(BuildContext context, vutric.Connected peer) async {
-  final v = context.v;
-  final close = await showModalBottomSheet<bool>(
+  final action = await showModalBottomSheet<String>(
     context: context,
-    builder: (ctx) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(peer.peerName, style: v.title),
-            const SizedBox(height: 4),
-            Text('${platformName(peer.peerPlatform)} · ${routeLabel(peer.route)}', style: v.caption),
-            const SizedBox(height: 16),
-            Text('Tekshiruv kodi', style: v.label),
-            Text(peer.checkCode, style: v.text(34, FontWeight.w600, mono: true, tracking: 0.08)),
-            Text('Ikkala ekranda bir xil boʻlishi kerak.', style: v.caption),
-            const SizedBox(height: 16),
-            VButton(label: 'Uzish', kind: VButtonKind.secondary, onPressed: () => Navigator.pop(ctx, true)),
-          ],
+    builder: (ctx) => PeerSheet(peer: peer),
+  );
+  if (!context.mounted) return;
+  switch (action) {
+    case 'close':
+      await Session.instance.disconnect();
+    case 'device':
+      final d = (await vutric.devices()).where((d) => d.id == peer.peerId).firstOrNull;
+      if (d != null && context.mounted) {
+        await Navigator.of(context).push(MaterialPageRoute<bool>(builder: (_) => DevicePage(device: d)));
+      }
+    case 'clipboard':
+      await sendClipboard(context);
+  }
+}
+
+class PeerSheet extends StatelessWidget {
+  const PeerSheet({super.key, required this.peer});
+  final vutric.Connected peer;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.v;
+    final s = Session.instance;
+    return ListenableBuilder(
+      listenable: s,
+      builder: (context, _) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(peer.peerName, style: v.title),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(platformName(peer.peerPlatform), style: v.caption),
+                  RouteBadge(badge: s.badge.isEmpty ? peer.route : s.badge),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text('Tekshiruv kodi', style: v.label),
+              Text(peer.checkCode, style: v.text(34, FontWeight.w600, mono: true, tracking: 0.08)),
+              Text('Ikkala ekranda bir xil boʻlishi kerak.', style: v.caption),
+              const SizedBox(height: 16),
+              if (peer.trusted) ...[
+                VRowCard(
+                  icon: Icons.tune_rounded,
+                  title: tr('devices.rules'),
+                  subtitle: tr('devices.rules.hint'),
+                  onTap: () => Navigator.pop(context, 'device'),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (s.clipboardButton) ...[
+                VButton(
+                  label: tr('companion.clipboard.send'),
+                  icon: Icons.content_paste_go_rounded,
+                  kind: VButtonKind.secondary,
+                  onPressed: () => Navigator.pop(context, 'clipboard'),
+                ),
+                const SizedBox(height: 10),
+              ],
+              VButton(label: 'Uzish', kind: VButtonKind.secondary, onPressed: () => Navigator.pop(context, 'close')),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-  if (close == true) await Session.instance.disconnect();
+    );
+  }
+}
+
+/// The route badge (ADR-0060): what the packets travel over now, never a promise.
+class RouteBadge extends StatelessWidget {
+  const RouteBadge({super.key, required this.badge});
+  final String badge;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.v;
+    final icon = switch (badge) {
+      'route.badge.direct_lan' || 'direct' => Icons.router_outlined,
+      'route.badge.direct_internet' => Icons.public_rounded,
+      'route.badge.relay' || 'relay' => Icons.cloud_outlined,
+      'route.badge.hotspot' => Icons.wifi_tethering_rounded,
+      'route.badge.cable' => Icons.cable_rounded,
+      _ => Icons.more_horiz_rounded,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: v.bgAlt, borderRadius: BorderRadius.circular(v.rPill.clamp(0, 10))),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: v.accent),
+          const SizedBox(width: 5),
+          Flexible(child: Text(routeLabel(badge), style: v.text(12, FontWeight.w600))),
+        ],
+      ),
+    );
+  }
 }
 
 /// "⌃ Yuborish uchun yuqoriga suring" with two chevrons rising (1.6 s, staggered 0.3 s).
@@ -670,7 +764,14 @@ class _SentStrip extends StatelessWidget {
             padding: const EdgeInsets.only(right: 6),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.memory(s.jpeg, width: 30, height: 30, fit: BoxFit.cover, cacheWidth: 90, gaplessPlayback: true),
+              child: Image.memory(
+                s.jpeg,
+                width: 30,
+                height: 30,
+                fit: BoxFit.cover,
+                cacheWidth: 90,
+                gaplessPlayback: true,
+              ),
             ),
           ),
         const SizedBox(width: 4),

@@ -22,8 +22,48 @@ class ReceiveTile extends AndroidEvent {
   const ReceiveTile();
 }
 
+/// A notification posted on this phone that passed the Companion filter (A12).
+class PhoneNotice extends AndroidEvent {
+  const PhoneNotice({
+    required this.app,
+    required this.package,
+    required this.title,
+    required this.text,
+    required this.at,
+  });
+  final String app;
+  final String package;
+  final String title;
+  final String text;
+  final DateTime at;
+}
+
+/// A LocalSend or KDE Connect device seen on this Wi-Fi (A13).
+class ForeignDevice extends AndroidEvent {
+  const ForeignDevice({
+    required this.app,
+    required this.id,
+    required this.name,
+    required this.type,
+    required this.host,
+    required this.port,
+  });
+  final String app;
+  final String id;
+  final String name;
+  final String type;
+  final String host;
+  final int port;
+
+  /// One entry per app and device id.
+  String get key => '$app:$id';
+}
+
 /// A folder picked through the system (SAF): the tree URI and a name to show.
 typedef SafFolder = ({String uri, String label});
+
+/// This phone's local-only hotspot.
+typedef HotspotCredentials = ({String ssid, String password, String security});
 
 class AndroidBridge {
   AndroidBridge._() {
@@ -48,13 +88,29 @@ class AndroidBridge {
     switch (raw['kind']) {
       case 'receive':
         return const ReceiveTile();
+      case 'notice':
+        return PhoneNotice(
+          app: '${raw['app'] ?? ''}',
+          package: '${raw['package'] ?? ''}',
+          title: '${raw['title'] ?? ''}',
+          text: '${raw['text'] ?? ''}',
+          at: DateTime.fromMillisecondsSinceEpoch(raw['at'] is int ? raw['at'] as int : 0),
+        );
+      case 'foreign':
+        final id = '${raw['id'] ?? ''}';
+        if (id.isEmpty) return null;
+        return ForeignDevice(
+          app: '${raw['app'] ?? ''}',
+          id: id,
+          name: '${raw['name'] ?? ''}',
+          type: '${raw['type'] ?? ''}',
+          host: '${raw['host'] ?? ''}',
+          port: raw['port'] is int ? raw['port'] as int : 0,
+        );
       case 'share':
         final files = (raw['files'] as List? ?? const []).whereType<Map>().toList();
         if (files.isEmpty) return null;
-        return SharedFiles(
-          [for (final f in files) '${f['path']}'],
-          [for (final f in files) '${f['name']}'],
-        );
+        return SharedFiles([for (final f in files) '${f['path']}'], [for (final f in files) '${f['name']}']);
     }
     return null;
   }
@@ -145,15 +201,63 @@ class AndroidBridge {
     }
   }
 
+  // ── Companion (A12) and ForeignDiscovery (A13) ─────────────────────────────────────────────────────────────
+
+  /// Whether Vutric has notification access; with [ask], opens the system page when it has not.
+  Future<bool> notificationAccess({bool ask = false}) async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return await _ch.invokeMethod<bool>('notificationAccess', {'ask': ask}) ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Turns mirroring on or off for the listener; an empty [apps] list means every app.
+  Future<void> companionMirror(bool on, List<String> apps) async {
+    if (Platform.isAndroid) await _ch.invokeMethod<void>('companionMirror', {'on': on, 'apps': apps});
+  }
+
+  Future<void> foreignStart() async {
+    if (Platform.isAndroid) await _ch.invokeMethod<void>('foreignStart');
+  }
+
+  Future<void> foreignStop() async {
+    if (Platform.isAndroid) await _ch.invokeMethod<void>('foreignStop');
+  }
+
   // ── LinkManager: local-only hotspot ────────────────────────────────────────────────────────────────────────
 
   /// Opens the hotspot; throws a [PlatformException] whose code says why not (`permission`, `disallowed`, …).
-  Future<({String ssid, String password})> hotspotStart() async {
+  /// `security` is `wpa2`, `wpa3` or `open`, as the pairing link carries it (ADR-0058).
+  Future<HotspotCredentials> hotspotStart() async {
     final r = await _ch.invokeMapMethod<String, String>('hotspotStart');
-    return (ssid: r?['ssid'] ?? '', password: r?['password'] ?? '');
+    return (ssid: r?['ssid'] ?? '', password: r?['password'] ?? '', security: r?['security'] ?? 'wpa2');
   }
 
   Future<void> hotspotStop() async {
     if (Platform.isAndroid) await _ch.invokeMethod<void>('hotspotStop');
+  }
+
+  /// Joins the hotspot a scanned link carries and routes this app's new sockets over it (Android 10+). Throws a
+  /// [PlatformException]: `unsupported` (older Android: join in system settings), `unavailable` (refused or not
+  /// found), `bad_network`, `permission`.
+  Future<void> hotspotJoin({
+    required String ssid,
+    required String password,
+    required String security,
+    bool hidden = false,
+  }) async {
+    if (!Platform.isAndroid) throw PlatformException(code: 'unsupported');
+    await _ch.invokeMethod<bool>('hotspotJoin', {
+      'ssid': ssid,
+      'password': password,
+      'security': security,
+      'hidden': hidden,
+    });
+  }
+
+  Future<void> hotspotLeave() async {
+    if (Platform.isAndroid) await _ch.invokeMethod<void>('hotspotLeave');
   }
 }

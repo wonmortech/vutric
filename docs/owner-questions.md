@@ -18,3 +18,6 @@ The browser page (C2) uses HTTPS with the device's self-signed certificate, as A
 files and the link token over the LAN unencrypted. Current choice: HTTPS only. Should plain HTTP be an opt-in
 setting? Work continues with HTTPS only until you answer.
 
+(W1) 2026-11-18 · A stranger that connects while the phone shows its own QR (pairing window) is trusted as `ticket` without the six-digit check, because the listener cannot know whether the dialer runs it (W3 #13). Accept that for the spike, or refuse such peers until #13? Default meanwhile: trusted as `ticket`.
+(W1) 2026-11-18 · Companion notifications: once W3 #12 lands, mirror every app by default (with the allowlist to narrow it) or start with an empty list the user fills? Default meanwhile: every app, and nothing is sent yet.
+(W1) 2026-11-18 · LocalSend and KDE Connect on the phone: discovery only until a phone host for the compat adapters exists (W3 #11). Is "discovery only" acceptable for the next APK, or should the rows stay hidden until sending works? Default meanwhile: shown, marked "sending opens later".

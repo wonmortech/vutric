@@ -1,6 +1,8 @@
-// Routersiz (backlog A6, route R3): this phone opens a local-only hotspot. Step 1 shows how to join it (a Wi-Fi QR
-// the other phone's camera understands, and the name and password for a computer); step 2 is the normal pairing
-// QR, which by then carries the hotspot address. The hotspot closes when this page closes or the session ends.
+// Routersiz (backlog A6, route R3, ADR-0058): this phone opens a local-only hotspot and shows ONE QR that carries
+// both the network (name, password, security) and the pairing link. Another Vutric phone scans it, joins the
+// network and pairs in one go (joinHotspot below); a phone without Vutric gets the plain `WIFI:` QR from the
+// "Kamera bilan" tab, and a computer types the name and password. The hotspot closes when this page closes
+// unpaired, or when the session it carries ends.
 
 import 'dart:async';
 
@@ -11,8 +13,10 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../android.dart';
 import '../design/tokens.dart';
 import '../design/widgets.dart';
+import '../i18n.dart';
 import '../session.dart';
 import '../src/rust/api.dart' as vutric;
+import '../ui.dart';
 import 'connect.dart';
 
 class HotspotPage extends StatefulWidget {
@@ -24,9 +28,16 @@ class HotspotPage extends StatefulWidget {
 
 class _HotspotPageState extends State<HotspotPage> {
   final _bridge = AndroidBridge.instance;
-  ({String ssid, String password})? _net;
+  HotspotCredentials? _net;
+  String? _link;
+  String? _wifiQr;
   String? _error;
   bool _paired = false;
+  bool _closing = false;
+  int _qr = 0;
+
+  /// The phone notices the hotspot interface a moment after it is up: refresh the link so it carries its address.
+  Timer? _refresh;
 
   @override
   void initState() {
@@ -36,8 +47,12 @@ class _HotspotPageState extends State<HotspotPage> {
 
   @override
   void dispose() {
+    _refresh?.cancel();
     // Paired: the hotspot is the session's road, so it stays up until the session ends (Session.onDisconnect).
-    if (!_paired) _bridge.hotspotStop();
+    if (!_paired) {
+      _bridge.hotspotStop();
+      vutric.setVisibility(mode: 'trusted_only').catchError((Object _) => vutric.visibility());
+    }
     super.dispose();
   }
 
@@ -50,31 +65,55 @@ class _HotspotPageState extends State<HotspotPage> {
         unawaited(_bridge.hotspotStop());
         return;
       }
-      setState(() => _net = n);
+      final wifi = await vutric.wifiQr(ssid: n.ssid, password: n.password, security: n.security, hidden: false);
+      setState(() {
+        _net = n;
+        _wifiQr = wifi;
+      });
+      await _relink();
+      _refresh = Timer.periodic(const Duration(seconds: 4), (_) => _relink());
+      await vutric.setVisibility(mode: 'pairing');
+      unawaited(_wait());
     } on PlatformException catch (e) {
       if (!mounted) return;
-      setState(
-        () => _error = switch (e.code) {
-          'permission' => 'Yaqin-atrofdagi qurilmalar ruxsati kerak. Sozlamalar → Ilovalar → Vutric.',
-          'disallowed' => 'Bu telefonda hotspot yoqish taqiqlangan (administrator yoki operator).',
-          'incompatible' => 'Hotspot hozir yoqilmaydi: oddiy hotspot yoki Wi-Fi Direct band. Ularni oʻchirib koʻring.',
-          'no_channel' => 'Boʻsh Wi-Fi kanali topilmadi. Birozdan keyin qayta urinib koʻring.',
-          'unsupported' => 'Android 8 yoki yangisi kerak.',
-          _ => 'Hotspot ochilmadi (${e.code}).',
-        },
-      );
+      setState(() => _error = hotspotError(e.code));
+    } catch (e) {
+      if (mounted) setState(() => _error = errorText(e));
     }
   }
 
-  Future<void> _pair() async {
-    // The node notices the new interface on its own; ask for the link again so the QR carries the hotspot address.
-    await Session.instance.refreshLink();
-    if (!mounted) return;
-    final c = await Navigator.of(context).push<vutric.Connected>(MaterialPageRoute(builder: (_) => const MyQrPage()));
-    if (c == null || !mounted) return;
-    _paired = true;
-    Session.instance.onDisconnect = _bridge.hotspotStop;
-    Navigator.of(context).pop(c);
+  Future<void> _relink() async {
+    final n = _net;
+    if (n == null) return;
+    try {
+      final link = await vutric.hotspotLink(ssid: n.ssid, password: n.password, security: n.security);
+      if (mounted && link != _link) setState(() => _link = link);
+    } catch (e) {
+      if (mounted) setState(() => _error = errorText(e));
+    }
+  }
+
+  /// Waits for the other device on this phone's own session listener (same as "Kutish: QR kodimni").
+  Future<void> _wait() async {
+    try {
+      final c = await Session.instance.connect(vutric.acceptSession);
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      _paired = true;
+      _closing = true;
+      Session.instance.onDisconnect = _bridge.hotspotStop;
+      unawaited(vutric.setVisibility(mode: 'trusted_only'));
+      Navigator.of(context).pop(c);
+    } catch (e) {
+      if (!mounted || _closing || isCancelled(e)) return;
+      setState(() => _error = errorText(e));
+    }
+  }
+
+  Future<void> _back() async {
+    _closing = true;
+    await disconnectNow();
+    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -82,54 +121,71 @@ class _HotspotPageState extends State<HotspotPage> {
     final v = context.v;
     final n = _net;
     final w = MediaQuery.sizeOf(context).width;
-    return Scaffold(
-      backgroundColor: v.bg,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    final qr = _qr == 0 ? _link : _wifiQr;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (did, _) {
+        if (!did) _back();
+      },
+      child: Scaffold(
+        backgroundColor: v.bg,
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             children: [
-              VNavHeader(title: 'Routersiz', onBack: () => Navigator.pop(context)),
+              VNavHeader(title: 'Routersiz', onBack: _back),
               const SizedBox(height: 12),
-              Text('1. Boshqa qurilma\nshu Wi-Fi’ga ulansin', style: v.title),
+              Text('Boshqa qurilma shu\nQR kodni skanerlasin', style: v.title),
               const SizedBox(height: 6),
               Text(
-                'Internet kerak emas. Telefon kamerasi bilan skanerlang yoki kompyuterda nom va parolni kiriting.',
+                'Internet kerak emas. Vutric oʻzi Wi-Fi’ga ulanadi va juftlaydi. Kompyuterda nom va parolni kiriting.',
                 style: v.caption,
               ),
-              const Spacer(),
-              if (_error != null)
-                VNotice(title: 'Hotspot ochilmadi', body: _error)
-              else if (n == null)
-                const Center(child: CircularProgressIndicator())
+              const SizedBox(height: 18),
+              if (_error != null) ...[
+                VNotice(title: 'Hotspot ochilmadi', body: _error),
+                const SizedBox(height: 18),
+                VButton(label: 'Qayta urinish', icon: Icons.refresh_rounded, onPressed: _start),
+              ] else if (n == null || qr == null)
+                const Padding(
+                  padding: EdgeInsets.all(48),
+                  child: Center(child: CircularProgressIndicator()),
+                )
               else ...[
+                VSegmented(
+                  labels: [tr('hotspot.qr.vutric'), tr('hotspot.qr.camera')],
+                  index: _qr,
+                  onChanged: (i) => setState(() => _qr = i),
+                ),
+                const SizedBox(height: 18),
                 Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
-                    child: QrImageView(
-                      data: wifiQr(n.ssid, n.password),
-                      size: (w * 0.5).clamp(180.0, 260.0),
-                      padding: EdgeInsets.zero,
-                      semanticsLabel: 'Wi-Fi ulanish QR kodi',
-                    ),
-                  ),
+                  child: _qr == 0
+                      ? PairingQr(data: qr, size: (w * 0.56).clamp(180.0, 280.0))
+                      : Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+                          child: QrImageView(
+                            data: qr,
+                            size: (w * 0.5).clamp(180.0, 260.0),
+                            padding: EdgeInsets.zero,
+                            semanticsLabel: 'Wi-Fi ulanish QR kodi',
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 18),
                 _Field(label: 'Tarmoq', value: n.ssid),
                 const SizedBox(height: 8),
-                _Field(label: 'Parol', value: n.password),
-              ],
-              const Spacer(),
-              if (_error != null)
-                VButton(label: 'Qayta urinish', icon: Icons.refresh_rounded, onPressed: _start)
-              else
-                VButton(
-                  label: 'Ulandi: 2. QR kodim',
-                  icon: Icons.arrow_forward_rounded,
-                  onPressed: n == null ? null : _pair,
+                if (n.password.isNotEmpty) _Field(label: 'Parol', value: n.password),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox.square(dimension: 14, child: CircularProgressIndicator(strokeWidth: 2, color: v.muted)),
+                    const SizedBox(width: 8),
+                    Flexible(child: Text('Ikkinchi qurilma kutilmoqda…', style: v.caption)),
+                  ],
                 ),
+              ],
             ],
           ),
         ),
@@ -138,10 +194,58 @@ class _HotspotPageState extends State<HotspotPage> {
   }
 }
 
-/// The `WIFI:` QR format phone cameras join directly (special characters escaped as the format requires).
-String wifiQr(String ssid, String password) {
-  String esc(String s) => s.replaceAllMapped(RegExp(r'([\\;,:"])'), (m) => '\\${m[1]}');
-  return 'WIFI:T:WPA;S:${esc(ssid)};P:${esc(password)};;';
+/// The hotspot start error, said plainly.
+String hotspotError(String code) => switch (code) {
+  'permission' => 'Yaqin-atrofdagi qurilmalar ruxsati kerak. Sozlamalar → Ilovalar → Vutric.',
+  'disallowed' => 'Bu telefonda hotspot yoqish taqiqlangan (administrator yoki operator).',
+  'incompatible' => 'Hotspot hozir yoqilmaydi: oddiy hotspot yoki Wi-Fi Direct band. Ularni oʻchirib koʻring.',
+  'no_channel' => 'Boʻsh Wi-Fi kanali topilmadi. Birozdan keyin qayta urinib koʻring.',
+  'unsupported' => 'Android 8 yoki yangisi kerak.',
+  _ => 'Hotspot ochilmadi ($code).',
+};
+
+/// The joining side of R3: asks once, joins the hotspot a scanned link carries, and restarts the node so its
+/// sockets ride the new network. Leaves the network again when the session ends. False: not joined (the user
+/// said no, the network was not found, or this Android is too old, in which case it says how to join by hand).
+Future<bool> joinHotspot(BuildContext context, vutric.HotspotNet net) async {
+  final go = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(tr('hotspot.join.title', {'ssid': net.ssid})),
+      content: Text(tr('hotspot.join.body')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Bekor qilish')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('hotspot.join.go'))),
+      ],
+    ),
+  );
+  if (go != true || !context.mounted) return false;
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.showSnackBar(SnackBar(content: Text(tr('hotspot.join.wait')), duration: const Duration(seconds: 30)));
+  final bridge = AndroidBridge.instance;
+  try {
+    await bridge.hotspotJoin(ssid: net.ssid, password: net.password, security: net.security, hidden: net.hidden);
+  } on PlatformException catch (e) {
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            e.code == 'unsupported'
+                ? tr('hotspot.join.manual', {'ssid': net.ssid})
+                : '${tr('hotspot.join.failed')} (${e.code})',
+          ),
+        ),
+      );
+    return false;
+  }
+  messenger.hideCurrentSnackBar();
+  // Sockets opened before the join stay on the old network: start the node again on the hotspot.
+  await Session.instance.restart();
+  Session.instance.onDisconnect = () {
+    bridge.hotspotLeave();
+  };
+  return true;
 }
 
 class _Field extends StatelessWidget {

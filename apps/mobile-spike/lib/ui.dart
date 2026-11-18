@@ -2,6 +2,7 @@
 
 import 'dart:io';
 
+import 'i18n.dart';
 import 'src/rust/api.dart' as vutric;
 
 Future<void> _lastDisconnect = Future.value();
@@ -19,14 +20,16 @@ Future<T> afterDisconnect<T>(Future<T> Function() job) async {
 /// iPhone cannot use mDNS without Apple's multicast entitlement (a free Apple ID has none): pair by QR there.
 final hasMdns = !Platform.isIOS;
 
-/// A call that `disconnect()` cancelled on purpose (the page closed, or the user tapped cancel).
-/// How the session travels, for the line under the peer's name.
+/// How the session travels, for the line under the peer's name: the route badge of ADR-0060 when Rust gave one
+/// (`route.badge.*`), else the older direct/relay word.
 String routeLabel(String route) => switch (route) {
+  final k when k.startsWith('route.badge.') => tr(k),
   'direct' => "to'g'ridan-to'g'ri",
   'relay' => 'internet orqali (shifrlangan)',
-  _ => "yo'l tanlanmoqda…",
+  _ => tr('route.badge.connecting'),
 };
 
+/// A call that `disconnect()` cancelled on purpose (the page closed, or the user tapped cancel).
 bool isCancelled(Object e) => '$e'.contains('vutric: cancelled');
 
 /// The Rust error, trimmed to its first line for the screen.
@@ -35,5 +38,9 @@ String errorText(Object e) {
   final raw = '$e';
   final s = RegExp(r'^AnyhowException\((.*)\)$', dotAll: true).firstMatch(raw)?.group(1) ?? raw;
   final line = s.split('\n').first.trim();
+  if (hasLine(line)) return tr(line);
+  if (line.contains('accepts only its trusted devices')) {
+    return 'Qurilma sizni tanimaydi: avval QR orqali juftlang yoki u yerda “Hamma, 10 daqiqa”ni yoqing';
+  }
   return line.isEmpty ? 'Nomaʼlum xato' : line;
 }

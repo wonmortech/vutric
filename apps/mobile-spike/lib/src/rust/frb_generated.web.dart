@@ -27,9 +27,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AnyhowException dco_decode_AnyhowException(dynamic raw);
 
   @protected
-  RustStreamSink<TransferProgress> dco_decode_StreamSink_transfer_progress_Sse(
-    dynamic raw,
-  );
+  RustStreamSink<TransferProgress> dco_decode_StreamSink_transfer_progress_Sse(dynamic raw);
 
   @protected
   String dco_decode_String(dynamic raw);
@@ -44,6 +42,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FilesOffer dco_decode_box_autoadd_files_offer(dynamic raw);
 
   @protected
+  HotspotNet dco_decode_box_autoadd_hotspot_net(dynamic raw);
+
+  @protected
   Photo dco_decode_box_autoadd_photo(dynamic raw);
 
   @protected
@@ -51,6 +52,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Connected dco_decode_connected(dynamic raw);
+
+  @protected
+  DeviceInfo dco_decode_device_info(dynamic raw);
 
   @protected
   double dco_decode_f_32(dynamic raw);
@@ -62,10 +66,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FilesOffer dco_decode_files_offer(dynamic raw);
 
   @protected
+  HotspotNet dco_decode_hotspot_net(dynamic raw);
+
+  @protected
   Incoming dco_decode_incoming(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<DeviceInfo> dco_decode_list_device_info(dynamic raw);
 
   @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
@@ -80,7 +90,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FilesOffer? dco_decode_opt_box_autoadd_files_offer(dynamic raw);
 
   @protected
+  HotspotNet? dco_decode_opt_box_autoadd_hotspot_net(dynamic raw);
+
+  @protected
   Photo dco_decode_photo(dynamic raw);
+
+  @protected
+  RoutePlan dco_decode_route_plan(dynamic raw);
 
   @protected
   RunReport dco_decode_run_report(dynamic raw);
@@ -104,12 +120,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void dco_decode_unit(dynamic raw);
 
   @protected
+  VisibilityState dco_decode_visibility_state(dynamic raw);
+
+  @protected
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
 
   @protected
-  RustStreamSink<TransferProgress> sse_decode_StreamSink_transfer_progress_Sse(
-    SseDeserializer deserializer,
-  );
+  RustStreamSink<TransferProgress> sse_decode_StreamSink_transfer_progress_Sse(SseDeserializer deserializer);
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
@@ -124,6 +141,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FilesOffer sse_decode_box_autoadd_files_offer(SseDeserializer deserializer);
 
   @protected
+  HotspotNet sse_decode_box_autoadd_hotspot_net(SseDeserializer deserializer);
+
+  @protected
   Photo sse_decode_box_autoadd_photo(SseDeserializer deserializer);
 
   @protected
@@ -131,6 +151,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Connected sse_decode_connected(SseDeserializer deserializer);
+
+  @protected
+  DeviceInfo sse_decode_device_info(SseDeserializer deserializer);
 
   @protected
   double sse_decode_f_32(SseDeserializer deserializer);
@@ -142,10 +165,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FilesOffer sse_decode_files_offer(SseDeserializer deserializer);
 
   @protected
+  HotspotNet sse_decode_hotspot_net(SseDeserializer deserializer);
+
+  @protected
   Incoming sse_decode_incoming(SseDeserializer deserializer);
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<DeviceInfo> sse_decode_list_device_info(SseDeserializer deserializer);
 
   @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
@@ -157,12 +186,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Caught? sse_decode_opt_box_autoadd_caught(SseDeserializer deserializer);
 
   @protected
-  FilesOffer? sse_decode_opt_box_autoadd_files_offer(
-    SseDeserializer deserializer,
-  );
+  FilesOffer? sse_decode_opt_box_autoadd_files_offer(SseDeserializer deserializer);
+
+  @protected
+  HotspotNet? sse_decode_opt_box_autoadd_hotspot_net(SseDeserializer deserializer);
 
   @protected
   Photo sse_decode_photo(SseDeserializer deserializer);
+
+  @protected
+  RoutePlan sse_decode_route_plan(SseDeserializer deserializer);
 
   @protected
   RunReport sse_decode_run_report(SseDeserializer deserializer);
@@ -186,19 +219,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_decode_unit(SseDeserializer deserializer);
 
   @protected
+  VisibilityState sse_decode_visibility_state(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
-  void sse_encode_AnyhowException(
-    AnyhowException self,
-    SseSerializer serializer,
-  );
+  void sse_encode_AnyhowException(AnyhowException self, SseSerializer serializer);
 
   @protected
-  void sse_encode_StreamSink_transfer_progress_Sse(
-    RustStreamSink<TransferProgress> self,
-    SseSerializer serializer,
-  );
+  void sse_encode_StreamSink_transfer_progress_Sse(RustStreamSink<TransferProgress> self, SseSerializer serializer);
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
@@ -210,10 +240,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_caught(Caught self, SseSerializer serializer);
 
   @protected
-  void sse_encode_box_autoadd_files_offer(
-    FilesOffer self,
-    SseSerializer serializer,
-  );
+  void sse_encode_box_autoadd_files_offer(FilesOffer self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_hotspot_net(HotspotNet self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_photo(Photo self, SseSerializer serializer);
@@ -225,6 +255,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_connected(Connected self, SseSerializer serializer);
 
   @protected
+  void sse_encode_device_info(DeviceInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_f_32(double self, SseSerializer serializer);
 
   @protected
@@ -234,43 +267,43 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_files_offer(FilesOffer self, SseSerializer serializer);
 
   @protected
+  void sse_encode_hotspot_net(HotspotNet self, SseSerializer serializer);
+
+  @protected
   void sse_encode_incoming(Incoming self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_device_info(List<DeviceInfo> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_prim_u_8_strict(
-    Uint8List self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_prim_u_8_strict(Uint8List self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_box_autoadd_caught(
-    Caught? self,
-    SseSerializer serializer,
-  );
+  void sse_encode_opt_box_autoadd_caught(Caught? self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_box_autoadd_files_offer(
-    FilesOffer? self,
-    SseSerializer serializer,
-  );
+  void sse_encode_opt_box_autoadd_files_offer(FilesOffer? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_hotspot_net(HotspotNet? self, SseSerializer serializer);
 
   @protected
   void sse_encode_photo(Photo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_route_plan(RoutePlan self, SseSerializer serializer);
+
+  @protected
   void sse_encode_run_report(RunReport self, SseSerializer serializer);
 
   @protected
-  void sse_encode_transfer_progress(
-    TransferProgress self,
-    SseSerializer serializer,
-  );
+  void sse_encode_transfer_progress(TransferProgress self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_16(int self, SseSerializer serializer);
@@ -286,6 +319,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_visibility_state(VisibilityState self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
