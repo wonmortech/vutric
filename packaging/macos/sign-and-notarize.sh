@@ -24,7 +24,9 @@ DMG=${2:?output .dmg path}
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 APPEX=$APP/Contents/PlugIns/VutricShare.appex
+QAEX=$APP/Contents/PlugIns/VutricQuickAction.appex
 SHARE_ENT=$ROOT/apps/macos/ShareExtension/ShareExtension.entitlements
+QA_ENT=$ROOT/apps/macos/QuickAction/QuickAction.entitlements
 AGENT_ENT=$ROOT/apps/macos/Agent/Agent.entitlements
 WORK=${RUNNER_TEMP:-$(mktemp -d)}/vutric-sign
 
@@ -43,9 +45,13 @@ sign_all() {
   shift
   local flags=(--force --sign "$id" "$@")
   codesign "${flags[@]}" --entitlements "$SHARE_ENT" "$APPEX"
-  if [[ -f $APP/Contents/MacOS/vutric-daemon ]]; then
-    codesign "${flags[@]}" "$APP/Contents/MacOS/vutric-daemon"
-  fi
+  codesign "${flags[@]}" --entitlements "$QA_ENT" "$QAEX"
+  local helper
+  for helper in vutric-daemon vutric-mac-compat vutric-compat; do
+    if [[ -f $APP/Contents/MacOS/$helper ]]; then
+      codesign "${flags[@]}" "$APP/Contents/MacOS/$helper"
+    fi
+  done
   codesign "${flags[@]}" --entitlements "$AGENT_ENT" "$APP"
   codesign --verify --strict --verbose=2 "$APP"
 }

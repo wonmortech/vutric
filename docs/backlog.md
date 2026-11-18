@@ -69,7 +69,7 @@ Sources:
 | C9 | Settings `compat.*`: per-adapter `enabled` (LocalSend and browser on by default) and `pinned`: `vutric_core::storage::Compat` (ADR-0054) | 1 | [x] |
 | Cn | Not possible: AirDrop, Continuity, Samsung/Huawei/Mi Share, Xender/SHAREit/Zapya/Send Anywhere/Blip/Feem, Phone Link, Nearby Sharing (ADR-0010 §2) | — | — |
 | C10 | (W3) Compat adapters on the phone: the `vutric-compat` loop as a library (`serve`), run in an Android `:compat` process, driven by `Adapter::attach` over a socket pair (#11) | 1 | [~] ADR-0066; tests `tests/library_mode.rs` (in-memory stream both ways; Unix socket pair in CI); W1 wiring (service, JNI entry, bridge) and an Android build + real LocalSend/KDE Connect on a phone are left · phone (W1): `CompatService` in `:compat`, Binder descriptor handoff, JNI `CompatNative.serve` → `serve_socket_fd`, `compat_start` → `attach_socket_fd`, received paths re-checked (ADR-0014 #6, #7); release APK builds; device steps: checklist 34–35 |
-| W5-C1 | (W5) LocalSend (C1) and Quick Share (C3) on macOS: the engine crates' tests run on the macOS CI runner (`macos-desktop.yml`, Intel and Apple silicon); `_FC9F5ED42C8A._tcp` and `_vutric._udp` in the app's `NSBonjourServices`, Local Network text in Uzbek (ADR-0112). Host wiring comes with the daemon on macOS (W2 #28, #30); Quick Share's QR for Android (NearDrop style) is W3 engine work | 5 | [~] · real-Mac step: LocalSend 1.18 and an Android Quick Share sender find and send to the Mac |
+| W5-C1 | (W5) LocalSend (C1) and Quick Share (C3) on macOS: the engine crates' tests run on the macOS CI runner (`macos-desktop.yml`, Intel and Apple silicon); `_FC9F5ED42C8A._tcp` and `_vutric._udp` in the app's `NSBonjourServices`, Local Network text in Uzbek (ADR-0112). Foreground use without the daemon: bridge `vutric-mac-compat` started by the menu-bar agent's switch, receive from LocalSend and Quick Share, send to LocalSend devices (ADR-0117); the daemon takes it over later (W2 #28, #30); Quick Share's QR for Android (NearDrop style) is W3 engine work | 5 | [~] · real-Mac step: ADR-0117 checklist (LocalSend 1.18 and an Android Quick Share sender send to the Mac, the Mac sends to LocalSend) |
 
 ## 3. Security (ADR-0005, ADR-0007 §2, report 0.2, TM §3)
 
@@ -112,7 +112,7 @@ Sources:
 | D8 | Overlay checks: NVIDIA and AMD dGPU, multi-monitor with mixed DPI, Windows 11; choose the monitor | 1 | [ ] |
 | D9 | GPU needing over 2 s to start: the first fling must not be refused | 1 | [ ] |
 | D10 | Linux: `vutric-host-wlr` (KDE, wlroots, COSMIC), GNOME 46/50 extension + D-Bus, systemd user unit, one-time extension checklist, Nautilus/Dolphin scripts, StatusNotifier, `.deb` + PPA, extensions.gnome.org | 2 | [ ] |
-| D11 | macOS: `NSPanel` overlay, notarised `.dmg` · (W5) overlay host `crates/vutric-host-mac` + `vutric-mac-probe` (ADR-0110), menu-bar agent (ADR-0111), Share extension + Services (ADR-0112), universal `.app` → `.dmg`, Developer ID + notarytool waiting for the secrets (ADR-0113); CI: `.github/workflows/macos-desktop.yml`. Daemon side: W2 #28, #29, #30 | 5 | [~] · real-Mac steps: the checklists at the end of ADR-0110–0113 |
+| D11 | macOS: `NSPanel` overlay, notarised `.dmg` · (W5) overlay host `crates/vutric-host-mac` + `vutric-mac-probe` (ADR-0110), menu-bar agent (ADR-0111), Share extension + Services (ADR-0112), universal `.app` → `.dmg`, Developer ID + notarytool waiting for the secrets (ADR-0113); display-link pacing for ProMotion (ADR-0114), icon drawn from the brand mark (ADR-0116); CI: `.github/workflows/macos-desktop.yml`. Daemon side: W2 #28, #29, #30 | 5 | [~] · real-Mac steps: the checklists at the end of ADR-0110–0117 |
 
 ## 6. Android (ADR-0009 §2, roadmap Phase 1)
 
@@ -172,7 +172,7 @@ Sources:
 | F18 | "Wow" throw effect (Canopy Portal, Mac only) | overlay | [x] Windows |
 | F19 | Simple first screen with no setup (LocalSend lesson) | A1, A2 | [~] |
 | F20 | (W3) Wire for F12/F13: `Message::Notice` and `Message::Clipboard`, caps, trusted-only, rate limit, kept across transfers (#12) | ADR-0065 | [x] engine: `vutric_core::companion`, `Session::send_notice`/`send_clipboard`; tests `message.rs::companion_bounds`, `companion.rs`, `tests/pair_intent.rs` (2), fuzz `companion`. Phone/desktop screens: W1/W2 · phone (W1): [~] both ways, trusted only, caps and rate limit applied on receive (ADR-0014 #4; `catch.rs` scenario 7); device steps: checklist 31–33 |
-| W5-F1 | (W5) Send from the macOS Share menu, Finder Services and `vutric://send`, always confirmed by the agent | ADR-0112, W2 #29 | [~] · built and unit-checked in CI; real-Mac step: ADR-0112 checklist |
+| W5-F1 | (W5) Send from the macOS Share menu, Finder Services, the Finder Quick Action and `vutric://send`, always confirmed by the agent; the Share menu also takes text and links (`Clipboard` to a paired device, `.txt` otherwise) | ADR-0112, ADR-0115, W2 #29 | [~] · built and unit-checked in CI; real-Mac step: ADR-0112 and ADR-0115 checklists |
 
 ## 9. Effects (effects.md)
 
