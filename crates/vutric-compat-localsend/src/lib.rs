@@ -9,7 +9,7 @@
 //! - [`client`], sending;
 //! - [`discovery`], multicast announce and answer;
 //! - [`web`], the browser page for devices with no app (C2, ADR-0055);
-//! - the [`ipc`] and [`host`] modules: everything above runs in its own low-privilege process (`vutric-compat-localsend`
+//! - the [`ipc`] and [`host`] modules: everything above runs in its own low-privilege process (`vutric-compat`
 //!   binary); the daemon talks to it over JSON lines on stdin/stdout (ADR-0010 §3.4).
 
 pub mod client;

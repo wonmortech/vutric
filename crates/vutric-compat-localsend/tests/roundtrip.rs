@@ -167,7 +167,7 @@ async fn reject_and_pin() {
 async fn through_the_sandboxed_process() {
     let dir = tmp("proc");
     let staging = dir.join("staging");
-    let exe = PathBuf::from(env!("CARGO_BIN_EXE_vutric-compat-localsend"));
+    let exe = PathBuf::from(env!("CARGO_BIN_EXE_vutric-compat"));
     let (mut adapter, mut events) = Adapter::spawn(
         &exe,
         Start {
@@ -180,6 +180,7 @@ async fn through_the_sandboxed_process() {
             pin: None,
             multicast: false,
             decide_timeout_secs: 10,
+            quickshare: false,
         },
     )
     .await
@@ -228,6 +229,76 @@ async fn through_the_sandboxed_process() {
     assert!(
         adapter.received_file(&dir.join("doc.pdf")).is_none(),
         "outside staging"
+    );
+    adapter.stop().await.unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn quickshare_through_the_sandboxed_process() {
+    use vutric_compat_localsend::ipc::Via;
+    let dir = tmp("qsproc");
+    let exe = PathBuf::from(env!("CARGO_BIN_EXE_vutric-compat"));
+    let (mut adapter, mut events) = Adapter::spawn(
+        &exe,
+        Start {
+            alias: "Vutric proc".into(),
+            device_type: DeviceType::Desktop,
+            port: 0,
+            bind: LOCAL,
+            staging: dir.join("staging"),
+            identity: dir.join("localsend.id"),
+            pin: None,
+            multicast: false,
+            decide_timeout_secs: 10,
+            quickshare: true,
+        },
+    )
+    .await
+    .unwrap();
+    let port = match tokio::time::timeout(Duration::from_secs(10), events.recv()).await {
+        Ok(Some(FromAdapter::Ready {
+            quickshare_port: Some(p),
+            ..
+        })) => p,
+        other => panic!("no ready: {other:?}"),
+    };
+    let f = dir.join("IMG_0007.jpg");
+    std::fs::write(&f, vec![9u8; 700_000]).unwrap();
+    let send = tokio::spawn(async move {
+        vutric_compat_quickshare::client::send((LOCAL, port).into(), "Pixel", &[f]).await
+    });
+    let (mut code, mut saved) = (None, None);
+    while let Ok(Some(ev)) = tokio::time::timeout(Duration::from_secs(10), events.recv()).await {
+        match ev {
+            FromAdapter::Offer {
+                session_id,
+                via,
+                code: c,
+                alias,
+                ..
+            } => {
+                assert_eq!(via, Via::Quickshare);
+                assert_eq!(alias, "Pixel");
+                code = c;
+                adapter.decide(&session_id, vec!["0".into()]).await.unwrap();
+            }
+            FromAdapter::Received { path, .. } => saved = adapter.received_file(&path),
+            FromAdapter::Finished { .. } => break,
+            _ => {}
+        }
+    }
+    let outcome = send.await.unwrap().unwrap();
+    assert_eq!(
+        Some(outcome.pin),
+        code,
+        "the daemon gets the code the sender shows"
+    );
+    assert_eq!(
+        std::fs::metadata(saved.expect("checked staged file"))
+            .unwrap()
+            .len(),
+        700_000
     );
     adapter.stop().await.unwrap();
     let _ = std::fs::remove_dir_all(dir);

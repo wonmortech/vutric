@@ -1,4 +1,5 @@
-//! The `LocalSend` adapter process (ADR-0054). Started by the daemon through
+//! The compat adapter process `vutric-compat` (ADR-0054, ADR-0056): `LocalSend`, the browser page and Quick Share.
+//! Started by the daemon through
 //! [`vutric_compat_localsend::host::Adapter`]; speaks [`vutric_compat_localsend::ipc`] on stdin/stdout and exits
 //! when stdin closes. All foreign bytes are parsed here, never in the daemon.
 
@@ -12,9 +13,10 @@ use tokio::sync::{Mutex, mpsc, oneshot};
 use vutric_compat_localsend::client::{self, Target};
 use vutric_compat_localsend::discovery::Discovery;
 use vutric_compat_localsend::host::read_line;
-use vutric_compat_localsend::ipc::{self, FromAdapter, OfferFile, Start, ToAdapter};
+use vutric_compat_localsend::ipc::{self, FromAdapter, OfferFile, Start, ToAdapter, Via};
 use vutric_compat_localsend::server::{self, Decision, Event, Receiver};
 use vutric_compat_localsend::tls::Identity;
+use vutric_compat_quickshare as qs;
 
 type Out = mpsc::Sender<FromAdapter>;
 
@@ -77,13 +79,18 @@ async fn run(start: Start, input: &mut BufReader<tokio::io::Stdin>, out: Out) ->
     } else {
         None
     };
+    let pending: Pending = Arc::default();
+    let quickshare = if start.quickshare {
+        Some(start_quickshare(&start, out.clone(), Arc::clone(&pending)).await?)
+    } else {
+        None
+    };
     out.send(FromAdapter::Ready {
         fingerprint: receiver.fingerprint().to_owned(),
         port: receiver.addr().port(),
+        quickshare_port: quickshare.as_ref().map(|(r, _)| r.addr().port()),
     })
     .await?;
-
-    let pending: Pending = Arc::default();
     spawn_bridge(events, out.clone(), Arc::clone(&pending));
 
     let mut buf = Vec::new();
@@ -93,15 +100,7 @@ async fn run(start: Start, input: &mut BufReader<tokio::io::Stdin>, out: Out) ->
         };
         match cmd {
             ToAdapter::Start(_) => {}
-            ToAdapter::Decide { session_id, accept } => {
-                if let Some(reply) = pending.lock().await.remove(&session_id) {
-                    let _ = reply.send(if accept.is_empty() {
-                        Decision::Reject
-                    } else {
-                        Decision::Accept(accept)
-                    });
-                }
-            }
+            ToAdapter::Decide { session_id, accept } => decide(&pending, &session_id, accept).await,
             ToAdapter::Announce => {
                 if let Some(d) = &discovery {
                     let _ = d.announce().await;
@@ -140,12 +139,127 @@ async fn run(start: Start, input: &mut BufReader<tokio::io::Stdin>, out: Out) ->
             ToAdapter::Stop => break,
         }
     }
+    drop(quickshare);
     drop(discovery);
     drop(receiver);
     Ok(())
 }
 
-type Pending = Arc<Mutex<HashMap<String, oneshot::Sender<Decision>>>>;
+/// An offer waiting for the daemon's answer, by protocol.
+#[derive(Debug)]
+enum Reply {
+    LocalSend(oneshot::Sender<Decision>),
+    QuickShare(oneshot::Sender<qs::server::Decision>),
+}
+
+type Pending = Arc<Mutex<HashMap<String, Reply>>>;
+
+/// Passes the daemon's answer on; an empty `accept` rejects. Quick Share takes all files or none.
+async fn decide(pending: &Pending, session_id: &str, accept: Vec<String>) {
+    match pending.lock().await.remove(session_id) {
+        Some(Reply::LocalSend(r)) => {
+            let _ = r.send(if accept.is_empty() {
+                Decision::Reject
+            } else {
+                Decision::Accept(accept)
+            });
+        }
+        Some(Reply::QuickShare(r)) => {
+            let _ = r.send(if accept.is_empty() {
+                qs::server::Decision::Reject
+            } else {
+                qs::server::Decision::Accept
+            });
+        }
+        None => {}
+    }
+}
+
+/// Starts the Quick Share receiver (and its mDNS advert when multicast is allowed) and forwards its events.
+async fn start_quickshare(
+    start: &Start,
+    out: Out,
+    pending: Pending,
+) -> Result<(qs::server::Receiver, Option<qs::mdns::Advert>)> {
+    let device = match start.device_type {
+        vutric_compat_localsend::proto::DeviceType::Mobile => qs::endpoint::Device::Phone,
+        _ => qs::endpoint::Device::Laptop,
+    };
+    let (rx, mut events) = qs::server::Receiver::start(qs::server::Config {
+        name: start.alias.clone(),
+        device,
+        port: 0,
+        bind: start.bind,
+        staging: start.staging.clone(),
+        decide_timeout: Duration::from_secs(start.decide_timeout_secs.clamp(5, 600)),
+    })
+    .await?;
+    let advert = if start.multicast {
+        qs::mdns::Advert::start(rx.endpoint_id(), rx.endpoint_info(), rx.addr().port()).ok()
+    } else {
+        None
+    };
+    tokio::spawn(async move {
+        while let Some(ev) = events.recv().await {
+            let msg = match ev {
+                qs::server::Event::Offer { offer, reply } => {
+                    pending
+                        .lock()
+                        .await
+                        .insert(offer.session_id.clone(), Reply::QuickShare(reply));
+                    FromAdapter::Offer {
+                        session_id: offer.session_id,
+                        peer: offer.peer,
+                        peer_cert: None,
+                        alias: offer.from.unwrap_or_else(|| "Quick Share".to_owned()),
+                        files: offer
+                            .files
+                            .into_iter()
+                            .enumerate()
+                            .map(|(n, f)| OfferFile {
+                                id: n.to_string(),
+                                name: f.name,
+                                size: f.size,
+                                file_type: f.mime,
+                            })
+                            .collect(),
+                        via: Via::Quickshare,
+                        code: Some(offer.pin),
+                    }
+                }
+                qs::server::Event::Received {
+                    session_id,
+                    name,
+                    path,
+                    size,
+                } => FromAdapter::Received {
+                    session_id,
+                    file_id: String::new(),
+                    name,
+                    path,
+                    size,
+                },
+                qs::server::Event::Text {
+                    session_id,
+                    kind,
+                    text,
+                } => FromAdapter::Text {
+                    session_id,
+                    kind,
+                    text,
+                },
+                qs::server::Event::Finished { session_id } => FromAdapter::Finished { session_id },
+                qs::server::Event::Cancelled { session_id } => {
+                    FromAdapter::Cancelled { session_id }
+                }
+            };
+            if out.send(msg).await.is_err() {
+                break;
+            }
+        }
+    });
+    Ok((rx, advert))
+}
 
 /// Forwards receiver events to the daemon; offers wait in `pending` for the daemon's `decide`.
 fn spawn_bridge(mut events: mpsc::Receiver<Event>, out: Out, pending: Pending) {
@@ -159,7 +273,10 @@ fn spawn_bridge(mut events: mpsc::Receiver<Event>, out: Out, pending: Pending) {
                     device_type: info.device_type,
                 },
                 Event::Offer { offer, reply } => {
-                    pending.lock().await.insert(offer.session_id.clone(), reply);
+                    pending
+                        .lock()
+                        .await
+                        .insert(offer.session_id.clone(), Reply::LocalSend(reply));
                     FromAdapter::Offer {
                         session_id: offer.session_id,
                         peer: offer.peer,
@@ -175,6 +292,8 @@ fn spawn_bridge(mut events: mpsc::Receiver<Event>, out: Out, pending: Pending) {
                                 file_type: f.file_type,
                             })
                             .collect(),
+                        via: Via::Localsend,
+                        code: None,
                     }
                 }
                 Event::Received {

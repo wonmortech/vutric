@@ -9,5 +9,5 @@ Send to and receive from the [LocalSend](https://localsend.org) app (ADR-0010, A
 | Tested against the real app | not yet (backlog M5) |
 | Source used | the protocol document only; no LocalSend code was copied |
 
-The `vutric-compat-localsend` binary is the adapter process; the daemon starts it with `host::Adapter` and never
+The `vutric-compat` binary is the adapter process (it also hosts Quick Share, ADR-0056); the daemon starts it with `host::Adapter` and never
 parses LocalSend bytes itself.

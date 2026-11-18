@@ -311,6 +311,53 @@ pub fn localsend_ipc(data: &[u8]) {
     let _ = ipc::parse::<ipc::ToAdapter>(data);
 }
 
+/// Every Quick Share parser a peer reaches before or after the handshake (ADR-0056): offline and sharing frames,
+/// UKEY2 messages, keys, endpoint info, and payload reassembly. Kept values stay within their limits.
+pub fn quickshare_frames(data: &[u8]) {
+    use vutric_compat_quickshare::{conn, endpoint, msg};
+    if let Some(f) = msg::parse_offline(data) {
+        let mut b = conn::Bytes::default();
+        for _ in 0..3 {
+            if let conn::Piece::Message(_, m) = b.feed(&f) {
+                assert!(m.len() <= conn::MAX_BYTES_PAYLOAD);
+            }
+        }
+    }
+    if let Some(msg::Share::Introduction { files, texts }) = msg::parse_share(data) {
+        assert!(files.len() + texts.len() <= msg::MAX_FILES);
+        for f in &files {
+            assert!(f.size >= 0 && f.name.chars().count() <= msg::MAX_NAME);
+        }
+    }
+    if let Some((_, inner)) = msg::parse_ukey(data) {
+        let _ = msg::parse_client_init(inner);
+        let _ = msg::parse_server_init(inner);
+    }
+    let _ = msg::parse_p256_key(data);
+    let _ = msg::parse_secure_message(data);
+    let _ = msg::parse_header_and_body(data);
+    if let Some(p) = endpoint::parse(data)
+        && let Some(n) = p.name
+    {
+        assert!(!n.is_empty() && !n.chars().any(char::is_control));
+    }
+}
+
+/// A hostile `ClientInit`, and hostile secure messages on an established channel: refused, never a panic.
+pub fn quickshare_secure(data: &[u8]) {
+    use vutric_compat_quickshare::ukey2;
+    if let Ok((server, _)) = ukey2::Server::start(data) {
+        // Only a ClientFinished matching the commitment could pass; random bytes never do.
+        assert!(server.finish(data).is_err());
+    }
+    let (client, init) = ukey2::Client::start();
+    let (server, server_init) = ukey2::Server::start(&init).expect("own init");
+    let (_, finished) = client.finish(&server_init).expect("own server init");
+    let keys = server.finish(&finished).expect("own finish");
+    let mut ch = ukey2::Channel::new(&keys, true);
+    assert!(ch.open(data).is_err(), "unsigned bytes never open");
+}
+
 #[cfg(test)]
 mod smoke {
     //! Deterministic stand-in for libFuzzer on stable: random inputs plus valid frames with bytes flipped.
@@ -479,6 +526,14 @@ mod smoke {
             v[i] = pool[(r.next() as usize) % pool.len()];
             localsend_prepare(&v);
             localsend_announce(&v);
+        }
+    }
+
+    #[test]
+    fn quickshare_random() {
+        run(quickshare_frames, 512, 47);
+        for i in 0..64u8 {
+            quickshare_secure(&[i; 40]);
         }
     }
 

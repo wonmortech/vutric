@@ -46,7 +46,7 @@ pub fn checked_path(staging: &Path, path: &Path) -> Option<PathBuf> {
 }
 
 impl Adapter {
-    /// Starts `exe` (the `vutric-compat-localsend` binary) and sends it `start`. Events arrive on the channel;
+    /// Starts `exe` (the `vutric-compat` binary) and sends it `start`. Events arrive on the channel;
     /// it closes when the process exits.
     pub async fn spawn(exe: &Path, start: Start) -> Result<(Self, mpsc::Receiver<FromAdapter>)> {
         let staging = start.staging.clone();

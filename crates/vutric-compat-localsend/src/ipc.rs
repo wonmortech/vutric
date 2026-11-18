@@ -27,6 +27,18 @@ pub struct Start {
     /// Join the multicast group and answer announcements.
     pub multicast: bool,
     pub decide_timeout_secs: u64,
+    /// Also receive from Android's Quick Share (C3, ADR-0056); advertised over mDNS when `multicast` is on.
+    #[serde(default)]
+    pub quickshare: bool,
+}
+
+/// Which protocol an offer came over.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Via {
+    #[default]
+    Localsend,
+    Quickshare,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -72,6 +84,8 @@ pub enum FromAdapter {
     Ready {
         fingerprint: String,
         port: u16,
+        #[serde(default)]
+        quickshare_port: Option<u16>,
     },
     Seen {
         alias: String,
@@ -86,6 +100,17 @@ pub enum FromAdapter {
         peer_cert: Option<String>,
         alias: String,
         files: Vec<OfferFile>,
+        #[serde(default)]
+        via: Via,
+        /// Quick Share's 4-digit code, shown on both screens.
+        #[serde(default)]
+        code: Option<String>,
+    },
+    /// Text or a link shared over Quick Share (kind: 1 text, 2 URL, 3 address, 4 phone number).
+    Text {
+        session_id: String,
+        kind: i64,
+        text: String,
     },
     Received {
         session_id: String,

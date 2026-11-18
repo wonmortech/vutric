@@ -34,7 +34,7 @@ bytes do not match the `sha256` given in `prepare-upload`. We implement 2.2 and 
      as typed `Refusal` values.
    - `discovery`: multicast announce and answer on `224.0.0.167:53317` (register over HTTPS first, multicast
      answer as fallback), our own echoes filtered by fingerprint.
-2. **Its own process.** The `vutric-compat-localsend` binary runs all of the above; the daemon starts it through
+2. **Its own process.** The `vutric-compat` binary (named so in ADR-0056, which adds Quick Share to it) runs all of the above; the daemon starts it through
    `host::Adapter` and talks JSON lines over stdin/stdout (`ipc`). The daemon treats the adapter as untrusted
    too: lines are capped at 1 MiB, messages are closed enums, and a received file is moved only if
    `host::checked_path` finds a plain file with a sanitized name directly inside the staging folder.
