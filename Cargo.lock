@@ -5608,6 +5608,7 @@ name = "vutric-host-mac"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "image",
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
  "objc2-core-foundation",
@@ -5621,6 +5622,7 @@ dependencies = [
  "tokio",
  "vutric-compat-localsend",
  "vutric-core",
+ "vutric-daemon",
  "vutric-overlay",
  "wgpu",
  "winit",

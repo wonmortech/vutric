@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let link = DaemonLink()
     private let notifier = Notifier()
     private let compat = CompatLink()
+    private var history = History.load()
     private var item: NSStatusItem!
     private var state: DaemonLink.State = .starting
     private var queued: [SendRequest] = []
@@ -57,6 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(entry("menu.connect", #selector(connectPhone)))
         menu.addItem(entry("menu.send", #selector(pickAndSend)))
+        menu.addItem(.separator())
+        menu.addItem(historyMenu())
         menu.addItem(.separator())
         menu.addItem(compatToggle())
         if compat.isRunning {
@@ -126,6 +129,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel.prompt = t("send.confirm.button")
         guard panel.runModal() == .OK, let r = SendRequest(files: panel.urls) else { return }
         send(r)
+    }
+
+    // MARK: - history (ADR-0119)
+
+    private func historyMenu() -> NSMenuItem {
+        let parent = entry("menu.history", nil)
+        let sub = NSMenu()
+        let shown = history.shown { FileManager.default.fileExists(atPath: $0) }
+        if shown.isEmpty {
+            let none = NSMenuItem(title: t("menu.history.none"), action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            sub.addItem(none)
+        }
+        let time = DateFormatter()
+        time.dateStyle = .none
+        time.timeStyle = .short
+        for e in shown {
+            let title = [e.label, e.from, time.string(from: e.at)].compactMap { $0 }.joined(separator: " · ")
+            let i = NSMenuItem(title: title, action: #selector(revealHistory(_:)), keyEquivalent: "")
+            i.target = self
+            i.representedObject = e.path
+            i.toolTip = e.path
+            sub.addItem(i)
+        }
+        if !shown.isEmpty {
+            sub.addItem(.separator())
+            sub.addItem(entry("menu.history.clear", #selector(clearHistory)))
+        }
+        parent.submenu = sub
+        return parent
+    }
+
+    @objc private func revealHistory(_ sender: NSMenuItem) {
+        guard let path = sender.representedObject as? String else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    @objc private func clearHistory() {
+        history.clear()
+        history.save()
+    }
+
+    private func remember(path: String, files: Int, from: String?) {
+        let label = files == 1 ? (path as NSString).lastPathComponent : t("history.files", files)
+        history.add(path: path, label: label, from: from.map { SendRequest.preview($0, max: 60) })
+        history.save()
     }
 
     // MARK: - LocalSend and Quick Share (ADR-0117)
@@ -213,6 +262,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "received":
             let path = e["path"] as? String ?? ""
             notifier.received(files: 1, folder: (path as NSString).deletingLastPathComponent, from: nil)
+            remember(path: path, files: 1, from: nil)
         case "send_failed", "error":
             notifier.failed(reason: (e["reason"] as? String) ?? (e["message"] as? String) ?? "")
         default:
@@ -299,12 +349,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func event(_ e: [String: Any]) {
         switch e["event"] as? String {
         case "received":
-            notifier.received(
-                files: e["files"] as? Int ?? 1, folder: e["folder"] as? String ?? "", from: nil)
+            let files = e["files"] as? Int ?? 1
+            let folder = e["folder"] as? String ?? ""
+            notifier.received(files: files, folder: folder, from: e["from"] as? String)
+            remember(path: folder, files: files, from: e["from"] as? String)
+        // ADR-0065 on macOS (ADR-0119); event names proposed to W2 on #30.
+        case "notice":
+            notifier.notice(
+                app: e["app"] as? String ?? "", title: e["title"] as? String ?? "", text: e["text"] as? String ?? "")
+        case "clipboard":
+            guard let text = e["text"] as? String, !text.isEmpty else { return }
+            offerCopy(text: text, from: e["from"] as? String)
         case "failed":
             notifier.failed(reason: e["reason"] as? String ?? "")
         default:
             break
+        }
+    }
+
+    /// Clipboard text from a paired phone: a prompt with "Nusxalash", never written to the clipboard by itself
+    /// (ADR-0065 §3).
+    private func offerCopy(text: String, from: String?) {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = from.map { t("clipboard.title.from", SendRequest.preview($0, max: 60)) }
+            ?? t("compat.text.title")
+        alert.informativeText = SendRequest.preview(text, max: 400)
+        alert.addButton(withTitle: t("compat.text.copy"))
+        alert.addButton(withTitle: t("compat.text.close"))
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
         }
     }
 

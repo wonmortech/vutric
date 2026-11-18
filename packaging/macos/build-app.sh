@@ -29,7 +29,7 @@ swift_build() {
 run_tests() {
   mkdir -p "$OUT/tests"
   swift_build -o "$OUT/tests/send-request" "$SRC/Tests/main.swift" "$SRC/Shared/SendRequest.swift" \
-    "$SRC/Shared/SharedItems.swift"
+    "$SRC/Shared/SharedItems.swift" "$SRC/Shared/History.swift"
   "$OUT/tests/send-request"
   python3 "$ROOT/packaging/macos/xcstrings.py" --check "$SRC"/Shared/*.xcstrings "$SRC"/Agent/*.xcstrings \
     "$SRC"/ShareExtension/*.xcstrings "$SRC"/QuickAction/*.xcstrings
@@ -70,7 +70,8 @@ agents=() shares=() actions=()
 for arch in $ARCHS; do
   mkdir -p "$OBJ/$arch"
   swift_build -target "$arch-apple-macos$MIN" -module-name Vutric -o "$OBJ/$arch/Vutric" \
-    "$SRC"/Agent/Sources/*.swift "$SRC/Shared/SendRequest.swift" "$SRC/Shared/L10n.swift"
+    "$SRC"/Agent/Sources/*.swift "$SRC/Shared/SendRequest.swift" "$SRC/Shared/L10n.swift" \
+    "$SRC/Shared/History.swift"
   ext_build "$arch" VutricShare "$OBJ/$arch/VutricShare" "$SRC"/ShareExtension/Sources/*.swift
   ext_build "$arch" VutricQuickAction "$OBJ/$arch/VutricQuickAction" "$SRC"/QuickAction/Sources/*.swift
   agents+=("$OBJ/$arch/Vutric")

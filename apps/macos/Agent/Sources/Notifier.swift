@@ -33,6 +33,16 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         center.add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil))
     }
 
+    /// A notification mirrored from the phone (ADR-0065): shown only, no actions, grouped per app. The daemon has
+    /// cleaned and rate-limited it already; the text is cleaned again here because it is shown as is.
+    func notice(app: String, title: String, text: String) {
+        let c = UNMutableNotificationContent()
+        c.title = SendRequest.preview(title.isEmpty ? app : "\(app): \(title)", max: 80)
+        c.body = SendRequest.preview(text, max: 400)
+        c.threadIdentifier = "vutric.notice." + SendRequest.preview(app, max: 80)
+        center.add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil))
+    }
+
     func failed(reason: String) {
         let c = UNMutableNotificationContent()
         c.title = t("notify.failed.title")

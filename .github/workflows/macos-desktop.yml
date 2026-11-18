@@ -14,6 +14,8 @@ on:
     paths:
       - crates/vutric-host-mac/**
       - crates/vutric-overlay/**
+      - crates/vutric-daemon/src/cards.rs
+      - crates/vutric-daemon/src/i18n.rs
       - crates/vutric-compat-localsend/**
       - crates/vutric-compat-quickshare/**
       - apps/macos/**
@@ -83,6 +85,10 @@ jobs:
         run: cargo build --release --locked -p vutric-host-mac --bin vutric-mac-probe
       - name: Measure on the runner's WindowServer
         run: bash crates/vutric-host-mac/tools/measure.sh target/release/vutric-mac-probe "$RUNNER_TEMP/pacing"
+      - name: Cards (W2's card model in the non-activating card panel, ADR-0118)
+        run: |
+          cargo build --release --locked -p vutric-host-mac --example cards
+          bash crates/vutric-host-mac/tools/cards.sh target/release/examples/cards "$RUNNER_TEMP/pacing/cards"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
