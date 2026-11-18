@@ -17,8 +17,12 @@ object IncomingNotice {
     private const val CHANNEL = "incoming"
     private const val ID = 7102
 
+    /**
+     * Posts the notice; returns whether the user can actually see it. False when notifications are off for the app
+     * or for this channel: the caller must then not report the photo as shown.
+     */
     @Suppress("DEPRECATION")
-    fun show(context: Context, title: String, text: String, jpeg: ByteArray?) {
+    fun show(context: Context, title: String, text: String, jpeg: ByteArray?): Boolean {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val b = if (Build.VERSION.SDK_INT >= 26) {
             if (nm.getNotificationChannel(CHANNEL) == null) {
@@ -58,5 +62,15 @@ object IncomingNotice {
             b.setLargeIcon(bmp).setStyle(Notification.BigPictureStyle().bigPicture(bmp).setSummaryText(text))
         }
         nm.notify(ID, b.build())
+        return visible(nm)
+    }
+
+    private fun visible(nm: NotificationManager): Boolean {
+        if (!nm.areNotificationsEnabled()) return false
+        if (Build.VERSION.SDK_INT >= 26) {
+            val ch = nm.getNotificationChannel(CHANNEL) ?: return false
+            if (ch.importance == NotificationManager.IMPORTANCE_NONE) return false
+        }
+        return true
     }
 }

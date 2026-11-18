@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
 import android.os.Build
+import androidx.lifecycle.Lifecycle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
@@ -27,6 +28,8 @@ class MainActivity : FlutterActivity() {
     private var pendingTree: MethodChannel.Result? = null
     private var pendingHotspot: MethodChannel.Result? = null
     private var notificationsAsked = false
+    private var notificationsAsking = false
+    private var hotspotRetried = false
 
     /** The intent that started the app (cold start from Share or the tile), until Dart takes it. */
     private var startIntent: Intent? = null
@@ -99,20 +102,22 @@ class MainActivity : FlutterActivity() {
                 }
                 val paths = call.argument<List<String>>("paths") ?: emptyList()
                 io.execute {
-                    val n = SafStore.moveInto(applicationContext, uri, paths)
+                    // Always answer: a lost reply would leave Dart's receive handler waiting forever.
+                    val n = runCatching { SafStore.moveInto(applicationContext, uri, paths) }.getOrDefault(0)
                     runOnUiThread { result.success(n) }
                 }
             }
-            "notifyIncoming" -> {
-                askNotifications()
-                IncomingNotice.show(
-                    this,
-                    call.argument<String>("title") ?: "Vutric",
-                    call.argument<String>("text") ?: "",
-                    call.argument<ByteArray>("jpeg"),
-                )
-                result.success(null)
-            }
+            // Called while Vutric is in the background, so no permission prompt here; answers whether it is visible.
+            "notifyIncoming" -> result.success(
+                runCatching {
+                    IncomingNotice.show(
+                        this,
+                        call.argument<String>("title") ?: "Vutric",
+                        call.argument<String>("text") ?: "",
+                        call.argument<ByteArray>("jpeg"),
+                    )
+                }.getOrDefault(false),
+            )
             "hotspotStart" -> startHotspot(result)
             "hotspotStop" -> {
                 LinkManager.stop()
@@ -157,11 +162,12 @@ class MainActivity : FlutterActivity() {
     private fun hotspotPermission(): String =
         if (Build.VERSION.SDK_INT >= 33) Manifest.permission.NEARBY_WIFI_DEVICES else Manifest.permission.ACCESS_FINE_LOCATION
 
-    private fun startHotspot(result: MethodChannel.Result) {
+    private fun startHotspot(result: MethodChannel.Result, retried: Boolean = false) {
         val perm = hotspotPermission()
         if (checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) {
             pendingHotspot?.error("busy", "busy", null)
             pendingHotspot = result
+            hotspotRetried = retried
             requestPermissions(arrayOf(perm), REQUEST_HOTSPOT)
             return
         }
@@ -170,26 +176,44 @@ class MainActivity : FlutterActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode != REQUEST_HOTSPOT) return
-        val r = pendingHotspot ?: return
-        pendingHotspot = null
-        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) startHotspot(r)
-        else r.error("permission", "permission", null)
+        when (requestCode) {
+            REQUEST_HOTSPOT -> {
+                val r = pendingHotspot ?: return
+                pendingHotspot = null
+                when {
+                    grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED -> startHotspot(r)
+                    // Empty means the request was interrupted (another dialog, a rotation), not refused: ask once more.
+                    grantResults.isEmpty() && !hotspotRetried -> startHotspot(r, retried = true)
+                    else -> r.error("permission", "permission", null)
+                }
+            }
+            REQUEST_NOTIFICATIONS -> notificationsAsking = false
+        }
     }
 
-    /** Android 13+: the progress notification is hidden without this; the transfer itself runs either way. */
+    /**
+     * Android 13+: the progress notification is hidden without this; the transfer itself runs either way.
+     * Asked once per launch, only while Vutric is on screen and no other permission dialog is open
+     * (two requests at once cancel each other and come back empty).
+     */
     private fun askNotifications() {
-        if (Build.VERSION.SDK_INT < 33 || notificationsAsked) return
-        notificationsAsked = true
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATIONS)
+        if (Build.VERSION.SDK_INT < 33 || notificationsAsked || notificationsAsking) return
+        if (pendingHotspot != null || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            notificationsAsked = true
+            return
         }
+        notificationsAsked = true
+        notificationsAsking = true
+        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATIONS)
     }
 
     override fun onDestroy() {
         lock?.release()
         lock = null
-        LinkManager.stop()
+        // A rotation or a system-recreated activity is not "leaving": Dart's hotspotStop owns the hotspot then.
+        // Only a real finish with no transfer still running closes it here.
+        if (isFinishing && !TransferService.isRunning) LinkManager.stop()
         io.shutdown()
         super.onDestroy()
     }

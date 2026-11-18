@@ -2,6 +2,8 @@
 // the other phone's camera understands, and the name and password for a computer); step 2 is the normal pairing
 // QR, which by then carries the hotspot address. The hotspot closes when this page closes or the session ends.
 
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -43,7 +45,12 @@ class _HotspotPageState extends State<HotspotPage> {
     setState(() => _error = null);
     try {
       final n = await _bridge.hotspotStart();
-      if (mounted) setState(() => _net = n);
+      if (!mounted) {
+        // Left during the start: dispose's stop ran too early, so close the hotspot that came up after it.
+        unawaited(_bridge.hotspotStop());
+        return;
+      }
+      setState(() => _net = n);
     } on PlatformException catch (e) {
       if (!mounted) return;
       setState(

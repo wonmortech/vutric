@@ -101,12 +101,14 @@ class AndroidBridge {
   }
 
   /// A heads-up notification for something that arrived while Vutric is not on screen (A11).
-  Future<void> notifyIncoming(String title, String text, {Uint8List? jpeg}) async {
-    if (!Platform.isAndroid) return;
+  /// Returns whether the user can see it: false when notifications are off (or off this platform), so a photo
+  /// must not be reported as shown.
+  Future<bool> notifyIncoming(String title, String text, {Uint8List? jpeg}) async {
+    if (!Platform.isAndroid) return false;
     try {
-      await _ch.invokeMethod<void>('notifyIncoming', {'title': title, 'text': text, 'jpeg': jpeg});
+      return await _ch.invokeMethod<bool>('notifyIncoming', {'title': title, 'text': text, 'jpeg': jpeg}) ?? false;
     } on PlatformException {
-      // No notification permission: the photo is still waiting in the Qabul tab.
+      return false;
     }
   }
 
@@ -120,8 +122,14 @@ class AndroidBridge {
     return (uri: uri, label: r?['label'] ?? 'Papka');
   }
 
-  Future<bool> folderUsable(String uri) async =>
-      Platform.isAndroid && (await _ch.invokeMethod<bool>('folderUsable', {'uri': uri}) ?? false);
+  Future<bool> folderUsable(String uri) async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return await _ch.invokeMethod<bool>('folderUsable', {'uri': uri}) ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
 
   Future<void> releaseFolder(String uri) async {
     if (Platform.isAndroid) await _ch.invokeMethod<void>('releaseFolder', {'uri': uri});
@@ -130,7 +138,11 @@ class AndroidBridge {
   /// Moves finished files into the folder; returns how many moved (the rest stay in Vutric's own folder).
   Future<int> moveToFolder(String uri, List<String> paths) async {
     if (!Platform.isAndroid || paths.isEmpty) return 0;
-    return await _ch.invokeMethod<int>('moveToFolder', {'uri': uri, 'paths': paths}) ?? 0;
+    try {
+      return await _ch.invokeMethod<int>('moveToFolder', {'uri': uri, 'paths': paths}) ?? 0;
+    } on PlatformException {
+      return 0; // Nothing moved; the files stay in Vutric's own folder.
+    }
   }
 
   // ── LinkManager: local-only hotspot ────────────────────────────────────────────────────────────────────────

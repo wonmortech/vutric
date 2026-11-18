@@ -267,9 +267,15 @@ class Session extends ChangeNotifier {
     final done = _listenDone = Completer<void>();
     try {
       while (peer != null && !_pauseWanted) {
-        final next = await vutric.nextIncoming();
+        final next = await vutric.nextIncoming(); // only an error here means the session is gone
         if (next.photo == null && next.files == null) break; // paused for a send
-        await onIncoming?.call(next);
+        try {
+          await onIncoming?.call(next);
+        } catch (e) {
+          // A failing handler (gallery, folder, notification) loses that one item, not the session.
+          if (isCancelled(e)) rethrow;
+          debugPrint('vutric: incoming handler failed: $e');
+        }
       }
     } catch (e) {
       if (!isCancelled(e)) lost();
@@ -282,15 +288,20 @@ class Session extends ChangeNotifier {
   /// Runs [job] (a throw or a send) with the session to itself, then listens again.
   Future<T> exclusive<T>(Future<T> Function() job) async {
     _pauseWanted = true;
-    if (_listening) {
-      await vutric.pauseIncoming();
-      await _listenDone?.future;
-    }
     try {
+      if (_listening) {
+        await vutric.pauseIncoming();
+        await _listenDone?.future;
+      }
       return await job();
     } finally {
+      // Whatever failed above, the listener comes back; a resume error must not hide the job's own error.
       _pauseWanted = false;
-      await vutric.resumeIncoming();
+      try {
+        await vutric.resumeIncoming();
+      } catch (e) {
+        debugPrint('vutric: resumeIncoming failed: $e');
+      }
       if (peer != null) unawaited(_listen());
     }
   }
@@ -303,11 +314,16 @@ class Session extends ChangeNotifier {
   }
 
   bool _starting = false;
+  bool _restartAgain = false;
 
   /// Puts this device on the network under [deviceName] (again after a rename: the pairing link carries the
   /// name). The relay takes ~3 s; until then the link works on this network only, so the fuller one replaces it.
+  /// A call during a start is not dropped: one more start follows, with the name as it is by then.
   Future<void> restart() async {
-    if (_starting) return;
+    if (_starting) {
+      _restartAgain = true;
+      return;
+    }
     _starting = true;
     bootError = null;
     myLink = null;
@@ -325,6 +341,10 @@ class Session extends ChangeNotifier {
     } finally {
       _starting = false;
       notifyListeners();
+    }
+    if (_restartAgain) {
+      _restartAgain = false;
+      await restart();
     }
   }
 

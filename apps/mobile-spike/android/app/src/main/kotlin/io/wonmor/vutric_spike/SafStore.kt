@@ -53,7 +53,10 @@ object SafStore {
      */
     fun moveInto(context: Context, uri: String, paths: List<String>): Int {
         val tree = Uri.parse(uri)
-        val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        // A malformed or no-longer-tree URI moves nothing; every file stays in the app folder.
+        val parent = runCatching {
+            DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        }.getOrNull() ?: return 0
         var moved = 0
         for (p in paths) {
             val src = File(p)

@@ -71,6 +71,9 @@ class TransferService : Service() {
         /** Set once the service is in the foreground, so updates never call startForegroundService again. */
         @Volatile private var running = false
 
+        /** Whether a transfer still holds the foreground service (MainActivity keeps the hotspot up for it). */
+        val isRunning: Boolean get() = running
+
         /**
          * Starts the service (the first call, made while the app is in front) or updates its notification.
          * [permille] is 0..1000, or -1 while waiting. Updates go straight to the notification manager: Android 12+

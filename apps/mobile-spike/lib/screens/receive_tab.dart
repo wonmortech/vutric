@@ -64,6 +64,19 @@ Future<void> handleIncoming(BuildContext context, vutric.Incoming next, VoidCall
     await vutric.refuse(id: p.id);
     return;
   }
+  // In the background no frame is drawn, so waiting for one would hang the thrower. There the photo reaches the
+  // screen as a heads-up notification with its thumbnail (A11), and that is what "shown" reports. With
+  // notifications off nothing reaches the screen, so the throw is refused and the thrower sees it bounce.
+  final front = _inFront;
+  if (!front &&
+      !await AndroidBridge.instance.notifyIncoming(
+        '${Session.instance.peer?.peerName ?? 'Qurilma'} rasm otdi',
+        p.fileName,
+        jpeg: p.jpeg,
+      )) {
+    await vutric.refuse(id: p.id);
+    return;
+  }
   HapticFeedback.lightImpact();
   showReceive();
   c
@@ -73,17 +86,7 @@ Future<void> handleIncoming(BuildContext context, vutric.Incoming next, VoidCall
     ..landing += 1
     ..savedLast = false
     ..update();
-  // In the background no frame is drawn, so waiting for one would hang the thrower. There the photo reaches the
-  // screen as a heads-up notification with its thumbnail (A11), and that is what "shown" reports.
-  if (_inFront) {
-    await SchedulerBinding.instance.endOfFrame;
-  } else {
-    await AndroidBridge.instance.notifyIncoming(
-      '${Session.instance.peer?.peerName ?? 'Qurilma'} rasm otdi',
-      p.fileName,
-      jpeg: p.jpeg,
-    );
-  }
+  if (front) await SchedulerBinding.instance.endOfFrame;
   clock.stop();
   c
     ..lastMs = clock.elapsedMicroseconds / 1000
