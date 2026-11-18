@@ -181,6 +181,7 @@ async fn through_the_sandboxed_process() {
             multicast: false,
             decide_timeout_secs: 10,
             quickshare: false,
+            kdeconnect: false,
         },
     )
     .await
@@ -252,6 +253,7 @@ async fn quickshare_through_the_sandboxed_process() {
             multicast: false,
             decide_timeout_secs: 10,
             quickshare: true,
+            kdeconnect: false,
         },
     )
     .await
@@ -299,6 +301,103 @@ async fn quickshare_through_the_sandboxed_process() {
             .unwrap()
             .len(),
         700_000
+    );
+    adapter.stop().await.unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn kdeconnect_through_the_sandboxed_process() {
+    use vutric_compat_kdeconnect::link::{Link, Me};
+    use vutric_compat_kdeconnect::proto::DeviceType as KdeType;
+    use vutric_compat_localsend::ipc::Via;
+    let dir = tmp("kdcproc");
+    let exe = PathBuf::from(env!("CARGO_BIN_EXE_vutric-compat"));
+    let (mut adapter, mut events) = Adapter::spawn(
+        &exe,
+        Start {
+            alias: "Vutric proc".into(),
+            device_type: DeviceType::Desktop,
+            port: 0,
+            bind: LOCAL,
+            staging: dir.join("staging"),
+            identity: dir.join("localsend.id"),
+            pin: None,
+            multicast: false,
+            decide_timeout_secs: 10,
+            quickshare: false,
+            kdeconnect: true,
+        },
+    )
+    .await
+    .unwrap();
+    let (port, id) = match tokio::time::timeout(Duration::from_secs(10), events.recv()).await {
+        Ok(Some(FromAdapter::Ready {
+            kdeconnect_port: Some(p),
+            kdeconnect_id: Some(id),
+            ..
+        })) => (p, id),
+        other => panic!("no ready: {other:?}"),
+    };
+    let phone = Me {
+        tls: vutric_compat_kdeconnect::tls::Identity::generate().unwrap(),
+        name: "Pixel 8".into(),
+        kind: KdeType::Phone,
+    };
+    let f = dir.join("video.mp4");
+    std::fs::write(&f, vec![3u8; 250_000]).unwrap();
+    let mut link = Link::dial(&phone, (LOCAL, port).into(), &id).await.unwrap();
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let phone2 = phone.clone();
+    let send = tokio::spawn(async move {
+        assert!(
+            link.request_pair(ts, Duration::from_secs(10))
+                .await
+                .unwrap()
+        );
+        link.send_files(&phone2, &[f], LOCAL, 0..=0).await
+    });
+    let (mut code, mut paired, mut saved) = (None, false, None);
+    while let Ok(Some(ev)) = tokio::time::timeout(Duration::from_secs(10), events.recv()).await {
+        match ev {
+            FromAdapter::PairRequest {
+                session_id,
+                via,
+                alias,
+                code: c,
+                ..
+            } => {
+                assert_eq!(via, Via::Kdeconnect);
+                assert_eq!(alias, "Pixel 8");
+                code = Some(c);
+                adapter
+                    .decide(&session_id, vec!["pair".into()])
+                    .await
+                    .unwrap();
+            }
+            FromAdapter::Paired { .. } => paired = true,
+            FromAdapter::Received { path, .. } => {
+                saved = adapter.received_file(&path);
+                break;
+            }
+            _ => {}
+        }
+    }
+    send.await.unwrap().unwrap();
+    assert!(paired);
+    assert_eq!(code.map(|c| c.len()), Some(8));
+    assert_eq!(
+        std::fs::metadata(saved.expect("checked staged file"))
+            .unwrap()
+            .len(),
+        250_000
+    );
+    assert!(
+        dir.join("kdeconnect-trusted.json").exists(),
+        "pairing is kept"
     );
     adapter.stop().await.unwrap();
     let _ = std::fs::remove_dir_all(dir);

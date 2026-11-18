@@ -11,6 +11,7 @@ authors.workspace = true
 [dependencies]
 vutric-core.workspace = true
 vutric-compat-quickshare = { path = "../vutric-compat-quickshare" }
+vutric-compat-kdeconnect = { path = "../vutric-compat-kdeconnect" }
 anyhow.workspace = true
 serde.workspace = true
 serde_json = "1"
@@ -34,7 +35,8 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Syste
 libc = "0.2.191"
 
 [[bin]]
-# One low-privilege process for every foreign protocol: LocalSend, the browser page, Quick Share (ADR-0056).
+# One low-privilege process for every foreign protocol: LocalSend, the browser page, Quick Share (ADR-0056),
+# KDE Connect (ADR-0062).
 name = "vutric-compat"
 path = "src/main.rs"
 

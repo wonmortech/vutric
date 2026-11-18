@@ -8,6 +8,7 @@ members = [
     "crates/vutric-relay",
     "crates/vutric-compat-localsend",
     "crates/vutric-compat-quickshare",
+    "crates/vutric-compat-kdeconnect",
     "apps/net-spike",
     "crates/vutric-mobile",
     "apps/overlay-spike",

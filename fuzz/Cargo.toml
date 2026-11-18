@@ -25,6 +25,7 @@ libfuzzer-sys = { version = "0.4.13", optional = true }
 serde_json = "1"
 vutric-compat-localsend = { path = "../crates/vutric-compat-localsend" }
 vutric-compat-quickshare = { path = "../crates/vutric-compat-quickshare" }
+vutric-compat-kdeconnect = { path = "../crates/vutric-compat-kdeconnect" }
 
 [[bin]]
 name = "frame_stream"
@@ -125,6 +126,14 @@ required-features = ["libfuzzer"]
 [[bin]]
 name = "quickshare_secure"
 path = "fuzz_targets/quickshare_secure.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "kdeconnect_packet"
+path = "fuzz_targets/kdeconnect_packet.rs"
 test = false
 doc = false
 bench = false

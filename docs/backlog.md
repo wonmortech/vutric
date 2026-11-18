@@ -61,7 +61,7 @@ Sources:
 | C1 | LocalSend v2.1 (now v2.2, re-read 2026-11-18), send and receive: desktop, Android; iOS in 3; macOS in 5. Built in `crates/vutric-compat-localsend` (ADR-0054); real-app test waits for M5 | 1 | [~] |
 | C2 | Browser page, no app needed, upload and download (LocalSend "Web share" / qrcp). Built on the LocalSend receiver (ADR-0055), checked in real Chromium; real phones wait for M5 | 1 | [~] |
 | C3 | Quick Share LAN mode (NearDrop `PROTOCOL.md`): Windows 1, Linux 2, macOS 5; labelled "eksperimental" until it has survived 2 Quick Share releases. Receiver built in `crates/vutric-compat-quickshare` (ADR-0056); real Android test waits for M5; sending to Android needs the BLE wake-up (W2) | 1/2/5 | [~] |
-| C4 | KDE Connect v8, share plugin: desktop, Android | 2 | [ ] |
+| C4 | KDE Connect v8, share plugin: desktop, Android. Built in `crates/vutric-compat-kdeconnect`, hosted in `vutric-compat` (ADR-0062); tests `tests/interop.rs`, `roundtrip.rs::kdeconnect_through_the_sandboxed_process`, fuzz `kdeconnect_packet`; real KDE Connect (Linux, Android) test waits for M5 | 2 | [~] |
 | C5 | Warpinator (gRPC, group code) | 2 | [ ] |
 | C6 | croc (PAKE, relay) | 2 | [ ] |
 | C7 | magic-wormhole (mailbox + transit) | 2 | [ ] |

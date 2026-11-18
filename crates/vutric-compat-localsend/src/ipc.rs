@@ -30,15 +30,20 @@ pub struct Start {
     /// Also receive from Android's Quick Share (C3, ADR-0056); advertised over mDNS when `multicast` is on.
     #[serde(default)]
     pub quickshare: bool,
+    /// Also speak KDE Connect v8, share plugin only (C4, ADR-0062); UDP discovery when `multicast` is on.
+    #[serde(default)]
+    pub kdeconnect: bool,
 }
 
 /// Which protocol an offer came over.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum Via {
     #[default]
     Localsend,
     Quickshare,
+    Kdeconnect,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,6 +72,13 @@ pub enum ToAdapter {
     Unshare {
         token: String,
     },
+    /// Send files to a paired KDE Connect device at `to` (its TCP address from `Seen`).
+    KdeSend {
+        request_id: u64,
+        to: SocketAddr,
+        device_id: String,
+        paths: Vec<PathBuf>,
+    },
     Stop,
 }
 
@@ -80,18 +92,47 @@ pub struct OfferFile {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "t", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum FromAdapter {
     Ready {
         fingerprint: String,
         port: u16,
         #[serde(default)]
         quickshare_port: Option<u16>,
+        #[serde(default)]
+        kdeconnect_port: Option<u16>,
+        /// Our KDE Connect device id, which a dialling device must name.
+        #[serde(default)]
+        kdeconnect_id: Option<String>,
     },
     Seen {
         alias: String,
         device_type: Option<DeviceType>,
         to: SocketAddr,
         https: bool,
+        #[serde(default)]
+        via: Via,
+        /// The KDE Connect device id, for `KdeSend`.
+        #[serde(default)]
+        device_id: Option<String>,
+    },
+    /// A device asks to pair (KDE Connect). Show `alias` and `code` on screen; answer with `Decide` on
+    /// `session_id`: a non-empty `accept` pairs, an empty one refuses.
+    PairRequest {
+        session_id: String,
+        via: Via,
+        device_id: String,
+        alias: String,
+        code: String,
+    },
+    Paired {
+        via: Via,
+        device_id: String,
+        alias: String,
+    },
+    Unpaired {
+        via: Via,
+        device_id: String,
     },
     Offer {
         session_id: String,

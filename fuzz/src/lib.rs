@@ -341,6 +341,45 @@ pub fn localsend_ipc(data: &[u8]) {
     let _ = ipc::parse::<ipc::ToAdapter>(data);
 }
 
+/// Every KDE Connect parser a peer reaches (ADR-0062): a packet line before and after TLS, the identity, pairing
+/// and share bodies, and the certificate reader behind the verification key.
+pub fn kdeconnect_packet(data: &[u8]) {
+    use vutric_compat_kdeconnect::{proto, tls};
+    let _ = tls::spki(data);
+    let small = proto::Packet::parse(data, proto::MAX_PREAUTH_LINE);
+    assert!(small.is_none() || data.len() <= proto::MAX_PREAUTH_LINE);
+    let Some(p) = proto::Packet::parse(data, proto::MAX_LINE) else {
+        return;
+    };
+    assert!(p.kind.starts_with("kdeconnect.") && p.kind.len() <= 64);
+    if let Some(id) = proto::Identity::from_packet(&p) {
+        assert!(proto::valid_device_id(&id.device_id));
+        let n = id.device_name.chars().count();
+        assert!((1..=proto::MAX_NAME).contains(&n));
+        assert!(
+            !id.device_name
+                .chars()
+                .any(|c| c.is_control() || "\"',;:.!?()[]<>".contains(c))
+        );
+        assert!(id.incoming.len() <= proto::MAX_CAPS && id.outgoing.len() <= proto::MAX_CAPS);
+    }
+    match proto::Share::from_packet(&p) {
+        Some(proto::Share::File { name, port, .. }) => {
+            assert_eq!(
+                vutric_core::filename::sanitize(&name),
+                name,
+                "file name is already clean"
+            );
+            assert_ne!(port, 0);
+        }
+        Some(proto::Share::Text(t) | proto::Share::Url(t)) => {
+            assert!(t.chars().count() <= proto::MAX_TEXT);
+        }
+        None => {}
+    }
+    let _ = proto::Pair::from_packet(&p);
+}
+
 /// Every Quick Share parser a peer reaches before or after the handshake (ADR-0056): offline and sharing frames,
 /// UKEY2 messages, keys, endpoint info, and payload reassembly. Kept values stay within their limits.
 pub fn quickshare_frames(data: &[u8]) {
@@ -567,6 +606,27 @@ mod smoke {
         run(quickshare_frames, 512, 47);
         for i in 0..64u8 {
             quickshare_secure(&[i; 40]);
+        }
+    }
+
+    #[test]
+    fn kdeconnect_random_and_near_valid() {
+        run(kdeconnect_packet, 512, 53);
+        let seeds = [
+            &br#"{"id":0,"type":"kdeconnect.identity","body":{"deviceId":"740bd4b9b4184ee497d6caf1da8151be","protocolVersion":8,"deviceName":"Pixel","deviceType":"phone","incomingCapabilities":["kdeconnect.share.request"],"tcpPort":1716}}"#[..],
+            br#"{"id":0,"type":"kdeconnect.share.request","body":{"filename":"../a:b.txt","numberOfFiles":1},"payloadSize":10,"payloadTransferInfo":{"port":1739}}"#,
+            br#"{"id":0,"type":"kdeconnect.pair","body":{"pair":true,"timestamp":642247200}}"#,
+        ];
+        let mut r = Rng(29);
+        for seed in seeds {
+            kdeconnect_packet(seed);
+            for _ in 0..RUNS {
+                let mut v = seed.to_vec();
+                let i = (r.next() as usize) % v.len();
+                let pool = b"\"{}[]:,.0-9az\\\x00\xff";
+                v[i] = pool[(r.next() as usize) % pool.len()];
+                kdeconnect_packet(&v);
+            }
         }
     }
 

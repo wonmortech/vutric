@@ -5259,6 +5259,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
+name = "vutric-compat-kdeconnect"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "rcgen",
+ "ring",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "socket2",
+ "tokio",
+ "tokio-rustls",
+ "vutric-core",
+]
+
+[[package]]
 name = "vutric-compat-localsend"
 version = "0.0.1"
 dependencies = [
@@ -5278,6 +5295,7 @@ dependencies = [
  "socket2",
  "tokio",
  "tokio-rustls",
+ "vutric-compat-kdeconnect",
  "vutric-compat-quickshare",
  "vutric-core",
  "windows-sys 0.61.2",

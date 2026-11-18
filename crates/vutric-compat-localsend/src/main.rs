@@ -1,4 +1,5 @@
-//! The compat adapter process `vutric-compat` (ADR-0054, ADR-0056): `LocalSend`, the browser page and Quick Share.
+//! The compat adapter process `vutric-compat` (ADR-0054, ADR-0056, ADR-0062): `LocalSend`, the browser page,
+//! Quick Share and KDE Connect.
 //! Started by the daemon through
 //! [`vutric_compat_localsend::host::Adapter`]; speaks [`vutric_compat_localsend::ipc`] on stdin/stdout and exits
 //! when stdin closes. All foreign bytes are parsed here, never in the daemon.
@@ -10,6 +11,7 @@ use std::time::Duration;
 use anyhow::{Context as _, Result};
 use tokio::io::{AsyncWriteExt as _, BufReader};
 use tokio::sync::{Mutex, mpsc, oneshot};
+use vutric_compat_kdeconnect as kdc;
 use vutric_compat_localsend::client::{self, Target};
 use vutric_compat_localsend::discovery::Discovery;
 use vutric_compat_localsend::host::read_line;
@@ -80,15 +82,14 @@ async fn run(start: Start, input: &mut BufReader<tokio::io::Stdin>, out: Out) ->
         None
     };
     let pending: Pending = Arc::default();
-    let quickshare = if start.quickshare {
-        Some(start_quickshare(&start, out.clone(), Arc::clone(&pending)).await?)
-    } else {
-        None
-    };
+    let quickshare = start_quickshare(&start, out.clone(), Arc::clone(&pending)).await?;
+    let kde = start_kdeconnect(&start, out.clone(), Arc::clone(&pending)).await?;
     out.send(FromAdapter::Ready {
         fingerprint: receiver.fingerprint().to_owned(),
         port: receiver.addr().port(),
         quickshare_port: quickshare.as_ref().map(|(r, _)| r.addr().port()),
+        kdeconnect_port: kde.as_ref().map(|(r, _)| r.addr().port()),
+        kdeconnect_id: kde.as_ref().map(|(_, id)| id.clone()),
     })
     .await?;
     spawn_bridge(events, out.clone(), Arc::clone(&pending));
@@ -102,10 +103,9 @@ async fn run(start: Start, input: &mut BufReader<tokio::io::Stdin>, out: Out) ->
             ToAdapter::Start(_) => {}
             ToAdapter::Decide { session_id, accept } => decide(&pending, &session_id, accept).await,
             ToAdapter::Announce => {
-                if let Some(d) = &discovery {
-                    let _ = d.announce().await;
-                }
+                announce(discovery.as_ref(), kde.as_ref(), start.multicast).await;
             }
+            cmd @ ToAdapter::KdeSend { .. } => kde_send(kde.as_ref(), &out, cmd),
             ToAdapter::Send {
                 request_id,
                 to,
@@ -139,6 +139,7 @@ async fn run(start: Start, input: &mut BufReader<tokio::io::Stdin>, out: Out) ->
             ToAdapter::Stop => break,
         }
     }
+    drop(kde);
     drop(quickshare);
     drop(discovery);
     drop(receiver);
@@ -150,6 +151,7 @@ async fn run(start: Start, input: &mut BufReader<tokio::io::Stdin>, out: Out) ->
 enum Reply {
     LocalSend(oneshot::Sender<Decision>),
     QuickShare(oneshot::Sender<qs::server::Decision>),
+    KdePair(oneshot::Sender<bool>),
 }
 
 type Pending = Arc<Mutex<HashMap<String, Reply>>>;
@@ -171,16 +173,195 @@ async fn decide(pending: &Pending, session_id: &str, accept: Vec<String>) {
                 qs::server::Decision::Accept
             });
         }
+        Some(Reply::KdePair(r)) => {
+            let _ = r.send(!accept.is_empty());
+        }
         None => {}
     }
 }
 
-/// Starts the Quick Share receiver (and its mDNS advert when multicast is allowed) and forwards its events.
+/// Starts the KDE Connect receiver when `start.kdeconnect` (UDP discovery and an announcement when multicast is
+/// allowed) and forwards its events. Its identity and paired devices live next to the `LocalSend` identity file.
+async fn start_kdeconnect(
+    start: &Start,
+    out: Out,
+    pending: Pending,
+) -> Result<Option<(Arc<kdc::receiver::Receiver>, String)>> {
+    if !start.kdeconnect {
+        return Ok(None);
+    }
+    let tls = kdc::tls::Identity::load_or_create(&start.identity.with_file_name("kdeconnect.id"))
+        .context("kde connect identity")?;
+    let id = tls.device_id.clone();
+    let kind = match start.device_type {
+        vutric_compat_localsend::proto::DeviceType::Mobile => kdc::proto::DeviceType::Phone,
+        _ => kdc::proto::DeviceType::Desktop,
+    };
+    let fixed = start.port != 0;
+    let (rx, mut events) = kdc::receiver::Receiver::start(kdc::receiver::Config {
+        me: kdc::link::Me {
+            tls,
+            name: start.alias.clone(),
+            kind,
+        },
+        bind: start.bind,
+        tcp_ports: if fixed {
+            kdc::receiver::TCP_PORTS
+        } else {
+            0..=0
+        },
+        udp_port: start.multicast.then_some(kdc::receiver::UDP_PORT),
+        staging: start.staging.clone(),
+        trust: kdc::trust::Trust::load(&start.identity.with_file_name("kdeconnect-trusted.json")),
+        decide_timeout: Duration::from_secs(start.decide_timeout_secs.clamp(5, 600)),
+        payload_ports: if fixed { kdc::payload::PORTS } else { 0..=0 },
+    })
+    .await?;
+    if start.multicast {
+        rx.announce().await;
+    }
+    tokio::spawn(async move {
+        while let Some(ev) = events.recv().await {
+            let msg = kde_message(ev, &pending).await;
+            if out.send(msg).await.is_err() {
+                break;
+            }
+        }
+    });
+    Ok(Some((Arc::new(rx), id)))
+}
+
+/// "I am here" over `LocalSend` multicast and the KDE Connect UDP broadcast, where they run.
+async fn announce(
+    discovery: Option<&Discovery>,
+    kde: Option<&(Arc<kdc::receiver::Receiver>, String)>,
+    broadcast: bool,
+) {
+    if let Some(d) = discovery {
+        let _ = d.announce().await;
+    }
+    if let Some((k, _)) = kde.filter(|_| broadcast) {
+        k.announce().await;
+    }
+}
+
+/// Sends to a paired KDE Connect device in the background and reports how it went.
+fn kde_send(kde: Option<&(Arc<kdc::receiver::Receiver>, String)>, out: &Out, cmd: ToAdapter) {
+    let ToAdapter::KdeSend {
+        request_id,
+        to,
+        device_id,
+        paths,
+    } = cmd
+    else {
+        return;
+    };
+    let (kde, out) = (kde.map(|(k, _)| Arc::clone(k)), out.clone());
+    tokio::spawn(async move {
+        let sent = match &kde {
+            Some(k) => k.send(to, &device_id, &paths).await,
+            None => Err(anyhow::anyhow!("KDE Connect is off")),
+        };
+        let msg = match sent {
+            Ok(bytes) => FromAdapter::Sent {
+                request_id,
+                files: paths.len(),
+                bytes,
+                peer_cert: None,
+            },
+            Err(e) => FromAdapter::SendFailed {
+                request_id,
+                reason: format!("{e:#}"),
+            },
+        };
+        let _ = out.send(msg).await;
+    });
+}
+
+/// One KDE Connect event as a daemon message; a pairing question waits in `pending`.
+async fn kde_message(ev: kdc::receiver::Event, pending: &Pending) -> FromAdapter {
+    use kdc::receiver::Event as K;
+    match ev {
+        K::Seen {
+            device_id,
+            name,
+            addr,
+        } => FromAdapter::Seen {
+            alias: name,
+            device_type: None,
+            to: addr,
+            https: true,
+            via: Via::Kdeconnect,
+            device_id: Some(device_id),
+        },
+        K::PairRequest {
+            device_id,
+            name,
+            key,
+            answer,
+        } => {
+            let session_id = format!("kdc-pair-{device_id}");
+            pending
+                .lock()
+                .await
+                .insert(session_id.clone(), Reply::KdePair(answer));
+            FromAdapter::PairRequest {
+                session_id,
+                via: Via::Kdeconnect,
+                device_id,
+                alias: name,
+                code: key,
+            }
+        }
+        K::Paired { device_id, name } => FromAdapter::Paired {
+            via: Via::Kdeconnect,
+            device_id,
+            alias: name,
+        },
+        K::Unpaired { device_id } => FromAdapter::Unpaired {
+            via: Via::Kdeconnect,
+            device_id,
+        },
+        K::File {
+            device_id,
+            path,
+            size,
+            ..
+        } => FromAdapter::Received {
+            session_id: format!("kdc-{device_id}"),
+            file_id: String::new(),
+            name: path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+            path,
+            size,
+        },
+        K::Text {
+            device_id, text, ..
+        } => FromAdapter::Text {
+            session_id: format!("kdc-{device_id}"),
+            kind: 1,
+            text,
+        },
+        K::Url { device_id, url, .. } => FromAdapter::Text {
+            session_id: format!("kdc-{device_id}"),
+            kind: 2,
+            text: url,
+        },
+    }
+}
+
+/// Starts the Quick Share receiver when `start.quickshare` (and its mDNS advert when multicast is allowed) and
+/// forwards its events.
 async fn start_quickshare(
     start: &Start,
     out: Out,
     pending: Pending,
-) -> Result<(qs::server::Receiver, Option<qs::mdns::Advert>)> {
+) -> Result<Option<(qs::server::Receiver, Option<qs::mdns::Advert>)>> {
+    if !start.quickshare {
+        return Ok(None);
+    }
     let device = match start.device_type {
         vutric_compat_localsend::proto::DeviceType::Mobile => qs::endpoint::Device::Phone,
         _ => qs::endpoint::Device::Laptop,
@@ -258,7 +439,7 @@ async fn start_quickshare(
             }
         }
     });
-    Ok((rx, advert))
+    Ok(Some((rx, advert)))
 }
 
 /// Forwards receiver events to the daemon; offers wait in `pending` for the daemon's `decide`.
@@ -271,6 +452,8 @@ fn spawn_bridge(mut events: mpsc::Receiver<Event>, out: Out, pending: Pending) {
                     https: info.protocol != Some(vutric_compat_localsend::proto::Scheme::Http),
                     alias: info.alias,
                     device_type: info.device_type,
+                    via: Via::Localsend,
+                    device_id: None,
                 },
                 Event::Offer { offer, reply } => {
                     pending
@@ -363,6 +546,8 @@ async fn start_discovery(
                     device_type: f.info.device_type,
                     to: f.target.addr,
                     https: f.target.https,
+                    via: Via::Localsend,
+                    device_id: None,
                 })
                 .await;
         }
