@@ -99,7 +99,7 @@ impl PairingTicket {
     }
 }
 
-fn percent_encode(input: &str, out: &mut String) {
+pub(crate) fn percent_encode(input: &str, out: &mut String) {
     for byte in input.bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
             out.push(byte as char);
@@ -109,7 +109,7 @@ fn percent_encode(input: &str, out: &mut String) {
     }
 }
 
-fn percent_decode(input: &str) -> Result<String> {
+pub(crate) fn percent_decode(input: &str) -> Result<String> {
     let bytes = input.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;

@@ -115,6 +115,8 @@ pub enum Conflict {
     Replace,
     /// The old file stays; the new one is dropped (counted as received).
     Skip,
+    /// Ask the user for each clash (T7). A host that cannot ask, or a question nobody answers, keeps both.
+    Ask,
 }
 
 /// Whether an offer is accepted without asking.
@@ -153,6 +155,46 @@ pub enum After {
     Nothing,
 }
 
+/// What the host does after a transfer, worked out from [`After`] and what was saved (T5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AfterAction {
+    /// Show a notification for this many files.
+    Notify(usize),
+    /// Open this file in its app.
+    Open(PathBuf),
+    /// Open this folder.
+    OpenFolder(PathBuf),
+    Nothing,
+}
+
+impl After {
+    /// The action for files saved at `saved`. "Open file" with several files opens the folder they share
+    /// instead of many apps at once; nothing saved means nothing to do.
+    #[must_use]
+    pub fn action(self, saved: &[PathBuf]) -> AfterAction {
+        if saved.is_empty() {
+            return AfterAction::Nothing;
+        }
+        let folder = || {
+            let mut common = saved[0].parent().map(Path::to_path_buf).unwrap_or_default();
+            for p in &saved[1..] {
+                while !p.starts_with(&common) {
+                    if !common.pop() {
+                        break;
+                    }
+                }
+            }
+            common
+        };
+        match self {
+            After::Notify => AfterAction::Notify(saved.len()),
+            After::OpenFile if saved.len() == 1 => AfterAction::Open(saved[0].clone()),
+            After::OpenFile | After::OpenFolder => AfterAction::OpenFolder(folder()),
+            After::Nothing => AfterAction::Nothing,
+        }
+    }
+}
+
 /// The rules for one transfer: the global settings with the sending device's overrides applied.
 #[allow(clippy::struct_excessive_bools)] // independent user switches, saved as they appear on screen
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -174,6 +216,37 @@ pub struct SaveRules {
     pub album: String,
     /// Phones: keep the file in the save folder after it went to the gallery.
     pub keep_copy: bool,
+    /// Android: the folder the user picked through the Storage Access Framework (issue #8). Rust still saves
+    /// into `folder`; the phone moves each verified file into this tree. `None` = no picked tree.
+    pub android_tree: Option<AndroidTree>,
+}
+
+/// A Storage Access Framework tree the user granted (Android 11+), as the phone stores it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AndroidTree {
+    /// The tree URI from `ACTION_OPEN_DOCUMENT_TREE` (`content://…`).
+    pub uri: String,
+    /// What the settings screen shows ("SD karta / Vutric").
+    #[serde(default)]
+    pub label: String,
+}
+
+/// Longest SAF tree URI kept.
+pub const MAX_TREE_URI: usize = 2048;
+
+impl AndroidTree {
+    /// Whether the URI is one the phone could have been granted: `content://`, at most [`MAX_TREE_URI`] bytes,
+    /// no whitespace or control characters.
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
+        self.uri.len() <= MAX_TREE_URI
+            && self.uri.len() > "content://".len()
+            && self.uri.starts_with("content://")
+            && !self
+                .uri
+                .chars()
+                .any(|c| c.is_control() || c.is_whitespace())
+    }
 }
 
 impl Default for SaveRules {
@@ -188,6 +261,7 @@ impl Default for SaveRules {
             gallery: true,
             album: "Vutric".into(),
             keep_copy: true,
+            android_tree: None,
         }
     }
 }
@@ -205,6 +279,20 @@ pub struct Arrival<'a> {
 }
 
 impl SaveRules {
+    /// These rules with a chosen folder that is gone (an unplugged drive, a deleted folder) replaced by the
+    /// default, and the missing folder, so the host can tell the user (T2). `is_dir` is asked about the folder only.
+    #[must_use]
+    pub fn usable(&self, is_dir: impl Fn(&Path) -> bool) -> (SaveRules, Option<PathBuf>) {
+        match &self.folder {
+            Some(f) if !is_dir(f) => {
+                let mut r = self.clone();
+                r.folder = None;
+                (r, Some(f.clone()))
+            }
+            _ => (self.clone(), None),
+        }
+    }
+
     /// The final path for a received file, before conflict handling. `default_folder` is used when no folder
     /// is set. Every component that came from the peer is sanitized, so the result stays inside the chosen
     /// folder (or inside an absolute type folder the user chose).
@@ -289,6 +377,110 @@ pub struct Settings {
     pub history_days: Option<u32>,
     /// Overrides by the device's endpoint id (64 hex).
     pub devices: BTreeMap<String, DeviceRules>,
+    /// Other apps' protocols (ADR-0010 part 4, backlog C9).
+    pub compat: Compat,
+    /// The missing save folder the user was last told about, so it is said once, not on every transfer (T2).
+    pub told_missing_folder: Option<PathBuf>,
+    /// The route choice ("Avtomatik" by default, backlog Rx, ADR-0060).
+    #[serde(deserialize_with = "crate::route::lenient")]
+    pub route: crate::route::Picker,
+}
+
+/// One foreign protocol adapter.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Adapter {
+    /// The adapter may advertise and receive (still only while receive mode is on, ADR-0010 §3.3).
+    pub enabled: bool,
+    /// Certificate or key fingerprints whose offers skip the question (ADR-0010 §3.2). Upper-case hex.
+    pub pinned: Vec<String>,
+}
+
+impl Adapter {
+    const fn on() -> Self {
+        Self {
+            enabled: true,
+            pinned: Vec::new(),
+        }
+    }
+
+    const fn off() -> Self {
+        Self {
+            enabled: false,
+            pinned: Vec::new(),
+        }
+    }
+
+    /// Whether offers from `fingerprint` are accepted without asking.
+    #[must_use]
+    pub fn is_pinned(&self, fingerprint: &str) -> bool {
+        self.pinned
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case(fingerprint))
+    }
+}
+
+impl Default for Adapter {
+    fn default() -> Self {
+        Self::off()
+    }
+}
+
+/// Most per-device override entries kept (T3); the rest are dropped by [`Settings::migrate`].
+pub const MAX_DEVICE_RULES: usize = 1024;
+
+/// Most pinned fingerprints kept per adapter.
+pub const MAX_PINNED: usize = 256;
+
+/// `compat.*`: `LocalSend` and the browser page on by default; the rest off until the user turns them on,
+/// because they advertise on the network.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Compat {
+    pub localsend: Adapter,
+    pub browser: Adapter,
+    pub quickshare: Adapter,
+    pub kdeconnect: Adapter,
+    pub warpinator: Adapter,
+    pub croc: Adapter,
+    pub wormhole: Adapter,
+}
+
+impl Default for Compat {
+    fn default() -> Self {
+        Self {
+            localsend: Adapter::on(),
+            browser: Adapter::on(),
+            quickshare: Adapter::off(),
+            kdeconnect: Adapter::off(),
+            warpinator: Adapter::off(),
+            croc: Adapter::off(),
+            wormhole: Adapter::off(),
+        }
+    }
+}
+
+impl Compat {
+    fn migrate(&mut self) {
+        for a in [
+            &mut self.localsend,
+            &mut self.browser,
+            &mut self.quickshare,
+            &mut self.kdeconnect,
+            &mut self.warpinator,
+            &mut self.croc,
+            &mut self.wormhole,
+        ] {
+            a.pinned
+                .retain(|p| p.len() == 64 && p.bytes().all(|b| b.is_ascii_hexdigit()));
+            for p in &mut a.pinned {
+                p.make_ascii_uppercase();
+            }
+            a.pinned.sort();
+            a.pinned.dedup();
+            a.pinned.truncate(MAX_PINNED);
+        }
+    }
 }
 
 impl Default for Settings {
@@ -302,6 +494,9 @@ impl Default for Settings {
             parts_keep_days: 7,
             history_days: Some(90),
             devices: BTreeMap::new(),
+            compat: Compat::default(),
+            told_missing_folder: None,
+            route: crate::route::Picker::Auto,
         }
     }
 }
@@ -312,7 +507,7 @@ impl Settings {
     pub fn rules_for(&self, device: &str) -> (SaveRules, Accept) {
         let mut save = self.save.clone();
         let mut accept = self.accept;
-        if let Some(d) = self.devices.get(device) {
+        if let Some(d) = self.devices.get(&device.to_ascii_lowercase()) {
             if let Some(f) = &d.folder {
                 save.folder = Some(f.clone());
             }
@@ -332,6 +527,22 @@ impl Settings {
         (save, accept)
     }
 
+    /// Whether to tell the user that `missing` (from [`SaveRules::usable`]) is gone: true the first time for that
+    /// folder, false after; `None` (the folder is back) resets it.
+    pub fn tell_missing_folder(&mut self, missing: Option<&Path>) -> bool {
+        match missing {
+            Some(m) if self.told_missing_folder.as_deref() != Some(m) => {
+                self.told_missing_folder = Some(m.to_path_buf());
+                true
+            }
+            Some(_) => false,
+            None => {
+                self.told_missing_folder = None;
+                false
+            }
+        }
+    }
+
     /// Brings a file written by an older version forward and clamps values to sane ranges.
     #[must_use]
     pub fn migrate(mut self) -> Self {
@@ -341,7 +552,53 @@ impl Settings {
             "Vutric".clone_into(&mut self.save.album);
         }
         self.save.album = self.save.album.chars().take(64).collect();
+        if self
+            .save
+            .android_tree
+            .as_ref()
+            .is_some_and(|t| !t.is_valid())
+        {
+            self.save.android_tree = None;
+        }
+        if let Some(t) = &mut self.save.android_tree {
+            t.label = t
+                .label
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(64)
+                .collect();
+        }
+        self.compat.migrate();
+        let devices = std::mem::take(&mut self.devices);
+        self.devices = devices
+            .into_iter()
+            .filter(|(k, d)| {
+                k.len() == 64
+                    && k.bytes().all(|b| b.is_ascii_hexdigit())
+                    && *d != DeviceRules::default()
+            })
+            .map(|(k, d)| (k.to_ascii_lowercase(), d))
+            .take(MAX_DEVICE_RULES)
+            .collect();
         self
+    }
+
+    /// Sets the overrides for `device` (endpoint id, 64 hex); all-`None` rules remove the entry (T3).
+    /// Returns false, changing nothing, for a malformed id or when [`MAX_DEVICE_RULES`] is reached.
+    pub fn set_device_rules(&mut self, device: &str, rules: DeviceRules) -> bool {
+        if device.len() != 64 || !device.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return false;
+        }
+        let key = device.to_ascii_lowercase();
+        if rules == DeviceRules::default() {
+            self.devices.remove(&key);
+            return true;
+        }
+        if !self.devices.contains_key(&key) && self.devices.len() >= MAX_DEVICE_RULES {
+            return false;
+        }
+        self.devices.insert(key, rules);
+        true
     }
 }
 
@@ -478,6 +735,47 @@ mod tests {
     }
 
     #[test]
+    fn device_rules_are_checked_and_bounded() {
+        let id = "AB".repeat(32);
+        let mut s = Settings::default();
+        let rules = DeviceRules {
+            accept: Some(Accept::Trusted),
+            ..DeviceRules::default()
+        };
+        assert!(s.set_device_rules(&id, rules.clone()));
+        assert_eq!(
+            s.rules_for(&id.to_ascii_lowercase()).1,
+            Accept::Trusted,
+            "ids match in any case"
+        );
+        assert!(!s.set_device_rules("not-an-id", rules.clone()));
+        assert!(
+            s.set_device_rules(&id, DeviceRules::default()),
+            "empty rules remove the entry"
+        );
+        assert!(s.devices.is_empty());
+
+        // A hand-edited file: bad keys and empty entries go, upper-case keys are folded, the count is capped.
+        for i in 0..MAX_DEVICE_RULES + 5 {
+            s.devices.insert(format!("{i:064X}"), rules.clone());
+        }
+        s.devices.insert("short".into(), rules.clone());
+        s.devices.insert("cd".repeat(32), DeviceRules::default());
+        let s = s.migrate();
+        assert_eq!(s.devices.len(), MAX_DEVICE_RULES);
+        assert!(
+            s.devices
+                .keys()
+                .all(|k| k.len() == 64 && *k == k.to_ascii_lowercase())
+        );
+        let mut full = s.clone();
+        assert!(
+            !full.set_device_rules(&"ef".repeat(32), rules),
+            "no room left"
+        );
+    }
+
+    #[test]
     fn migrate_clamps() {
         let s = Settings {
             version: 0,
@@ -492,5 +790,96 @@ mod tests {
         assert_eq!(s.version, SETTINGS_VERSION);
         assert_eq!(s.parts_keep_days, 30);
         assert_eq!(s.save.album, "Vutric");
+    }
+
+    #[test]
+    fn android_tree_is_kept_and_checked() {
+        let uri = "content://com.android.externalstorage.documents/tree/primary%3AVutric";
+        let json = format!(
+            r#"{{"save":{{"android_tree":{{"uri":"{uri}","label":"Ichki xotira / Vutric"}}}}}}"#
+        );
+        let s: Settings = serde_json::from_str(&json).unwrap();
+        let s = s.migrate();
+        let tree = s.save.android_tree.clone().expect("kept");
+        assert_eq!(tree.uri, uri);
+        assert_eq!(tree.label, "Ichki xotira / Vutric");
+        let again: Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(again, s);
+
+        let old: Settings = serde_json::from_str(r#"{"save":{"album":"A"}}"#).unwrap();
+        assert_eq!(old.save.android_tree, None, "older files have no tree");
+
+        for bad in [
+            "file:///sdcard",
+            "content://",
+            "content://a b",
+            &format!("content://{}", "x".repeat(3000)),
+        ] {
+            let mut s = Settings::default();
+            s.save.android_tree = Some(AndroidTree {
+                uri: bad.to_owned(),
+                label: String::new(),
+            });
+            assert_eq!(s.migrate().save.android_tree, None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn after_receive_actions() {
+        let one = [PathBuf::from("D/Vutric/Photos/a.jpg")];
+        let two = [one[0].clone(), PathBuf::from("D/Vutric/Videos/b.mp4")];
+        assert_eq!(
+            After::OpenFile.action(&one),
+            AfterAction::Open(one[0].clone())
+        );
+        assert_eq!(
+            After::OpenFile.action(&two),
+            AfterAction::OpenFolder(PathBuf::from("D/Vutric"))
+        );
+        assert_eq!(
+            After::OpenFolder.action(&one),
+            AfterAction::OpenFolder(PathBuf::from("D/Vutric/Photos"))
+        );
+        assert_eq!(After::Notify.action(&two), AfterAction::Notify(2));
+        assert_eq!(After::Notify.action(&[]), AfterAction::Nothing);
+        assert_eq!(After::Nothing.action(&one), AfterAction::Nothing);
+    }
+
+    #[test]
+    fn missing_folder_falls_back_and_is_told_once() {
+        let rules = SaveRules {
+            folder: Some(PathBuf::from("E:/USB")),
+            ..SaveRules::default()
+        };
+        let (r, missing) = rules.usable(|_| false);
+        assert_eq!(r.folder, None);
+        assert_eq!(missing.as_deref(), Some(Path::new("E:/USB")));
+        let (r, missing) = rules.usable(|_| true);
+        assert_eq!((r.folder, missing), (rules.folder.clone(), None));
+        let mut s = Settings::default();
+        assert!(s.tell_missing_folder(Some(Path::new("E:/USB"))));
+        assert!(!s.tell_missing_folder(Some(Path::new("E:/USB"))), "once");
+        assert!(!s.tell_missing_folder(None));
+        assert!(
+            s.tell_missing_folder(Some(Path::new("E:/USB"))),
+            "again after it came back"
+        );
+        let c: Conflict = serde_json::from_str("\"ask\"").unwrap();
+        assert_eq!(c, Conflict::Ask);
+    }
+
+    #[test]
+    fn compat_defaults_and_old_files() {
+        let s = Settings::default();
+        assert!(s.compat.localsend.enabled && s.compat.browser.enabled);
+        assert!(!s.compat.quickshare.enabled && !s.compat.croc.enabled);
+        // A file from before `compat` existed gets the defaults.
+        let old: Settings = serde_json::from_str(r#"{"version":1}"#).unwrap();
+        assert_eq!(old.compat, Compat::default());
+        let mut s = Settings::default();
+        s.compat.localsend.pinned = vec!["ab".repeat(32), "AB".repeat(32), "zz".into()];
+        let s = s.migrate();
+        assert_eq!(s.compat.localsend.pinned, vec!["AB".repeat(32)]);
+        assert!(s.compat.localsend.is_pinned(&"ab".repeat(32)));
     }
 }

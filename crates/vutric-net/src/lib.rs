@@ -16,13 +16,17 @@
 //! Every network wait is bounded ([`HANDSHAKE_TIMEOUT`], [`probe::ROUND_TRIP_TIMEOUT`]), so a silent peer can
 //! stall a caller for seconds, never forever.
 
+pub mod beacon;
 pub mod disk;
+pub mod find;
+pub mod lan;
 pub mod preview;
 pub mod probe;
 pub mod settings;
 pub mod transfer;
+pub mod trust;
 
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context as _, Result, anyhow, bail, ensure};
@@ -36,6 +40,7 @@ use iroh_mdns_address_lookup::{DiscoveryEvent, MdnsAddressLookup};
 use n0_future::StreamExt as _;
 use n0_future::boxed::BoxStream;
 use vutric_core::frame::{self, Decoder};
+pub use vutric_core::trust::Admission;
 use vutric_core::{ALPN, EndpointId, Message, PROTOCOL_VERSION, PairingTicket, Platform};
 
 /// Prints a line without ever blocking the caller: a Windows console in selection mode (`QuickEdit`) freezes
@@ -64,6 +69,12 @@ pub const MDNS_SERVICE: &str = "vutric";
 /// Longest wait for QUIC, the control stream and `Hello` when a session opens, either direction.
 pub const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(8);
 
+/// Longest wait for each machine step of [`Session::pair_code`].
+pub const PAIR_STEP_TIMEOUT: Duration = Duration::from_secs(8);
+
+/// Longest wait for the other user to compare the digits in [`Session::pair_finish`].
+pub const PAIR_CONFIRM_TIMEOUT: Duration = Duration::from_secs(120);
+
 /// How long a closing side waits for the peer to take its last bytes before it closes anyway.
 const LINGER: Duration = Duration::from_secs(2);
 
@@ -78,6 +89,19 @@ pub enum Reach {
     Anywhere,
 }
 
+impl Reach {
+    /// The endpoint reach for the user's route choice (backlog Rx, ADR-0060): internet only for "Avtomatik" and
+    /// "Internet orqali".
+    #[must_use]
+    pub fn for_picker(p: vutric_core::route::Picker) -> Self {
+        if p.uses_internet() {
+            Self::Anywhere
+        } else {
+            Self::Lan
+        }
+    }
+}
+
 /// How a session's packets travel right now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Route {
@@ -87,6 +111,103 @@ pub enum Route {
     Relay,
     /// No path yet.
     Unknown,
+}
+
+/// Which relays a [`Reach::Anywhere`] peer uses (backlog R2, ADR-0053).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Relays {
+    /// Our own relays (`https://relay.example.org/`), from settings or the build.
+    pub urls: Vec<String>,
+    /// Also use n0's public relays and lookup service. iroh picks the home relay by latency among all of them,
+    /// so an n0 relay is used only where it is closer or ours is down. `false`: nothing third-party at all
+    /// (peers are then dialed by ticket or mDNS, not looked up by key).
+    pub n0_fallback: bool,
+}
+
+impl Default for Relays {
+    /// n0 only, until a Vutric relay is deployed.
+    fn default() -> Self {
+        Self {
+            urls: Vec::new(),
+            n0_fallback: true,
+        }
+    }
+}
+
+impl Relays {
+    fn mode(&self) -> Result<RelayMode> {
+        if self.urls.is_empty() {
+            return if self.n0_fallback {
+                Ok(RelayMode::Default)
+            } else {
+                Err(anyhow!(
+                    "no relay: give a relay url or allow the n0 fallback"
+                ))
+            };
+        }
+        let ours = self
+            .urls
+            .iter()
+            .map(|u| {
+                u.parse::<RelayUrl>()
+                    .with_context(|| format!("relay url {u}"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let map = iroh::RelayMap::empty();
+        for u in ours {
+            map.insert(u.clone(), std::sync::Arc::new(iroh::RelayConfig::from(u)));
+        }
+        if self.n0_fallback {
+            map.extend(&iroh::defaults::prod::default_relay_map());
+        }
+        Ok(RelayMode::Custom(map))
+    }
+}
+
+/// Bytes a session has moved so far (all paths, QUIC overhead included); [`Speed`] turns samples into a rate.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Traffic {
+    pub sent: u64,
+    pub received: u64,
+}
+
+/// Live speed for the route badge: feed [`Session::traffic`] samples, read bytes per second over the last
+/// window (default 2 s).
+#[derive(Debug, Clone)]
+pub struct Speed {
+    window: Duration,
+    samples: std::collections::VecDeque<(Instant, Traffic)>,
+}
+
+impl Default for Speed {
+    fn default() -> Self {
+        Self::new(Duration::from_secs(2))
+    }
+}
+
+impl Speed {
+    #[must_use]
+    pub fn new(window: Duration) -> Self {
+        Self {
+            window,
+            samples: std::collections::VecDeque::new(),
+        }
+    }
+
+    /// Adds a sample taken at `at`; returns `(sent, received)` bytes per second over the window.
+    pub fn push(&mut self, at: Instant, t: Traffic) -> (u64, u64) {
+        self.samples.push_back((at, t));
+        while self.samples.len() > 2 && at.duration_since(self.samples[1].0) >= self.window {
+            self.samples.pop_front();
+        }
+        let (t0, first) = self.samples[0];
+        let secs = at.duration_since(t0).as_secs_f64();
+        if secs <= 0.0 {
+            return (0, 0);
+        }
+        let rate = |a: u64, b: u64| (a.saturating_sub(b) as f64 / secs) as u64;
+        (rate(t.sent, first.sent), rate(t.received, first.received))
+    }
 }
 
 /// Publishes through `B` without the device name: the name is for nearby devices (mDNS), not for a public
@@ -142,11 +263,23 @@ pub struct Nearby {
 
 impl Peer {
     /// Binds an endpoint. `secret` is the device's persistent identity (32 random bytes kept by the app).
+    /// [`Reach::Anywhere`] uses the default relays ([`Relays::default`]).
     pub async fn bind(
         secret: [u8; 32],
         name: &str,
         platform: Platform,
         reach: Reach,
+    ) -> Result<Self> {
+        Self::bind_with(secret, name, platform, reach, &Relays::default()).await
+    }
+
+    /// [`Self::bind`] with our own relays (backlog R2, ADR-0053). Ignored for [`Reach::Lan`].
+    pub async fn bind_with(
+        secret: [u8; 32],
+        name: &str,
+        platform: Platform,
+        reach: Reach,
+        relays: &Relays,
     ) -> Result<Self> {
         let user_data: UserData = clip(name, UserData::MAX_LENGTH)
             .parse()
@@ -154,11 +287,13 @@ impl Peer {
         let builder = match reach {
             Reach::Lan => Endpoint::builder(presets::Minimal).relay_mode(RelayMode::Disabled),
             // presets::N0 minus its publisher, which would put the device name on a public server.
-            Reach::Anywhere => Endpoint::builder(presets::Minimal)
-                .relay_mode(RelayMode::Default)
+            Reach::Anywhere if relays.n0_fallback => Endpoint::builder(presets::Minimal)
+                .relay_mode(relays.mode()?)
                 .address_lookup(Nameless(PkarrPublisher::n0_dns()))
                 .address_lookup(PkarrResolver::n0_dns())
                 .address_lookup(DnsAddressLookup::n0_dns()),
+            // Self-hosted only: nothing reaches a third-party server, peers are dialed by ticket or mDNS.
+            Reach::Anywhere => Endpoint::builder(presets::Minimal).relay_mode(relays.mode()?),
         };
         let endpoint = builder
             .secret_key(SecretKey::from_bytes(&secret))
@@ -202,20 +337,12 @@ impl Peer {
     /// The QR payload: our key plus every LAN address we listen on (for networks that drop multicast).
     #[must_use]
     pub fn ticket(&self) -> PairingTicket {
-        let mut addrs: Vec<SocketAddr> = self
-            .endpoint
-            .addr()
-            .ip_addrs()
-            .copied()
-            .filter(|a| is_lan(a.ip()))
-            // A link-local IPv6 address carries this machine's interface index, meaningless on the other device.
-            .filter(
-                |a| !matches!(a, SocketAddr::V6(v6) if v6.ip().segments()[0] & 0xffc0 == 0xfe80),
-            )
-            .collect();
-        addrs.sort_by_key(|a| (a.is_ipv6(), *a));
-        addrs.dedup();
-        addrs.truncate(8);
+        // Ranked by interface (wired, Wi-Fi, tethering, virtual last); link-local IPv6 goes in without its zone and
+        // the dialer expands it to its own interfaces (`lan::expand_link_local`).
+        let addrs = lan::ticket_addrs(
+            self.endpoint.addr().ip_addrs().copied(),
+            &lan::local_addrs(),
+        );
         PairingTicket {
             endpoint: self.id(),
             device_name: self.name.clone(),
@@ -295,8 +422,8 @@ impl Peer {
     ) -> Result<Session> {
         let key = iroh::PublicKey::from_bytes(&id.0).context("peer key")?;
         let mut target = EndpointAddr::new(key);
-        for a in addrs {
-            target = target.with_ip_addr(*a);
+        for a in lan::expand_link_local(addrs, &lan::local_addrs()) {
+            target = target.with_ip_addr(a);
         }
         if self.reach == Reach::Anywhere
             && let Some(url) = relay
@@ -309,11 +436,60 @@ impl Peer {
                 .connect(target, ALPN)
                 .await
                 .context("connect")?;
-            let (send, recv) = conn.open_bi().await.context("open control stream")?;
-            Session::handshake(conn, send, recv, &self.name, self.platform).await
+            let opened = async {
+                let (send, recv) = conn.open_bi().await.context("open control stream")?;
+                Session::handshake(conn.clone(), send, recv, &self.name, self.platform, true).await
+            }
+            .await;
+            match opened {
+                Err(_) if refused(&conn) => Err(NotAdmitted.into()),
+                other => other,
+            }
         })
         .await
         .map_err(|_| anyhow!("no answer from the device within {HANDSHAKE_TIMEOUT:?}"))?
+    }
+
+    /// Like [`Self::accept`], but asks `admit` about each peer's key as soon as QUIC has authenticated it, before
+    /// a single byte from the peer is parsed (ADR-0007 part 2). A refused peer's connection is closed with
+    /// [`REFUSED_CODE`], and its dialer gets [`NotAdmitted`]. Returns the session and the admission it got.
+    ///
+    /// Hosts build `admit` from [`vutric_core::trust::admit`] with their trust store, visibility and clock.
+    pub async fn accept_with<F>(&self, admit: F) -> Result<(Session, Admission)>
+    where
+        F: Fn(&EndpointId) -> Admission + Send + Sync + 'static,
+    {
+        let admit = std::sync::Arc::new(admit);
+        let mut pending = tokio::task::JoinSet::new();
+        loop {
+            tokio::select! {
+                incoming = self.endpoint.accept() => {
+                    let incoming = incoming.ok_or_else(|| anyhow!("endpoint closed"))?;
+                    let (name, platform, admit) = (self.name.clone(), self.platform, admit.clone());
+                    pending.spawn(async move {
+                        tokio::time::timeout(HANDSHAKE_TIMEOUT, async move {
+                            let conn = incoming.await.context("incoming connection")?;
+                            let peer = EndpointId(*conn.remote_id().as_bytes());
+                            let admission = admit(&peer);
+                            if admission == Admission::Refuse {
+                                conn.close(REFUSED_CODE.into(), b"not trusted");
+                                bail!("refused {}: not a trusted device", short_id(&peer));
+                            }
+                            let (send, recv) = conn.accept_bi().await.context("accept control stream")?;
+                            let s = Session::handshake(conn, send, recv, &name, platform, false).await?;
+                            Ok((s, admission))
+                        })
+                        .await
+                    });
+                }
+                Some(done) = pending.join_next(), if !pending.is_empty() => match done {
+                    Ok(Ok(Ok(s))) => return Ok(s),
+                    Ok(Ok(Err(e))) => say(format!("vutric-net: incoming connection dropped: {e:#}")),
+                    Ok(Err(_)) => say("vutric-net: incoming connection stalled its handshake, dropped".into()),
+                    Err(e) => say(format!("vutric-net: handshake task failed: {e}")),
+                },
+            }
+        }
     }
 
     /// Waits for the next peer to connect to us and returns the first one whose handshake completes.
@@ -330,7 +506,7 @@ impl Peer {
                         tokio::time::timeout(HANDSHAKE_TIMEOUT, async move {
                             let conn = incoming.await.context("incoming connection")?;
                             let (send, recv) = conn.accept_bi().await.context("accept control stream")?;
-                            Session::handshake(conn, send, recv, &name, platform).await
+                            Session::handshake(conn, send, recv, &name, platform, false).await
                         })
                         .await
                     });
@@ -361,6 +537,50 @@ pub struct Session {
     buf: Box<[u8]>,
     pub remote_name: String,
     pub remote_platform: Platform,
+    /// We opened the connection (the dialer); decides the role in [`Session::pair_code`].
+    dialer: bool,
+}
+
+/// QUIC application close code for "you are not a trusted device, and this device is not visible to everyone".
+pub const REFUSED_CODE: u32 = 403;
+
+/// The other device refused us before the handshake: we are not in its trust list and it is not in "everyone"
+/// or pairing mode. Find it with `err.downcast_ref::<NotAdmitted>()`. The UI says: pair first, or ask the other
+/// side to open "Hamma" for 10 minutes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NotAdmitted;
+
+impl std::fmt::Display for NotAdmitted {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("the other device accepts only its trusted devices right now")
+    }
+}
+
+impl std::error::Error for NotAdmitted {}
+
+/// The six digits of [`Session::pair_code`] did not come out of an honest exchange: the reveal did not open the
+/// commitment, or the peer broke the order. Treat as an attack; never offer to trust this peer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PairingTampered;
+
+impl std::fmt::Display for PairingTampered {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("pairing check failed: the other device did not follow the protocol")
+    }
+}
+
+impl std::error::Error for PairingTampered {}
+
+fn refused(conn: &Connection) -> bool {
+    matches!(
+        conn.close_reason(),
+        Some(iroh::endpoint::ConnectionError::ApplicationClosed(c))
+            if c.error_code.into_inner() == u64::from(REFUSED_CODE)
+    )
+}
+
+fn short_id(id: &EndpointId) -> String {
+    id.to_string()[..8].to_owned()
 }
 
 impl Session {
@@ -370,6 +590,7 @@ impl Session {
         recv: RecvStream,
         name: &str,
         platform: Platform,
+        dialer: bool,
     ) -> Result<Self> {
         let mut s = Self {
             conn,
@@ -379,6 +600,7 @@ impl Session {
             buf: vec![0u8; 16 * 1024].into_boxed_slice(),
             remote_name: String::new(),
             remote_platform: platform,
+            dialer,
         };
         s.send(&Message::hello(clip(name, 64), platform)).await?;
         match s.recv().await? {
@@ -443,6 +665,49 @@ impl Session {
         (route, Some(p.rtt()))
     }
 
+    /// The route badge for this session right now (backlog Rx, ADR-0060), against this device's addresses.
+    /// [`lan::local_addrs`] asks the OS, so a UI refreshing the badge passes a list it re-reads every few
+    /// seconds.
+    #[must_use]
+    pub fn badge_with(&self, locals: &[lan::LocalAddr]) -> vutric_core::route::Badge {
+        let paths = self.conn.paths();
+        let Some(p) = paths.iter().find(iroh::endpoint::Path::is_selected) else {
+            return lan::badge(None, None, locals);
+        };
+        let remote = match p.remote_addr() {
+            iroh::TransportAddr::Ip(a) => Some(a.ip()),
+            _ => None,
+        };
+        lan::badge(Some(p.is_relay()), remote, locals)
+    }
+
+    /// [`Self::badge_with`] with a fresh [`lan::local_addrs`].
+    #[must_use]
+    pub fn badge(&self) -> vutric_core::route::Badge {
+        self.badge_with(&lan::local_addrs())
+    }
+
+    /// The relay this session goes through right now, if it is relayed (for the route badge: "via relay.x").
+    #[must_use]
+    pub fn relay_url(&self) -> Option<String> {
+        let paths = self.conn.paths();
+        let p = paths.iter().find(iroh::endpoint::Path::is_selected)?;
+        match p.remote_addr() {
+            iroh::TransportAddr::Relay(u) => Some(u.to_string()),
+            _ => None,
+        }
+    }
+
+    /// Bytes moved so far, for [`Speed`].
+    #[must_use]
+    pub fn traffic(&self) -> Traffic {
+        let s = self.conn.stats();
+        Traffic {
+            sent: s.udp_tx.bytes,
+            received: s.udp_rx.bytes,
+        }
+    }
+
     /// Six digits both screens show while pairing (Bluetooth-style numeric comparison).
     pub fn check_code(&self) -> Result<String> {
         let mut out = [0u8; 8];
@@ -450,6 +715,68 @@ impl Session {
             .export_keying_material(&mut out, b"EXPORTER-vutric/1 pairing check", &[])
             .map_err(|e| anyhow!("keying material: {e:?}"))?;
         Ok(format!("{:06}", u64::from_le_bytes(out) % 1_000_000))
+    }
+
+    /// Whether we opened this connection.
+    #[must_use]
+    pub fn is_dialer(&self) -> bool {
+        self.dialer
+    }
+
+    /// Pairing without a QR code (backlog S2): the commit-then-reveal exchange of [`vutric_core::sas`], run on
+    /// this session by both sides at once (each side's role follows who dialed). Returns the six digits to show.
+    /// The users compare them, and each side then calls [`Self::pair_finish`]. Errors with [`PairingTampered`]
+    /// when the peer's reveal does not match its commitment.
+    pub async fn pair_code(&mut self) -> Result<String> {
+        use vutric_core::sas;
+        let mut x = [0u8; sas::EXPORTER_BYTES];
+        self.conn
+            .export_keying_material(&mut x, sas::EXPORTER_LABEL, &[])
+            .map_err(|e| anyhow!("keying material: {e:?}"))?;
+        let mine: [u8; sas::NONCE_BYTES] = new_identity();
+        if self.dialer {
+            self.send(&Message::PairCommit {
+                commit: sas::commitment(&x, &mine),
+            })
+            .await?;
+            let Message::PairNonce { nonce: theirs } = self.recv_step().await? else {
+                return Err(PairingTampered.into());
+            };
+            self.send(&Message::PairReveal { nonce: mine }).await?;
+            Ok(sas::code(&x, &mine, &theirs))
+        } else {
+            let Message::PairCommit { commit } = self.recv_step().await? else {
+                return Err(PairingTampered.into());
+            };
+            self.send(&Message::PairNonce { nonce: mine }).await?;
+            let theirs = match self.recv_step().await? {
+                Message::PairReveal { nonce } if sas::opens(&commit, &x, &nonce) => nonce,
+                _ => return Err(PairingTampered.into()),
+            };
+            Ok(sas::code(&x, &theirs, &mine))
+        }
+    }
+
+    async fn recv_step(&mut self) -> Result<Message> {
+        tokio::time::timeout(PAIR_STEP_TIMEOUT, self.recv())
+            .await
+            .map_err(|_| anyhow!("the other device stopped answering the pairing check"))?
+    }
+
+    /// Sends this user's answer ("the digits match") and waits for the other user's. Returns true only when
+    /// both confirmed; only then may the host store the peer in its trust list with
+    /// [`vutric_core::trust::PairMethod::Code`]. Waits up to [`PAIR_CONFIRM_TIMEOUT`] for the other user.
+    /// To end the session after a "no", call [`Self::finish`], not [`Self::close`], so the answer reaches the
+    /// other side before the connection goes.
+    pub async fn pair_finish(&mut self, confirmed: bool) -> Result<bool> {
+        self.send(&Message::PairResult { confirmed }).await?;
+        let theirs = tokio::time::timeout(PAIR_CONFIRM_TIMEOUT, self.recv())
+            .await
+            .map_err(|_| anyhow!("the other user did not answer the pairing check"))??;
+        match theirs {
+            Message::PairResult { confirmed: other } => Ok(confirmed && other),
+            _ => Err(PairingTampered.into()),
+        }
     }
 
     /// Closes at once. Bytes still in flight may be lost; after a final send use [`Session::finish`].
@@ -546,17 +873,6 @@ pub fn new_fling_id() -> vutric_core::FlingId {
 #[must_use]
 pub fn micros_since(start: Instant) -> u64 {
     u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX)
-}
-
-fn is_lan(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => v4.is_private() || v4.is_link_local(),
-        // Unique local (fc00::/7) and link local (fe80::/10) only: a global address would leave the LAN.
-        IpAddr::V6(v6) => {
-            let first = v6.segments()[0];
-            (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
-        }
-    }
 }
 
 fn clip(s: &str, max_bytes: usize) -> String {

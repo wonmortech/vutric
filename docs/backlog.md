@@ -36,10 +36,10 @@ Sources:
 | # | Route | Phase | Status |
 |---|---|---|---|
 | R0 | Same network + internet direct/relay (n0) | 0.2 | [x] |
-| R1 | Stronger LAN finding:<br>• every address in the QR: link-local IPv6, 169.254, tethering subnets<br>• unicast probe<br>• opt-in subnet scan<br>• LocalSend-style multicast inside `224.0.0.0/24`<br>• iOS `localNetworkDenied` detection, with a screen that explains it<br>• AP-isolation detection: internet works, no peer answers | 1 | [ ] |
-| R1a | Captive-portal and guest-Wi-Fi message: "this network keeps devices apart", then offer R2/R3 | TM §2.5 | [ ] |
-| R2 | Our own `iroh-relay`: ACME TLS, rate limit, on a Vutric domain; n0 only as fallback; route badge and live speed; publish what the relay operator can see (Syncthing lesson) | 1 (Phase 1 does not ship on n0) | [ ] |
-| R3 | Hotspot:<br>• Android LocalOnlyHotspot; the QR carries SSID, password and ticket<br>• iPhone joins with `NEHotspotConfiguration`<br>• Windows, Linux and macOS join<br>• a Windows host through `NetworkOperatorTetheringManager`<br>• fallback for MIUI/HarmonyOS without LOHS<br>• iOS may fall back to a saved network | 1–3 | [ ] |
+| R1 | Stronger LAN finding:<br>• every address in the QR: link-local IPv6, 169.254, tethering subnets<br>• unicast probe<br>• opt-in subnet scan<br>• LocalSend-style multicast inside `224.0.0.0/24`<br>• iOS `localNetworkDenied` detection, with a screen that explains it<br>• AP-isolation detection: internet works, no peer answers | 1 | [~] ADR-0052, `lan.rs`, `beacon.rs`, tests `beacon_unicast.rs`; QR now ranks Wi-Fi before virtual adapters (measured); real AP-isolated network and iOS denial still to check |
+| R1a | Captive-portal and guest-Wi-Fi message: "this network keeps devices apart", then offer R2/R3 | TM §2.5 | [~] API: `lan::diagnose` -> `Unreachable` + `key()` + `next_routes()`; screens are W1/W2 |
+| R2 | Our own `iroh-relay`: ACME TLS, rate limit, on a Vutric domain; n0 only as fallback; route badge and live speed; publish what the relay operator can see (Syncthing lesson) | 1 (Phase 1 does not ship on n0) | [~] ADR-0053, `crates/vutric-relay`, `docs/relay.md`, `Relays` + `Peer::bind_with`, `Session::relay_url` / `traffic` + `Speed`; test `relay_path.rs`; production domain and server wait for the owner |
+| R3 | Hotspot:<br>• Android LocalOnlyHotspot; the QR carries SSID, password and ticket<br>• iPhone joins with `NEHotspotConfiguration`<br>• Windows, Linux and macOS join<br>• a Windows host through `NetworkOperatorTetheringManager`<br>• fallback for MIUI/HarmonyOS without LOHS<br>• iOS may fall back to a saved network | 1–3 | [~] Core: ADR-0058, `vutric_core::hotspot` (link keys, `WIFI:` QR, checks), tests in `hotspot.rs`, fuzz `pairing_ticket`; opening/joining the hotspot is W1 (`LinkManager`, I5) and W2 (Windows), real devices left |
 | R4 | BLE for finding and handshake only: rotating IDs (never contact hashes); carries the ticket and hotspot keys; wake-up; ≤ 64 KB payloads | 1–3 | [ ] |
 | R5 | USB cable: Android ADB reverse / tethering / AOA; iPhone usbmuxd (peertalk), after an App Review check | 1–3 | [ ] |
 | R5a | Ethernet / Thunderbolt / USB4 cable between two computers (link-local IPv6 + mDNS) | 1–2 | [ ] |
@@ -49,35 +49,36 @@ Sources:
 | R9 | Animated QR (libcimbar, ≤ 33 MB, ~106 KB/s); TXQR as a lighter option | opt-in | [ ] |
 | R9a | Pairing code by sound (ggwave, 8–16 B/s), code only | idea | [ ] |
 | R10 | iPhone ⇄ Android Wi-Fi Aware, re-checked every quarter | watched | [ ] |
-| Rx | "Avtomatik" order: same network → internet direct → our relay → offer hotspot, Aware or cable; plus a route picker (Avtomatik, Faqat shu tarmoq, Internet orqali, Tarmoqsiz, Bluetooth) | ADR-0006 §2 | [ ] |
+| Rx | "Avtomatik" order: same network → internet direct → our relay → offer hotspot, Aware or cable; plus a route picker (Avtomatik, Faqat shu tarmoq, Internet orqali, Tarmoqsiz, Bluetooth) | ADR-0006 §2 | [x] engine: ADR-0060, `vutric_core::route` (`Picker::plan`, `Badge`), `Settings.route`, `Reach::for_picker`, `Session::badge`; tests `route.rs`, `lan::tests::badges_follow_the_link`, `tests/route_badge.rs`. Picker screens are W1/W2; Bluetooth answers `NotBuilt` until R4 |
 | Rb | Big files: consider `iroh-blobs` for verified streaming; never push 10–100 GB through the relay | TM §2.6 | [ ] |
+| R11 | (W3) Connect without the QR: typed IPv4 address or 8-character short code, resolved through the beacon, always confirmed with the 6-digit code (#9) | 1 | [~] ADR-0059, `vutric_core::code`, `vutric_net::find`, tests `find_typed.rs`, `code.rs`; the code over multicast on a real LAN is left (multicast does not loop back on one host) |
 | Rn | Not built, on purpose: Bluetooth Classic, NFC P2P, LoRa, bulk data over ultrasound | ADR-0007 | — |
 
 ## 2. Other apps' protocols (ADR-0010)
 
 | # | Adapter | Phase | Status |
 |---|---|---|---|
-| C1 | LocalSend v2.1, send and receive: desktop, Android; iOS in 3; macOS in 5 | 1 | [ ] |
-| C2 | Browser page, no app needed, upload and download (LocalSend "Web share" / qrcp) | 1 | [ ] |
-| C3 | Quick Share LAN mode (NearDrop `PROTOCOL.md`): Windows 1, Linux 2, macOS 5; labelled "eksperimental" until it has survived 2 Quick Share releases | 1/2/5 | [ ] |
-| C4 | KDE Connect v8, share plugin: desktop, Android | 2 | [ ] |
+| C1 | LocalSend v2.1 (now v2.2, re-read 2026-11-18), send and receive: desktop, Android; iOS in 3; macOS in 5. Built in `crates/vutric-compat-localsend` (ADR-0054); real-app test waits for M5 | 1 | [~] |
+| C2 | Browser page, no app needed, upload and download (LocalSend "Web share" / qrcp). Built on the LocalSend receiver (ADR-0055), checked in real Chromium; real phones wait for M5 | 1 | [~] |
+| C3 | Quick Share LAN mode (NearDrop `PROTOCOL.md`): Windows 1, Linux 2, macOS 5; labelled "eksperimental" until it has survived 2 Quick Share releases. Receiver built in `crates/vutric-compat-quickshare` (ADR-0056); real Android test waits for M5; sending to Android needs the BLE wake-up (W2) | 1/2/5 | [~] |
+| C4 | KDE Connect v8, share plugin: desktop, Android. Built in `crates/vutric-compat-kdeconnect`, hosted in `vutric-compat` (ADR-0062); tests `tests/interop.rs`, `roundtrip.rs::kdeconnect_through_the_sandboxed_process`, fuzz `kdeconnect_packet`; real KDE Connect (Linux, Android) test waits for M5 | 2 | [~] |
 | C5 | Warpinator (gRPC, group code) | 2 | [ ] |
 | C6 | croc (PAKE, relay) | 2 | [ ] |
 | C7 | magic-wormhole (mailbox + transit) | 2 | [ ] |
 | C8 | Adapter rules:<br>• clean-room code, no GPL copying<br>• foreign peers are always asked about unless pinned<br>• visible only in receive mode; "everyone" ends after 10 min<br>• sandboxed process for pre-auth parsing<br>• fuzzer per adapter<br>• real-app interop test per adapter<br>• protocol version re-read before writing the adapter | 1+ | [ ] |
-| C9 | Settings `compat.*`: per-adapter `enabled` (LocalSend and browser on by default) and `pinned` | 1 | [ ] |
+| C9 | Settings `compat.*`: per-adapter `enabled` (LocalSend and browser on by default) and `pinned`: `vutric_core::storage::Compat` (ADR-0054) | 1 | [x] |
 | Cn | Not possible: AirDrop, Continuity, Samsung/Huawei/Mi Share, Xender/SHAREit/Zapya/Send Anywhere/Blip/Feem, Phone Link, Nearby Sharing (ADR-0010 §2) | — | — |
 
 ## 3. Security (ADR-0005, ADR-0007 §2, report 0.2, TM §3)
 
 | # | Item | Phase | Status |
 |---|---|---|---|
-| S1 | Trust store of paired keys: an unknown device needs an explicit OK | 1 | [ ] |
-| S2 | Commit-then-reveal numeric comparison before mDNS pairing is offered (today the 6 digits are shown, not confirmed) | 1 | [ ] |
-| S3 | Default: only trusted devices can send; "everyone" switches off after 10 min | 1 | [ ] |
-| S4 | Fuzz the framing and the `Offer` parser in CI (protocol-aware) | 1 | [ ] |
-| S5 | Every route: bounded fixed frames before auth, same encryption for every frame type, 6-digit TLS-exporter code | all | [ ] |
-| S6 | Privacy line on screen A1: "Fayllar shifrlangan, faqat siz va qabul qiluvchi ko'radi"; the Lan-only setting brings back "Hech narsa internetga chiqmaydi" | 1 | [ ] |
+| S1 | Trust store of paired keys: an unknown device needs an explicit OK | 1 | [x] ADR-0050, `vutric_core::trust`, `vutric_net::trust`, `tests/trust_gate.rs` |
+| S2 | Commit-then-reveal numeric comparison before mDNS pairing is offered (today the 6 digits are shown, not confirmed) | 1 | [x] ADR-0050, `vutric_core::sas`, `Session::pair_code`/`pair_finish` |
+| S3 | Default: only trusted devices can send; "everyone" switches off after 10 min | 1 | [x] ADR-0050, `Visibility`, `Peer::accept_with` (UI toggles: W1/W2) |
+| S4 | Fuzz the framing and the `Offer` parser in CI (protocol-aware) | 1 | [x] ADR-0051, `fuzz/` (7 targets), `.github/workflows/fuzz.yml`; found 2 `sanitize` bugs |
+| S5 | Every route: bounded fixed frames before auth, same encryption for every frame type, 6-digit TLS-exporter code | all | [x] ADR-0061 audit of every route; Quick Share pre-auth frames capped at 16 KiB (`conn::tests::preauth_frames_are_small_until_the_gate_opens`); LocalSend and Quick Share have no 6-digit code by protocol (deviation in ADR-0061) |
+| S6 | Privacy line on screen A1: "Fayllar shifrlangan, faqat siz va qabul qiluvchi ko'radi"; the Lan-only setting brings back "Hech narsa internetga chiqmaydi" | 1 | [~] engine: `Picker::privacy_lines` (ADR-0061, test `privacy_line_only_promises_what_is_true`); the line on screen A1 is W1 |
 | S7 | The device name is never published to lookup | 0.2 | [x] |
 
 ## 4. Storage settings (ADR-0007 §4, ADR-0008)
@@ -85,14 +86,14 @@ Sources:
 | # | Item | Status |
 |---|---|---|
 | T1 | On the phone screen: accept mode, gallery + album + keep copy, split by type, subfolder, keep tree, conflicts | [~] |
-| T2 | Save folder of the user's choice: Android SAF (`SafStore`), iPhone Files bookmark, desktop folder dialog; a missing folder falls back to the default and tells the user once | [ ] |
-| T3 | Per-device overrides (`devices`) on the device detail screen | [ ] |
-| T4 | Free-space guard (refuse when < 1 GB would remain), checking app storage too on phones | [ ] |
-| T5 | After receiving: notification / open file / open folder / nothing | [ ] |
-| T6 | Unfinished parts kept 7 days (1–30, "delete now"); history 90 days | [ ] |
-| T7 | "Ask" option for name conflicts | [ ] |
+| T2 | Save folder of the user's choice: Android SAF (`SafStore`), iPhone Files bookmark, desktop folder dialog; a missing folder falls back to the default and tells the user once. Engine: fallback + told once (ADR-0057); `SaveRules.android_tree` keeps the SAF tree URI + label (#8, test `android_tree_is_kept_and_checked`); SAF/bookmark/dialog = W1/W2 | [~] |
+| T3 | Per-device overrides (`devices`) on the device detail screen. Engine: `DeviceRules`, `rules_for`, `set_device_rules` with id check and cap (ADR-0063, test `device_rules_are_checked_and_bounded`); the screen is W1/W2 | [~] |
+| T4 | Free-space guard (refuse when < 1 GB would remain), checking app storage too on phones. Engine: guard checks target and app storage (ADR-0057) | [~] |
+| T5 | After receiving: notification / open file / open folder / nothing. Engine: `After::action` (ADR-0057); hosts carry it out | [~] |
+| T6 | Unfinished parts kept 7 days (1–30, "delete now"); history 90 days. Engine: `disk::sweep_parts` (ADR-0057); hosts schedule it, history expiry with the history store | [~] |
+| T7 | "Ask" option for name conflicts. Engine: `Conflict::Ask` + `SaveTo.ask` (ADR-0057); screens = W1/W2 | [~] |
 | T8 | Desktop settings window with the same groups in the same order | [ ] |
-| T9 | Versioned schema with migrations from the first release | [~] (`version` field exists) |
+| T9 | Versioned schema with migrations from the first release. Bump rule and one migrate step per version; saving over a newer file keeps its unknown fields and version (ADR-0063, tests `a_newer_file_keeps_what_we_do_not_know`, `round_trip_damaged_and_missing`, `migrate_clamps`) | [x] |
 
 ## 5. Desktop (roadmap Phase 1–2, ADR-0009 §4, ST §3–5)
 
@@ -163,8 +164,8 @@ Sources:
 | F13 | Notifications mirrored to the PC (KDE Connect, Phone Link) | A12 | [ ] |
 | F14 | Ring my phone (KDE Connect) | Kotlin + Swift module, after Phase 1 | [ ] |
 | F15 | Phone as a mouse for the PC (KDE Connect) | Flutter + daemon input, later | [ ] |
-| F16 | Receive with no app, from a browser link (LocalSend, PairDrop) | C2 | [ ] |
-| F17 | LocalSend compatibility | C1 | [ ] |
+| F16 | Receive with no app, from a browser link (LocalSend, PairDrop) | C2 | [~] |
+| F17 | LocalSend compatibility | C1 | [~] |
 | F18 | "Wow" throw effect (Canopy Portal, Mac only) | overlay | [x] Windows |
 | F19 | Simple first screen with no setup (LocalSend lesson) | A1, A2 | [~] |
 

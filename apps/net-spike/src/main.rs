@@ -364,6 +364,34 @@ async fn fling_photo(s: &mut Session, path: &Path, count: u32) -> Result<()> {
     Ok(())
 }
 
+/// `lan`: this machine's ranked addresses, the QR hints, and who answers a beacon query (R1 field check).
+async fn lan_report(peer: &Peer) -> Result<()> {
+    let t0 = Instant::now();
+    let locals = vutric_net::lan::local_addrs();
+    println!("local addresses ({} in {:?}):", locals.len(), t0.elapsed());
+    for l in &locals {
+        println!(
+            "  {:<8?} {:<40} /{:<3} if{} {}",
+            l.medium, l.ip, l.prefix, l.iface, l.iface_name
+        );
+    }
+    let t = peer.ticket();
+    println!("QR hints ({}):", t.addrs.len());
+    for h in &t.addrs {
+        println!("  {h}");
+    }
+    let quic = t.addrs.first().map_or(0, std::net::SocketAddr::port);
+    let beacon = vutric_net::beacon::BeaconService::start(peer.id(), quic, false)?;
+    let mut rx = beacon.subscribe();
+    beacon.query().await;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+    while let Ok(Ok(h)) = tokio::time::timeout_at(deadline, rx.recv()).await {
+        println!("heard {} at {} (phone {})", h.id, h.addr, h.phone);
+    }
+    println!("beacon health: {:?}", beacon.health());
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let a = parse()?;
@@ -380,6 +408,7 @@ async fn main() -> Result<()> {
     .await?;
     println!("{} ({:?}) id {}", a.name, platform(), peer.id());
     let result = match a.mode.as_str() {
+        "lan" => lan_report(&peer).await,
         "listen" => listen(&peer, &a).await,
         // Without a target, `fling` shows its QR code and throws at whoever connects (a phone that cannot be
         // found over mDNS, such as an iPhone).

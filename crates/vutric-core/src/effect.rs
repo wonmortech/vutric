@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 /// the phone".
 ///
 /// Wire values are explicit and stable: never renumber, only append.
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum EffectId {
@@ -38,6 +39,7 @@ impl EffectId {
 }
 
 /// The screen edge where flung items enter the desktop.
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SendZone {
     Left,

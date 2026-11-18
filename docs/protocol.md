@@ -16,13 +16,75 @@ vutric://pair?v=2&id=<64 hex endpoint id>&n=<percent-encoded device name>&a=<ip:
 ```
 
 - `v` must equal the protocol version; other versions are rejected, not guessed.
-- `a` (optional, ≤ 8 entries) are LAN address hints for networks where mDNS/multicast is blocked.
+- `a` (optional, ≤ 8 entries) are LAN address hints for networks where mDNS/multicast is blocked, best first
+  (wired, Wi-Fi, tethering, other, virtual adapters last). A link-local IPv6 hint is written without a zone
+  (`[fe80::1]:4000`); the dialer tries it on each of its own interfaces ([ADR-0052](decisions/0052-lan-finding-beacon-and-diagnosis.md)).
 - `r` (optional) is the `https://` relay the device is reachable through from other networks.
 - The name is display-only: control characters are stripped and it is cut to 64 characters. It is never
   published to the lookup service.
+- `ws`, `wk`, `wp`, `wh` (optional, together) are a hotspot to join first: SSID, `wpa2`/`wpa3`/`open`,
+  passphrase (both percent-encoded) and `wh=1` for a hidden network
+  ([ADR-0058](decisions/0058-hotspot-in-the-pairing-link.md)). A half hotspot is an error; older apps ignore the
+  keys and pair as before.
 
-After the other device connects with the ticket, both sides store each other's endpoint id. Later connections are
-discovered via mDNS, or looked up by key, and authenticated by key.
+### Without the QR: typed address or short code ([ADR-0059](decisions/0059-connect-by-typed-address-or-code.md))
+
+Next to the QR the device shows its LAN address and a short code: the first 40 bits of its endpoint id in
+Crockford base32, `ABCD-EFGH` (`vutric_core::code::ShortCode`; typing forgives case, dashes, `O`/`0`, `I`/`L`/`1`).
+The other device sends beacon queries (unicast to a typed IPv4 address; multicast plus the opt-in scan for a code)
+and takes the first answer from that address, or whose id starts with the code. That answer is unauthenticated,
+so the connection must finish the 6-digit comparison below and is stored as `PairMethod::Code`, never `Ticket`.
+
+After the other device connects with the ticket, both sides store each other's endpoint id in their trust store
+(`PairMethod::Ticket`). Later connections are discovered via mDNS, or looked up by key, and authenticated by key.
+
+### Admission ([ADR-0050](decisions/0050-trust-store-and-pairing-code.md))
+
+A listener decides on every incoming connection as soon as QUIC has authenticated the peer's key, before it reads
+the control stream:
+
+| Visibility | Trusted key | Unknown key |
+|---|---|---|
+| `off` | refused | refused |
+| `trusted_only` (default) | admitted | refused |
+| `everyone(until)`, at most 10 min | admitted | admitted, every offer asked about |
+| `pairing(until)`, at most 10 min | admitted | admitted, to pair |
+
+A refused connection is closed with QUIC application error code `403` ("not trusted"); nothing the peer sent is
+parsed.
+
+### Pairing from the nearby list (no QR)
+
+Commit-then-reveal numeric comparison on the control stream, right after `Hello`. `x` = 32 bytes of TLS exporter
+output with label `EXPORTER-vutric/1 pairing sas` and an empty context; `a`, `b` are 32 random bytes.
+
+| Step | From | Message |
+|---|---|---|
+| 1 | dialer | `PairCommit { commit = BLAKE3-derive-key("vutric/1 2026-11-18 pairing commitment", x ‖ a) }` |
+| 2 | listener | `PairNonce { nonce = b }`, only after step 1 arrived |
+| 3 | dialer | `PairReveal { nonce = a }`; the listener checks it against the commitment |
+| 4 | both | show `code = u64_le(BLAKE3-derive-key("vutric/1 2026-11-18 pairing code", x ‖ a ‖ b)[..8]) mod 10^6`, six digits |
+| 5 | both | `PairResult { confirmed }`; the key is trusted (`PairMethod::Code`) only when both are `true` |
+
+Any other message in steps 1–3, or a reveal that does not open the commitment, aborts the pairing as tampered.
+
+### LAN beacon ([ADR-0052](decisions/0052-lan-finding-beacon-and-diagnosis.md))
+
+A UDP datagram of exactly 41 bytes, to `224.0.0.167:53319` (multicast) or to one host on port 53319 (probe,
+opt-in scan):
+
+| Bytes | Field |
+|---|---|
+| 0-3 | `VTRC` |
+| 4 | version, `1` |
+| 5 | kind: `0` announce ("I am here"), `1` query ("who is here?") |
+| 6-37 | endpoint id |
+| 38-39 | QUIC port, little-endian, never 0 |
+| 40 | flags: bit 0 phone; other bits 0 when sent, ignored when read |
+
+A visible device answers a query with a unicast announce to the sender, at most once per source per 500 ms. The
+address to dial is the datagram's source IP with the announced port; the key is then checked by QUIC as always.
+Any other datagram is dropped unread.
 
 ## Streams
 
@@ -48,6 +110,10 @@ detected from the header, before any allocation. Every decoded message is valida
 | `Offer { id, first, entries, total_files, total_bytes }` | sender | files on offer, ≤ 256 entries per message |
 | `OfferReply { id, accept, have }` | receiver | yes or no; `have[i]` = bytes of entry `i` already held |
 | `OfferDone { id, received, failed }` | receiver | one offer's files are in; `failed` = transfer-wide indices |
+| `PairCommit { commit }` | dialer | pairing step 1 (above) |
+| `PairNonce { nonce }` | listener | pairing step 2 |
+| `PairReveal { nonce }` | dialer | pairing step 3 |
+| `PairResult { confirmed }` | both | pairing step 5 |
 
 `gesture` = `{ speed (px/s ≥ 0), angle (rad, 0 = up, + = clockwise), exit_x (0..=1) }`. `preview` ≤ 96 KiB,
 longest side ≤ 512 px, JPEG/WebP/PNG.
