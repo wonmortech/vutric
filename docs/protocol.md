@@ -22,6 +22,10 @@ vutric://pair?v=2&id=<64 hex endpoint id>&n=<percent-encoded device name>&a=<ip:
 - `r` (optional) is the `https://` relay the device is reachable through from other networks.
 - The name is display-only: control characters are stripped and it is cut to 64 characters. It is never
   published to the lookup service.
+- `ws`, `wk`, `wp`, `wh` (optional, together) are a hotspot to join first: SSID, `wpa2`/`wpa3`/`open`,
+  passphrase (both percent-encoded) and `wh=1` for a hidden network
+  ([ADR-0058](decisions/0058-hotspot-in-the-pairing-link.md)). A half hotspot is an error; older apps ignore the
+  keys and pair as before.
 
 After the other device connects with the ticket, both sides store each other's endpoint id in their trust store
 (`PairMethod::Ticket`). Later connections are discovered via mDNS, or looked up by key, and authenticated by key.

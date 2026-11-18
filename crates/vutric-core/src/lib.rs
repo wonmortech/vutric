@@ -8,6 +8,7 @@ pub mod effect;
 pub mod error;
 pub mod filename;
 pub mod frame;
+pub mod hotspot;
 pub mod id;
 pub mod message;
 pub mod pairing;

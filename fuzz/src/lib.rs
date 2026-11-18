@@ -13,6 +13,7 @@ use std::path::{Component, Path, PathBuf};
 
 use arbitrary::{Arbitrary, Unstructured};
 use vutric_core::frame::{self, Decoder, MAX_FRAME_BYTES};
+use vutric_core::hotspot::{HotspotTicket, MAX_SSID_BYTES, Security, Wifi};
 use vutric_core::storage::{Arrival, Kind, SaveRules, Settings, Subfolder};
 use vutric_core::trust::TrustStore;
 use vutric_core::{Message, PairingTicket, filename};
@@ -79,9 +80,30 @@ pub fn pairing_ticket(data: &[u8]) {
     let Ok(text) = std::str::from_utf8(data) else {
         return;
     };
+    let wifi = Wifi::in_link(text).ok().flatten();
+    if let Some(w) = &wifi {
+        assert!((1..=MAX_SSID_BYTES).contains(&w.ssid().len()));
+        assert!(!w.ssid().chars().any(char::is_control));
+        assert_eq!(w.password().is_none(), w.security() == Security::Open);
+        let qr = w.to_wifi_qr();
+        assert!(qr.starts_with("WIFI:T:") && qr.ends_with(";;"));
+    }
     let Ok(t) = PairingTicket::parse(text) else {
         return;
     };
+    if let Some(wifi) = wifi {
+        let h = HotspotTicket {
+            pair: t.clone(),
+            wifi,
+        };
+        let uri = h.to_uri();
+        assert!(uri.is_ascii(), "hotspot QR payload must stay ASCII");
+        assert_eq!(
+            HotspotTicket::parse(&uri).expect("own hotspot link parses"),
+            h
+        );
+        assert_eq!(PairingTicket::parse(&uri).expect("old parser"), t);
+    }
     assert!(t.device_name.chars().count() <= 64);
     assert!(!t.device_name.chars().any(char::is_control));
     assert!(t.addrs.len() <= 8);
@@ -456,14 +478,17 @@ mod smoke {
     fn pairing_ticket_random_and_near_valid() {
         run(pairing_ticket, 512, 11);
         let ok = "vutric://pair?v=2&id=5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a&n=PC&a=192.168.1.2:4711&r=https%3A%2F%2Fr.example%2F";
-        pairing_ticket(ok.as_bytes());
+        let hotspot = format!("{ok}&ws=Vutric%20AB&wk=wpa2&wp=k%26y%3D12345&wh=1");
         let mut r = Rng(5);
-        for _ in 0..RUNS {
-            let mut v = ok.as_bytes().to_vec();
-            let i = (r.next() as usize) % v.len();
-            let pool = b"%&=,:.[]0aZ\x00\xff";
-            v[i] = pool[(r.next() as usize) % pool.len()];
-            pairing_ticket(&v);
+        for seed in [ok, hotspot.as_str()] {
+            pairing_ticket(seed.as_bytes());
+            for _ in 0..RUNS {
+                let mut v = seed.as_bytes().to_vec();
+                let i = (r.next() as usize) % v.len();
+                let pool = b"%&=,:.[]0aZ\x00\xff";
+                v[i] = pool[(r.next() as usize) % pool.len()];
+                pairing_ticket(&v);
+            }
         }
     }
 
