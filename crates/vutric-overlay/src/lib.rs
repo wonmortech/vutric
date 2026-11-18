@@ -4,6 +4,7 @@
 //! [`timeline::Frame`] into pixels with one scissored full-screen draw. Getting those pixels onto the desktop
 //! without stealing focus is the job of the platform host crates.
 
+pub mod card;
 pub mod palette;
 pub mod renderer;
 pub mod timeline;

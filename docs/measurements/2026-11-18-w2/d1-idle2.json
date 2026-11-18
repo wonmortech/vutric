@@ -1,0 +1,335 @@
+{
+ "status": "{\"kind\":\"status\",\"paused\":false,\"id\":\"1ba5b895a0c2cf8e7f36f5513c69baa0a61036a59d1136c35fc31ea2b1ce940c\",\"name\":\"XNOSIR\",\"online\":false,\"transfers\":0}",
+ "idle_samples": [
+  {
+   "t": 15.7,
+   "private_mb": 5.51,
+   "working_set_mb": 20.39,
+   "cpu_ms": 47,
+   "threads": 11
+  },
+  {
+   "t": 25.9,
+   "private_mb": 5.51,
+   "working_set_mb": 20.39,
+   "cpu_ms": 47,
+   "threads": 11
+  },
+  {
+   "t": 35.9,
+   "private_mb": 5.51,
+   "working_set_mb": 20.4,
+   "cpu_ms": 47,
+   "threads": 11
+  },
+  {
+   "t": 47.3,
+   "private_mb": 6.14,
+   "working_set_mb": 22.15,
+   "cpu_ms": 62,
+   "threads": 11
+  },
+  {
+   "t": 57.4,
+   "private_mb": 6.14,
+   "working_set_mb": 22.15,
+   "cpu_ms": 62,
+   "threads": 11
+  },
+  {
+   "t": 67.4,
+   "private_mb": 6.32,
+   "working_set_mb": 22.31,
+   "cpu_ms": 78,
+   "threads": 8
+  },
+  {
+   "t": 77.4,
+   "private_mb": 6.43,
+   "working_set_mb": 22.27,
+   "cpu_ms": 78,
+   "threads": 8
+  },
+  {
+   "t": 87.4,
+   "private_mb": 6.43,
+   "working_set_mb": 22.27,
+   "cpu_ms": 78,
+   "threads": 8
+  },
+  {
+   "t": 97.4,
+   "private_mb": 6.31,
+   "working_set_mb": 22.34,
+   "cpu_ms": 78,
+   "threads": 8
+  },
+  {
+   "t": 107.4,
+   "private_mb": 6.31,
+   "working_set_mb": 20.72,
+   "cpu_ms": 78,
+   "threads": 8
+  },
+  {
+   "t": 117.4,
+   "private_mb": 6.83,
+   "working_set_mb": 18.19,
+   "cpu_ms": 94,
+   "threads": 8
+  },
+  {
+   "t": 127.5,
+   "private_mb": 6.26,
+   "working_set_mb": 9.91,
+   "cpu_ms": 94,
+   "threads": 8
+  },
+  {
+   "t": 137.5,
+   "private_mb": 6.26,
+   "working_set_mb": 7.89,
+   "cpu_ms": 94,
+   "threads": 8
+  },
+  {
+   "t": 147.5,
+   "private_mb": 6.41,
+   "working_set_mb": 1.71,
+   "cpu_ms": 109,
+   "threads": 6
+  },
+  {
+   "t": 157.5,
+   "private_mb": 6.41,
+   "working_set_mb": 1.8,
+   "cpu_ms": 109,
+   "threads": 6
+  },
+  {
+   "t": 167.5,
+   "private_mb": 6.17,
+   "working_set_mb": 7.51,
+   "cpu_ms": 141,
+   "threads": 8
+  },
+  {
+   "t": 177.5,
+   "private_mb": 6.17,
+   "working_set_mb": 7.51,
+   "cpu_ms": 141,
+   "threads": 8
+  },
+  {
+   "t": 187.5,
+   "private_mb": 6.11,
+   "working_set_mb": 8.27,
+   "cpu_ms": 141,
+   "threads": 8
+  },
+  {
+   "t": 197.6,
+   "private_mb": 6.11,
+   "working_set_mb": 8.47,
+   "cpu_ms": 141,
+   "threads": 8
+  },
+  {
+   "t": 207.6,
+   "private_mb": 6.11,
+   "working_set_mb": 8.47,
+   "cpu_ms": 141,
+   "threads": 8
+  },
+  {
+   "t": 217.6,
+   "private_mb": 6.3,
+   "working_set_mb": 8.64,
+   "cpu_ms": 172,
+   "threads": 8
+  },
+  {
+   "t": 227.6,
+   "private_mb": 6.3,
+   "working_set_mb": 8.64,
+   "cpu_ms": 172,
+   "threads": 8
+  },
+  {
+   "t": 237.6,
+   "private_mb": 6.3,
+   "working_set_mb": 8.64,
+   "cpu_ms": 188,
+   "threads": 8
+  },
+  {
+   "t": 247.6,
+   "private_mb": 6.09,
+   "working_set_mb": 8.52,
+   "cpu_ms": 219,
+   "threads": 8
+  },
+  {
+   "t": 257.6,
+   "private_mb": 5.83,
+   "working_set_mb": 8.36,
+   "cpu_ms": 219,
+   "threads": 8
+  },
+  {
+   "t": 267.6,
+   "private_mb": 6.01,
+   "working_set_mb": 8.51,
+   "cpu_ms": 219,
+   "threads": 8
+  },
+  {
+   "t": 277.6,
+   "private_mb": 5.95,
+   "working_set_mb": 8.54,
+   "cpu_ms": 219,
+   "threads": 6
+  },
+  {
+   "t": 287.6,
+   "private_mb": 6.55,
+   "working_set_mb": 9.23,
+   "cpu_ms": 266,
+   "threads": 6
+  },
+  {
+   "t": 297.7,
+   "private_mb": 6.44,
+   "working_set_mb": 8.88,
+   "cpu_ms": 266,
+   "threads": 6
+  }
+ ],
+ "idle_avg_private_mb": 6.27,
+ "idle_max_private_mb": 6.83,
+ "idle_avg_working_set_mb": 11.15,
+ "idle_cpu_ms_per_min": 49,
+ "before_effect": {
+  "t": 307.7,
+  "private_mb": 6.52,
+  "working_set_mb": 9.38,
+  "cpu_ms": 281,
+  "threads": 8
+ },
+ "during_effect": [
+  {
+   "t": 309,
+   "private_mb": 128.14,
+   "working_set_mb": 140.38,
+   "cpu_ms": 500,
+   "threads": 13
+  },
+  {
+   "t": 309.2,
+   "private_mb": 128.14,
+   "working_set_mb": 140.38,
+   "cpu_ms": 516,
+   "threads": 13
+  },
+  {
+   "t": 309.5,
+   "private_mb": 128.14,
+   "working_set_mb": 140.38,
+   "cpu_ms": 531,
+   "threads": 13
+  },
+  {
+   "t": 309.8,
+   "private_mb": 128.14,
+   "working_set_mb": 140.38,
+   "cpu_ms": 531,
+   "threads": 13
+  },
+  {
+   "t": 310,
+   "private_mb": 128.14,
+   "working_set_mb": 140.38,
+   "cpu_ms": 531,
+   "threads": 13
+  },
+  {
+   "t": 310.3,
+   "private_mb": 128.14,
+   "working_set_mb": 140.38,
+   "cpu_ms": 562,
+   "threads": 13
+  },
+  {
+   "t": 310.6,
+   "private_mb": 128.14,
+   "working_set_mb": 140.38,
+   "cpu_ms": 625,
+   "threads": 13
+  },
+  {
+   "t": 310.8,
+   "private_mb": 128.14,
+   "working_set_mb": 140.38,
+   "cpu_ms": 672,
+   "threads": 13
+  },
+  {
+   "t": 311.1,
+   "private_mb": 128.15,
+   "working_set_mb": 140.4,
+   "cpu_ms": 719,
+   "threads": 13
+  },
+  {
+   "t": 311.4,
+   "private_mb": 128.15,
+   "working_set_mb": 140.4,
+   "cpu_ms": 719,
+   "threads": 13
+  },
+  {
+   "t": 311.6,
+   "private_mb": 128.15,
+   "working_set_mb": 140.4,
+   "cpu_ms": 719,
+   "threads": 13
+  },
+  {
+   "t": 311.9,
+   "private_mb": 128.15,
+   "working_set_mb": 140.4,
+   "cpu_ms": 719,
+   "threads": 13
+  }
+ ],
+ "after_effect_5s": {
+  "t": 316.9,
+  "private_mb": 127.67,
+  "working_set_mb": 141.83,
+  "cpu_ms": 781,
+  "threads": 13
+ },
+ "after_gpu_release": {
+  "t": 356.9,
+  "private_mb": 14.79,
+  "working_set_mb": 27.07,
+  "cpu_ms": 844,
+  "threads": 13
+ },
+ "with_pair_card": {
+  "t": 360.9,
+  "private_mb": 16.35,
+  "working_set_mb": 29.75,
+  "cpu_ms": 875,
+  "threads": 13
+ },
+ "preview_reply": "{\"kind\":\"ok\"}",
+ "show_reply": "{\"kind\":\"ok\"}",
+ "quit_reply": "{\"kind\":\"ok\"}",
+ "exit_ms": 1045,
+ "trace": [
+  "1794972945712 gpu ready in 416.2 ms",
+  "1794972978711 gpu released",
+  "1794972994525 card shown in 16.70 ms"
+ ]
+}
