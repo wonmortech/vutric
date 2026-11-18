@@ -41,6 +41,10 @@ The stable smoke run found two real bugs in `vutric_core::filename::sanitize`, b
 2. `com1 .tar.gz` was not treated as the COM1 device; Win32 ignores spaces before the dot. The reserved list now
    also has `COM0`, `LPT0`, `COM¹–³`, `LPT¹–³`, `CONIN$` and `CONOUT$`.
 
+The first libFuzzer run in CI (run 44214498931, 26 s) found a third: a reserved device name whose stem was
+already cut to 120 characters got its `_` prefix on top, one character over the limit. The prefix now replaces
+the last character. The input is kept in `fuzz/regressions/` and replayed by the smoke run.
+
 ## Consequences
 
 - `vutric-core` gains an optional `arbitrary` feature; default builds and W1/W2 are unaffected.

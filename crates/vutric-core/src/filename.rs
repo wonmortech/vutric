@@ -77,6 +77,14 @@ pub fn sanitize(name: &str) -> String {
         .trim_end()
         .to_ascii_uppercase();
     if WINDOWS_RESERVED.contains(&device.as_str()) {
+        // The prefix must not push a stem already cut to the limit over it (found by libFuzzer in CI).
+        if stem.chars().count() >= MAX_STEM_CHARS {
+            stem.pop();
+            let kept = stem
+                .trim_end_matches(|c: char| c == '.' || c.is_whitespace())
+                .len();
+            stem.truncate(kept);
+        }
         stem.insert(0, '_');
     }
 
@@ -169,6 +177,13 @@ mod tests {
         let long = format!("{}.{}", "a".repeat(500), "b".repeat(50));
         let out = sanitize(&long);
         assert_eq!(out.chars().count(), MAX_STEM_CHARS + 1 + MAX_EXT_CHARS);
+        // A device name at the limit keeps the limit after its `_` prefix.
+        let dev = format!("LPT3.{}.{}", "x".repeat(200), "b".repeat(50));
+        let out = sanitize(&dev);
+        assert!(out.starts_with("_LPT3."), "{out}");
+        assert_eq!(out.chars().count(), MAX_STEM_CHARS + 1 + MAX_EXT_CHARS);
+        let dev_dot = format!("CON{}.{}", ".".repeat(1) + &"y".repeat(115) + " .z", "b");
+        assert!(sanitize(&dev_dot).chars().count() <= MAX_STEM_CHARS + 1 + MAX_EXT_CHARS);
     }
 
     #[test]

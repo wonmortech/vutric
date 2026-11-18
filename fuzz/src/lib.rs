@@ -364,6 +364,8 @@ mod smoke {
         filename(format!("{}x.png", " .".repeat(80)).as_bytes());
         filename(b"CON .txt");
         filename(b"com1 .tar.gz");
+        // libFuzzer, CI run 44214498931: a device name cut to the stem limit, then prefixed with `_`.
+        filename(include_bytes!("../regressions/filename-device-at-limit.bin"));
         filename(format!("{} .jpg", "a".repeat(119)).as_bytes());
     }
 
