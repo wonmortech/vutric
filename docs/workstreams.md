@@ -134,6 +134,9 @@ done. An open question for the owner never blocks a stream. It goes into
 4. Swift Share extension "Vutric bilan yuborish" and a Finder Quick Action; Local Network and Bonjour notes.
 5. `packaging/macos/`: `.dmg`, signed and notarised once the Apple Developer secrets exist, unsigned until then.
 6. A real-Mac checklist (Intel and Apple silicon, macOS 15 and 26); nothing is `[x]` without a real Mac.
+7. Round 2 (PR #34): `CADisplayLink` pacing for ProMotion (ADR-0114), text and links in the Share menu plus the
+   Finder Quick Action (ADR-0115), the icon drawn from the brand mark (ADR-0116), foreground LocalSend / Quick
+   Share through the `vutric-mac-compat` bridge until the daemon runs on macOS (ADR-0117).
 
 ## When a stream is "done"
 

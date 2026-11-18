@@ -103,7 +103,7 @@ fi
 if [[ -f $ROOT/crates/vutric-daemon/Cargo.toml ]]; then
   rust_universal vutric-daemon vutric-daemon
 else
-  echo "::notice title=No daemon in this build::crates/vutric-daemon is not on this branch yet; Vutric.app ships the menu-bar agent and the Share extension only."
+  echo "::notice title=No daemon in this build::crates/vutric-daemon is not on this branch yet; Vutric.app ships the agent, its extensions and the LocalSend / Quick Share bridge, without the daemon."
 fi
 
 fill() {

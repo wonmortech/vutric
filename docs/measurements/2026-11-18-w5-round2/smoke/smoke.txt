@@ -1,0 +1,15 @@
+agent running: yes (pid 14102)
+     io.wonmor.vutric.share(0.0.1)	2BB3571A-3F21-4C5A-B48A-98F0D39D5105	2026-11-18 16:09:01 +0000	/Users/runner/Applications/Vutric.app/Contents/PlugIns/VutricShare.appex
+ (1 plug-in)
+share extension registered: yes
+     io.wonmor.vutric.quickaction(0.0.1)	98BA68FA-0A4E-471F-A1E7-5EF0FD68E851	2026-11-18 16:09:03 +0000	/Users/runner/Applications/Vutric.app/Contents/PlugIns/VutricQuickAction.appex
+ (1 plug-in)
+quick action registered: yes
+app icon: yes (  426683 bytes)
+services entry known to pbs: yes
+frontmost after vutric://send: Finder
+Vutric windows: 
+text question shown: see send-text-question.png
+agent quit: yes
+bridge exit: 0
+bridge ready: yes ({"kind":"ready","port":49203,"quickshare_port":49204})
