@@ -286,6 +286,12 @@ pub fn localsend_announce(data: &[u8]) {
         assert_ne!(info.port, Some(0));
     }
     if let Ok(q) = std::str::from_utf8(data) {
+        if let Some(r) = vutric_compat_localsend::web::route(q) {
+            use vutric_compat_localsend::web::Route;
+            let (Route::Page(t) | Route::List(t) | Route::File(t, _)) = r;
+            assert!(t.len() == 32 && t.bytes().all(|b| b.is_ascii_hexdigit()));
+            assert!(q.starts_with("/s/") && !q.contains(".."));
+        }
         let m = proto::query(q);
         assert!(m.len() <= 16);
         assert!(m.values().all(|v| v.chars().count() <= proto::MAX_TEXT));

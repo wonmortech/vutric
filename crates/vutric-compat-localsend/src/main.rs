@@ -73,27 +73,7 @@ async fn run(start: Start, input: &mut BufReader<tokio::io::Stdin>, out: Out) ->
         receiver.addr().port(),
     );
     let discovery = if start.multicast {
-        let (d, mut found) = Discovery::start(
-            if start.port == 0 { 0 } else { start.port },
-            &[],
-            us.clone(),
-            identity.clone(),
-        )?;
-        let out = out.clone();
-        tokio::spawn(async move {
-            while let Some(f) = found.recv().await {
-                let _ = out
-                    .send(FromAdapter::Seen {
-                        alias: f.info.alias,
-                        device_type: f.info.device_type,
-                        to: f.target.addr,
-                        https: f.target.https,
-                    })
-                    .await;
-            }
-        });
-        let _ = d.announce().await;
-        Some(d)
+        Some(start_discovery(start.port, us.clone(), identity.clone(), out.clone()).await?)
     } else {
         None
     };
@@ -142,6 +122,21 @@ async fn run(start: Start, input: &mut BufReader<tokio::io::Stdin>, out: Out) ->
                 paths,
                 pin,
             ),
+            ToAdapter::Share {
+                request_id,
+                paths,
+                ttl_secs,
+            } => {
+                let msg = match receiver.share(&paths, Duration::from_secs(ttl_secs)) {
+                    Ok(token) => FromAdapter::Shared { request_id, token },
+                    Err(e) => FromAdapter::ShareFailed {
+                        request_id,
+                        reason: format!("{e:#}"),
+                    },
+                };
+                out.send(msg).await?;
+            }
+            ToAdapter::Unshare { token } => receiver.unshare(&token),
             ToAdapter::Stop => break,
         }
     }
@@ -197,6 +192,7 @@ fn spawn_bridge(mut events: mpsc::Receiver<Event>, out: Out, pending: Pending) {
                 },
                 Event::Finished { session_id } => FromAdapter::Finished { session_id },
                 Event::Cancelled { session_id } => FromAdapter::Cancelled { session_id },
+                Event::Downloaded { token, name } => FromAdapter::Downloaded { token, name },
             };
             if out.send(msg).await.is_err() {
                 break;
@@ -230,4 +226,28 @@ fn spawn_send(
         };
         let _ = out.send(msg).await;
     });
+}
+
+/// Joins the multicast group, forwards devices seen, and announces us once.
+async fn start_discovery(
+    port: u16,
+    us: vutric_compat_localsend::proto::DeviceInfo,
+    identity: Identity,
+    out: Out,
+) -> Result<Discovery> {
+    let (d, mut found) = Discovery::start(port, &[], us, identity)?;
+    tokio::spawn(async move {
+        while let Some(f) = found.recv().await {
+            let _ = out
+                .send(FromAdapter::Seen {
+                    alias: f.info.alias,
+                    device_type: f.info.device_type,
+                    to: f.target.addr,
+                    https: f.target.https,
+                })
+                .await;
+        }
+    });
+    let _ = d.announce().await;
+    Ok(d)
 }

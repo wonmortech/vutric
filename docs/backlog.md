@@ -58,7 +58,7 @@ Sources:
 | # | Adapter | Phase | Status |
 |---|---|---|---|
 | C1 | LocalSend v2.1 (now v2.2, re-read 2026-11-18), send and receive: desktop, Android; iOS in 3; macOS in 5. Built in `crates/vutric-compat-localsend` (ADR-0054); real-app test waits for M5 | 1 | [~] |
-| C2 | Browser page, no app needed, upload and download (LocalSend "Web share" / qrcp) | 1 | [ ] |
+| C2 | Browser page, no app needed, upload and download (LocalSend "Web share" / qrcp). Built on the LocalSend receiver (ADR-0055), checked in real Chromium; real phones wait for M5 | 1 | [~] |
 | C3 | Quick Share LAN mode (NearDrop `PROTOCOL.md`): Windows 1, Linux 2, macOS 5; labelled "eksperimental" until it has survived 2 Quick Share releases | 1/2/5 | [ ] |
 | C4 | KDE Connect v8, share plugin: desktop, Android | 2 | [ ] |
 | C5 | Warpinator (gRPC, group code) | 2 | [ ] |
@@ -163,7 +163,7 @@ Sources:
 | F13 | Notifications mirrored to the PC (KDE Connect, Phone Link) | A12 | [ ] |
 | F14 | Ring my phone (KDE Connect) | Kotlin + Swift module, after Phase 1 | [ ] |
 | F15 | Phone as a mouse for the PC (KDE Connect) | Flutter + daemon input, later | [ ] |
-| F16 | Receive with no app, from a browser link (LocalSend, PairDrop) | C2 | [ ] |
+| F16 | Receive with no app, from a browser link (LocalSend, PairDrop) | C2 | [~] |
 | F17 | LocalSend compatibility | C1 | [~] |
 | F18 | "Wow" throw effect (Canopy Portal, Mac only) | overlay | [x] Windows |
 | F19 | Simple first screen with no setup (LocalSend lesson) | A1, A2 | [~] |

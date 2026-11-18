@@ -136,6 +136,28 @@ impl Adapter {
         .await
     }
 
+    /// Opens a browser link; the answer is [`FromAdapter::Shared`] or [`FromAdapter::ShareFailed`].
+    pub async fn share(
+        &mut self,
+        request_id: u64,
+        paths: Vec<PathBuf>,
+        ttl_secs: u64,
+    ) -> Result<()> {
+        self.tell(&ToAdapter::Share {
+            request_id,
+            paths,
+            ttl_secs,
+        })
+        .await
+    }
+
+    pub async fn unshare(&mut self, token: &str) -> Result<()> {
+        self.tell(&ToAdapter::Unshare {
+            token: token.to_owned(),
+        })
+        .await
+    }
+
     /// The staged file of a [`FromAdapter::Received`], if its path is acceptable.
     #[must_use]
     pub fn received_file(&self, path: &Path) -> Option<PathBuf> {

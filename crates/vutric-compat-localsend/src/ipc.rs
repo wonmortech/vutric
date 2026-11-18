@@ -46,6 +46,15 @@ pub enum ToAdapter {
         paths: Vec<PathBuf>,
         pin: Option<String>,
     },
+    /// Open a browser link (C2): download `paths` (none: upload only) for `ttl_secs`.
+    Share {
+        request_id: u64,
+        paths: Vec<PathBuf>,
+        ttl_secs: u64,
+    },
+    Unshare {
+        token: String,
+    },
     Stop,
 }
 
@@ -100,6 +109,19 @@ pub enum FromAdapter {
     SendFailed {
         request_id: u64,
         reason: String,
+    },
+    /// The page is at `https://<address>:<port>/s/<token>/`.
+    Shared {
+        request_id: u64,
+        token: String,
+    },
+    ShareFailed {
+        request_id: u64,
+        reason: String,
+    },
+    Downloaded {
+        token: String,
+        name: String,
     },
     Error {
         message: String,

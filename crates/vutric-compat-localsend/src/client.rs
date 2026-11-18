@@ -278,7 +278,7 @@ pub async fn send(
 }
 
 /// Streams a file as a request body, 256 KiB at a time.
-fn file_body(path: PathBuf) -> http_body_util::channel::Channel<Bytes, std::io::Error> {
+pub(crate) fn file_body(path: PathBuf) -> http_body_util::channel::Channel<Bytes, std::io::Error> {
     let (mut tx, body) = http_body_util::channel::Channel::new(4);
     tokio::spawn(async move {
         let mut f = match tokio::fs::File::open(&path).await {

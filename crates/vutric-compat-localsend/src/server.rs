@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context as _, Result};
 use bytes::Bytes;
 use http::{Method, Request, Response, StatusCode};
-use http_body_util::{BodyExt as _, Full, Limited};
+use http_body_util::{BodyExt as _, Either, Full, Limited};
 use hyper::body::Incoming;
 use hyper_util::rt::{TokioIo, TokioTimer};
 use sha2::{Digest as _, Sha256};
@@ -26,6 +26,7 @@ use tokio::sync::{Semaphore, mpsc, oneshot};
 
 use crate::proto::{self, DeviceInfo, DeviceType, FileMeta, Scheme};
 use crate::tls::{self, Identity};
+use crate::web;
 
 const API: &str = "/api/localsend/v2/";
 /// Most connections served at once.
@@ -90,6 +91,8 @@ pub enum Event {
     Finished { session_id: String },
     /// The sender cancelled; its partial files are deleted.
     Cancelled { session_id: String },
+    /// A browser started downloading a shared file (C2).
+    Downloaded { token: String, name: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -121,6 +124,8 @@ struct State {
     session: Mutex<Option<Session>>,
     preparing: AtomicBool,
     offers: Mutex<HashMap<IpAddr, (Instant, u32)>>,
+    /// Browser links by token (C2).
+    shares: Mutex<HashMap<String, web::Share>>,
     events: mpsc::Sender<Event>,
 }
 
@@ -129,6 +134,7 @@ struct State {
 pub struct Receiver {
     addr: SocketAddr,
     fingerprint: String,
+    st: Arc<State>,
     task: tokio::task::JoinHandle<()>,
 }
 
@@ -189,13 +195,15 @@ impl Receiver {
             session: Mutex::new(None),
             preparing: AtomicBool::new(false),
             offers: Mutex::new(HashMap::new()),
+            shares: Mutex::new(HashMap::new()),
             events: tx,
         });
-        let task = tokio::spawn(serve(listener, acceptor, st));
+        let task = tokio::spawn(serve(listener, acceptor, Arc::clone(&st)));
         Ok((
             Self {
                 addr,
                 fingerprint,
+                st,
                 task,
             },
             rx,
@@ -210,6 +218,30 @@ impl Receiver {
     #[must_use]
     pub fn fingerprint(&self) -> &str {
         &self.fingerprint
+    }
+
+    /// Opens a browser link to download `paths` (none: an upload-only page) for `ttl` (at most a day). Returns
+    /// the token; the page is at `https://<address>:<port>/s/<token>/`.
+    pub fn share(&self, paths: &[PathBuf], ttl: Duration) -> Result<String> {
+        let files = web::collect(paths)?;
+        let token = random_id();
+        let mut m = self.st.shares.lock().expect("shares lock");
+        let now = Instant::now();
+        m.retain(|_, s| s.until > now);
+        anyhow::ensure!(m.len() < web::MAX_SHARES, "too many open links");
+        m.insert(
+            token.clone(),
+            web::Share {
+                files,
+                until: now + ttl.min(web::MAX_TTL),
+            },
+        );
+        Ok(token)
+    }
+
+    /// Closes a browser link at once.
+    pub fn unshare(&self, token: &str) {
+        self.st.shares.lock().expect("shares lock").remove(token);
     }
 }
 
@@ -242,7 +274,7 @@ async fn serve(listener: TcpListener, acceptor: tokio_rustls::TlsAcceptor, st: A
             let svc = hyper::service::service_fn(move |req| {
                 let st = Arc::clone(&st);
                 let cert = cert.clone();
-                async move { Ok::<_, std::convert::Infallible>(handle(req, &st, ip, cert).await) }
+                async move { Ok::<_, std::convert::Infallible>(dispatch(req, &st, ip, cert).await) }
             });
             let _ = hyper::server::conn::http1::Builder::new()
                 .timer(TokioTimer::new())
@@ -250,6 +282,49 @@ async fn serve(listener: TcpListener, acceptor: tokio_rustls::TlsAcceptor, st: A
                 .serve_connection(TokioIo::new(tls), svc)
                 .await;
         });
+    }
+}
+
+/// The browser page (`/s/...`) or the `LocalSend` API.
+async fn dispatch(
+    req: Request<Incoming>,
+    st: &Arc<State>,
+    ip: IpAddr,
+    cert: Option<String>,
+) -> Response<web::Body> {
+    if req.uri().path().starts_with("/s/") {
+        return browser(&req, st);
+    }
+    handle(req, st, ip, cert).await.map(Either::Left)
+}
+
+fn browser(req: &Request<Incoming>, st: &State) -> Response<web::Body> {
+    let Some(route) = web::route(req.uri().path()).filter(|_| web::method_ok(req.method())) else {
+        return web::not_found();
+    };
+    let token = match route {
+        web::Route::Page(t) | web::Route::List(t) | web::Route::File(t, _) => t,
+    };
+    let share = {
+        let m = st.shares.lock().expect("shares lock");
+        match m.get(token) {
+            Some(s) if s.until > Instant::now() => s.clone(),
+            _ => return web::not_found(),
+        }
+    };
+    match route {
+        web::Route::Page(_) => web::page(&random_id()),
+        web::Route::List(_) => web::list(&share, &st.info.alias),
+        web::Route::File(_, n) => match share.files.get(n) {
+            Some(f) => {
+                let _ = st.events.try_send(Event::Downloaded {
+                    token: token.to_owned(),
+                    name: f.name.clone(),
+                });
+                web::file(f)
+            }
+            None => web::not_found(),
+        },
     }
 }
 
