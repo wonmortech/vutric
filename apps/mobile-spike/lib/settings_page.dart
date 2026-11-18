@@ -3,9 +3,11 @@
 // the theme and the name are UI-only and live in Session (ADR-0011).
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 
+import 'android.dart';
 import 'design/themes.g.dart';
 import 'design/tokens.dart';
 import 'design/widgets.dart';
@@ -75,6 +77,20 @@ class _SettingsPageState extends State<SettingsPage> {
     final v = _album.text.trim();
     final name = v.isEmpty ? 'Vutric' : v;
     if (name != _save(s)['album']) _set((s) => _save(s)['album'] = name);
+  }
+
+  Future<void> _pickFolder() async {
+    final old = _session.saveFolder;
+    final f = await AndroidBridge.instance.pickFolder();
+    if (f == null) return;
+    if (old != null && old.uri != f.uri) await AndroidBridge.instance.releaseFolder(old.uri);
+    await _session.setSaveFolder(f);
+  }
+
+  Future<void> _clearFolder() async {
+    final old = _session.saveFolder;
+    if (old != null) await AndroidBridge.instance.releaseFolder(old.uri);
+    await _session.setSaveFolder(null);
   }
 
   Future<void> _rename() async {
@@ -169,6 +185,24 @@ class _SettingsPageState extends State<SettingsPage> {
                 ],
               ),
               const _Header('Papkalar'),
+              if (Platform.isAndroid) ...[
+                VRowCard(
+                  icon: Icons.folder_open_rounded,
+                  title: _session.saveFolder == null ? 'Vutric papkasi' : _session.saveFolder!.label,
+                  subtitle: _session.saveFolder == null
+                      ? 'Istalgan papkani tanlash (SD karta, Download…)'
+                      : 'Qabul qilingan fayllar tekshirilgach shu yerga koʻchadi',
+                  onTap: _pickFolder,
+                  trailing: _session.saveFolder == null
+                      ? Icon(Icons.chevron_right_rounded, color: v.muted)
+                      : IconButton(
+                          tooltip: 'Vutric papkasiga qaytarish',
+                          icon: Icon(Icons.close_rounded, color: v.muted),
+                          onPressed: _clearFolder,
+                        ),
+                ),
+                const SizedBox(height: 10),
+              ],
               _Group(
                 children: [
                   _Switch(

@@ -2,6 +2,8 @@
 // the peer's name and address from its QR) and the waiting screen with this phone's own QR (S4-2).
 // Every path ends in Session.connect, so whichever tab started it, the whole app sees the same peer.
 
+import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
@@ -13,9 +15,10 @@ import '../design/widgets.dart';
 import '../session.dart';
 import '../src/rust/api.dart' as vutric;
 import '../ui.dart';
+import 'hotspot_page.dart';
 import 'scan_page.dart';
 
-enum ConnectWay { scan, find, wait }
+enum ConnectWay { scan, find, wait, hotspot }
 
 /// Asks how to connect (or uses [way]), runs it with the right screen, and returns the peer, or null.
 Future<vutric.Connected?> connectFlow(BuildContext context, {ConnectWay? way}) async {
@@ -37,6 +40,8 @@ Future<vutric.Connected?> connectFlow(BuildContext context, {ConnectWay? way}) a
       return _run(context, vutric.connectDiscovered);
     case ConnectWay.wait:
       return Navigator.of(context).push<vutric.Connected>(MaterialPageRoute(builder: (_) => const MyQrPage()));
+    case ConnectWay.hotspot:
+      return Navigator.of(context).push<vutric.Connected>(MaterialPageRoute(builder: (_) => const HotspotPage()));
   }
 }
 
@@ -89,6 +94,15 @@ class _WaySheet extends StatelessWidget {
               subtitle: 'Boshqa telefon yoki kompyuter sizga ulanadi',
               onTap: () => Navigator.pop(context, ConnectWay.wait),
             ),
+            if (Platform.isAndroid) ...[
+              const SizedBox(height: 10),
+              VRowCard(
+                icon: Icons.wifi_tethering_rounded,
+                title: 'Routersiz: telefon hotspoti',
+                subtitle: 'Wi-Fi ham, internet ham kerak emas',
+                onTap: () => Navigator.pop(context, ConnectWay.hotspot),
+              ),
+            ],
           ],
         ),
       ),
@@ -347,10 +361,27 @@ class _MyQrPageState extends State<MyQrPage> {
   bool _closing = false;
   String? _error;
 
+  /// The link gains the relay and new addresses (Wi-Fi switch, hotspot) while the page is open: keep the QR fresh.
+  Timer? _refresh;
+
   @override
   void initState() {
     super.initState();
+    Session.instance.addListener(_changed);
+    Session.instance.refreshLink();
+    _refresh = Timer.periodic(const Duration(seconds: 4), (_) => Session.instance.refreshLink());
     _wait();
+  }
+
+  @override
+  void dispose() {
+    _refresh?.cancel();
+    Session.instance.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _wait() async {

@@ -116,6 +116,11 @@ class Session extends ChangeNotifier {
       if (await f.exists()) {
         final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
         themeId = j['theme'] as String? ?? autoTheme;
+        onboarded = j['onboarded'] == true;
+        final folder = j['folder'];
+        if (folder is Map && folder['uri'] is String) {
+          saveFolder = (uri: folder['uri'] as String, label: '${folder['label'] ?? ''}');
+        }
         final name = (j['name'] as String?)?.trim();
         if (name != null && name.isNotEmpty) deviceName = name;
       }
@@ -135,7 +140,53 @@ class Session extends ChangeNotifier {
 
   Future<void> _saveUi() async {
     final f = await _file('ui.json');
-    await f.writeAsString(jsonEncode({'theme': themeId, 'name': deviceName}), flush: true);
+    await f.writeAsString(
+      jsonEncode({
+        'theme': themeId,
+        'name': deviceName,
+        'onboarded': onboarded,
+        if (saveFolder != null) 'folder': {'uri': saveFolder!.uri, 'label': saveFolder!.label},
+      }),
+      flush: true,
+    );
+  }
+
+  /// Android: a folder picked through the system (SafStore) where received files go after they are checked.
+  /// TEMP until W3 #8 adds a SAF tree field to vutric-core's settings (its serde drops unknown keys); ADR-0012.
+  ({String uri, String label})? saveFolder;
+
+  Future<void> setSaveFolder(({String uri, String label})? folder) async {
+    saveFolder = folder;
+    notifyListeners();
+    await _saveUi();
+  }
+
+  /// Fetches this device's pairing link again (a new network, such as the phone's own hotspot, adds addresses).
+  Future<void> refreshLink() async {
+    try {
+      myLink = await vutric.currentLink();
+      notifyListeners();
+    } catch (_) {
+      // Not started yet: restart() fills it.
+    }
+  }
+
+  /// Runs once when the session ends (the hotspot it rode on closes, for example).
+  VoidCallback? onDisconnect;
+
+  void _ended() {
+    final f = onDisconnect;
+    onDisconnect = null;
+    f?.call();
+  }
+
+  /// The first-start screens were shown (ADR-0012); they never come back on their own.
+  bool onboarded = false;
+
+  Future<void> finishOnboarding() async {
+    onboarded = true;
+    notifyListeners();
+    await _saveUi();
   }
 
   Future<void> setTheme(String id) async {
@@ -193,6 +244,7 @@ class Session extends ChangeNotifier {
     if (peer == null) return;
     lostPeer = peer!.peerName;
     peer = null;
+    _ended();
     notifyListeners();
   }
 
@@ -286,6 +338,7 @@ class Session extends ChangeNotifier {
     await disconnectNow();
     peer = null;
     lostPeer = null;
+    _ended();
     notifyListeners();
   }
 }

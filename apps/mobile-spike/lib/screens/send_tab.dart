@@ -126,6 +126,19 @@ class SendTabState extends State<SendTab> {
 
   int get _count => _picked.length + _files.length;
 
+  /// Files shared into Vutric from another app: selected on the Fayllar tab, ready for "Yuborish".
+  void addFiles(List<String> paths, List<String> names) {
+    if (!mounted || paths.isEmpty) return;
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _tab = 1;
+      for (var i = 0; i < paths.length; i++) {
+        _files[paths[i]] = i < names.length ? names[i] : baseName(paths[i]);
+      }
+    });
+    _loadReceived();
+  }
+
   void _clear() => setState(() {
     _picked.clear();
     _files.clear();

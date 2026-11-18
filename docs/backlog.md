@@ -115,13 +115,13 @@ Sources:
 | # | Item | Status |
 |---|---|---|
 | A1 | Gallery-first home, multi-select, one send button | [x] |
-| A2 | Onboarding + permissions; QR scan with manual IP as fallback | [ ] |
-| A3 | `ShareEntry`: Share target and sharing shortcuts for paired devices | [ ] |
-| A4 | `TransferJob`: user-initiated data transfer job (14+), `dataSync` foreground service before that | [ ] |
-| A5 | `VutricTile`: Quick Settings "receive mode" | [ ] |
-| A6 | `LinkManager`: hotspot (1), Wi-Fi P2P and Aware (later) | [ ] |
-| A7 | `Nearby`: NSD + MulticastLock (1), BLE (R4) | [ ] |
-| A8 | `SafStore`: SAF folder and MediaStore move after verification | [ ] |
+| A2 | Onboarding + permissions; QR scan with manual IP as fallback | [~] |
+| A3 | `ShareEntry`: Share target and sharing shortcuts for paired devices | [~] |
+| A4 | `TransferJob`: user-initiated data transfer job (14+), `dataSync` foreground service before that | [x] |
+| A5 | `VutricTile`: Quick Settings "receive mode" | [x] |
+| A6 | `LinkManager`: hotspot (1), Wi-Fi P2P and Aware (later) | [~] |
+| A7 | `Nearby`: NSD + MulticastLock (1), BLE (R4) | [~] |
+| A8 | `SafStore`: SAF folder and MediaStore move after verification | [x] |
 | A9 | Fling screen: velocity threshold, spring back, haptic | [ ] |
 | A10 | History with progress and resend | [x] |
 | A11 | Receive: Halqa in the app when open, otherwise a heads-up notification with a thumbnail; no `SYSTEM_ALERT_WINDOW` | [ ] |

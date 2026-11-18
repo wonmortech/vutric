@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../android.dart';
 import '../design/tokens.dart';
 import '../design/widgets.dart';
 import '../session.dart';
@@ -126,6 +127,14 @@ Future<void> _offer(BuildContext context, vutric.FilesOffer offer) async {
   }
   final ok = r.filesTotal - r.failedNames.length;
   final inGallery = await saveMediaToGallery(r.saved);
+  // Android: the files that are still here (not moved into the gallery) go on to the folder the user picked.
+  var saved = r.saved.where((p) => File(p).existsSync()).toList();
+  var inFolder = 0;
+  final folder = s.saveFolder;
+  if (folder != null && saved.isNotEmpty && await AndroidBridge.instance.folderUsable(folder.uri)) {
+    inFolder = await AndroidBridge.instance.moveToFolder(folder.uri, saved);
+    saved = saved.where((p) => File(p).existsSync()).toList();
+  }
   Catches.instance
     ..files += ok
     ..update();
@@ -139,12 +148,15 @@ Future<void> _offer(BuildContext context, vutric.FilesOffer offer) async {
         seconds: r.seconds,
         at: DateTime.now(),
         names: [for (final p in r.saved.take(20)) baseName(p)],
-        paths: r.saved.take(200).toList(),
+        paths: saved.take(200).toList(),
       ),
     ),
   );
   if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(doneText(r, sending: false, inGallery: inGallery))));
+    final where = inFolder > 0 ? ' · $inFolder tasi “${folder!.label}” papkasida' : '';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(doneText(r, sending: false, inGallery: inGallery) + where)),
+    );
   }
 }
 

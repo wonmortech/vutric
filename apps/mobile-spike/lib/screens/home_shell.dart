@@ -2,9 +2,12 @@
 // it, and the shared top row (wordmark, this phone's name, settings). It also routes everything the other side
 // sends (photos, file offers) to the Qabul tab, whichever tab is open.
 
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../android.dart';
 import '../design/tokens.dart';
 import '../design/widgets.dart';
 import '../session.dart';
@@ -23,6 +26,8 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   final _s = Session.instance;
+  final _send = GlobalKey<SendTabState>();
+  StreamSubscription<AndroidEvent>? _android;
   int _tab = 0;
 
   @override
@@ -32,13 +37,38 @@ class _HomeShellState extends State<HomeShell> {
     _s.onIncoming = (next) => handleIncoming(context, next, () {
       if (mounted && _tab != 1) setState(() => _tab = 1);
     });
+    final bridge = AndroidBridge.instance;
+    _android = bridge.events.listen(_onAndroid);
+    bridge.takeStartEvent().then((e) {
+      if (e != null) _onAndroid(e);
+    });
   }
 
   @override
   void dispose() {
+    _android?.cancel();
     _s.removeListener(_changed);
     _s.onIncoming = null;
     super.dispose();
+  }
+
+  /// Files from another app's Share menu land in the Otish selection; the tile opens Qabul with this phone's QR.
+  Future<void> _onAndroid(AndroidEvent e) async {
+    if (!mounted) return;
+    switch (e) {
+      case SharedFiles(:final paths, :final names):
+        setState(() => _tab = 0);
+        await WidgetsBinding.instance.endOfFrame;
+        _send.currentState?.addFiles(paths, names);
+      case ReceiveTile():
+        setState(() => _tab = 1);
+        if (_s.peer != null) return;
+        // The node may still be starting after a cold start from the tile.
+        for (var i = 0; i < 40 && _s.myLink == null && _s.bootError == null; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 250));
+        }
+        if (mounted && _s.myLink != null) await connectFlow(context, way: ConnectWay.wait);
+    }
   }
 
   void _changed() {
@@ -144,7 +174,7 @@ class _HomeShellState extends State<HomeShell> {
             IndexedStack(
               index: _tab,
               children: [
-                SendTab(header: header),
+                SendTab(key: _send, header: header),
                 ReceiveTab(header: header),
                 HistoryTab(header: header),
               ],

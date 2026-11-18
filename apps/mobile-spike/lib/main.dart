@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'design/themes.g.dart';
 import 'design/tokens.dart';
 import 'screens/home_shell.dart';
+import 'screens/onboarding.dart';
 import 'session.dart';
 import 'src/rust/api.dart' as vutric;
 import 'src/rust/frb_generated.dart';
@@ -91,7 +92,7 @@ class _VutricAppState extends State<VutricApp> with WidgetsBindingObserver {
       debugShowCheckedModeBanner: false,
       theme: buildTheme(themeFor(_theme, platform)),
       themeAnimationDuration: const Duration(milliseconds: 260),
-      home: const HomeShell(),
+      home: _s.onboarded ? const HomeShell() : Onboarding(onDone: () => setState(() {})),
     );
   }
 }

@@ -12,6 +12,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'android.dart';
 import 'design/tokens.dart';
 import 'design/widgets.dart';
 import 'session.dart';
@@ -178,13 +179,23 @@ class _TransferSheetState extends State<_TransferSheet> {
   String? _error;
   bool _cancelled = false;
 
+  final _bridge = AndroidBridge.instance;
+
   @override
   void initState() {
     super.initState();
+    // Android: a foreground service keeps the process alive if the user leaves the app mid-transfer (A4).
+    _bridge.transferUpdate(widget.title, 'Javob kutilmoqda…', force: true);
     _sub = widget.stream.listen(
       (p) {
         if (!mounted) return;
         setState(() => _p = p);
+        final total = p.bytesTotal.toDouble();
+        _bridge.transferUpdate(
+          widget.title,
+          '${p.filesDone} / ${p.filesTotal} fayl · ${sizeText(p.bytesDone.toDouble())} / ${sizeText(total)}',
+          fraction: total > 0 ? p.bytesDone.toDouble() / total : null,
+        );
         if (p.done) Navigator.of(context).pop(p);
       },
       onError: (Object e) {
@@ -201,6 +212,7 @@ class _TransferSheetState extends State<_TransferSheet> {
   @override
   void dispose() {
     _sub?.cancel();
+    _bridge.transferStop();
     super.dispose();
   }
 
