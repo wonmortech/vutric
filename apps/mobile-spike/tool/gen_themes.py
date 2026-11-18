@@ -24,6 +24,20 @@ CONST = {
 }
 
 
+# Accessibility corrections on top of the handoff (ADR-0011, decision 14). Every text pair must reach WCAG AA (4.5:1);
+# test/pure_test.dart measures all 9 themes. The handoff file itself stays as the designer delivered it.
+AA = {
+    # White on Apple system blue is 4.0:1 (light) and 3.7:1 (dark). #0071E3 is Apple's own button blue on the web,
+    # 4.7:1 with white text.
+    ('ios', 'action'): '#0071E3', ('ios', 'accent'): '#0071E3',
+    ('ios-dark', 'action'): '#0071E3', ('ios-dark', 'accent'): '#0071E3',
+    # secondaryLabel at 60% is 3.3:1 on the grouped background; 76% is 5.0:1.
+    ('ios', 'muted'): 'rgba(60,60,67,.76)',
+    # White on #F43F6B is 3.6:1; one step deeper in the same pink is 4.7:1.
+    ('blush', 'accent'): '#D92B57',
+}
+
+
 def color(css):
     css = css.strip()
     m = re.fullmatch(r'#([0-9a-fA-F]{6})', css)
@@ -95,6 +109,9 @@ def main():
         if len(vals) != 26:
             sys.exit('%s: %d values' % (tid, len(vals)))
         v = dict(zip(NAMES, vals))
+        for (aid, key), val in AA.items():
+            if aid == tid:
+                v[key] = val
         outer, border, highlight = shadows(v['glassShadow'])
         font = v['font']
         family = ('VFont.system' if font == 'system' else 'VFont.geist' if font == 'geist'

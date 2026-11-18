@@ -32,6 +32,7 @@ reconciles the two and records how the design became Flutter code.
 | 11 | **Reduced motion** (`MediaQuery.disableAnimations`) replaces every throw, landing, pulse and scan sweep with a 200 ms fade or a still frame | Accessibility; a rule in the handoff | every screen, `context.reducedMotion` |
 | 12 | The latency measurement moved from the home screen into Sozlamalar → Texnik | A developer tool, not a user screen | `lib/screens/measure_page.dart` |
 | 13 | Renaming the device restarts the node, so the pairing link carries the new name. Renaming is off while connected | The name is in the link (`n=`) | `Session.restart()` |
+| 14 | **Every text pair reaches WCAG AA (4.5:1) in all 9 themes**, measured by `flutter test` in CI. Three handoff values failed: white on Apple system blue (iOS light 4.0, dark 3.7) → `#0071E3`, Apple's own web button blue (4.7); iOS secondary text at 60 % (3.3) → 76 % (5.0); Blush accent `#F43F6B` (3.6) → `#D92B57` (4.7). The corrections live in the generator's `AA` table; the handoff file is untouched, so a new design drop keeps them and the test flags any new failure | Readable for everyone; the look stays the theme's own (same hue, one step deeper) | `tool/gen_themes.py` (`AA`), `test/pure_test.dart` |
 
 Removed: `gallery_page.dart`, `fling_page.dart`, `catch_page.dart` (ported into the screens above), and the old
 colour constants in `ui.dart`.

@@ -55,3 +55,7 @@ jobs:
         run: |
           python3 tool/gen_themes.py
           git diff --exit-code -- lib/design/themes.g.dart
+
+      # Pure Dart logic plus WCAG AA contrast for every theme; needs neither Rust nor a device.
+      - name: Test
+        run: flutter test
