@@ -94,10 +94,12 @@ class Surface {
     _adopt(win) {
         if (!this._client || !this._client.owns_window(win))
             return;
-        if (win.get_wm_class() !== SURFACE_APP_ID && win.get_gtk_application_id?.() !== SURFACE_APP_ID) {
-            // Our process, but not the effect window: leave it alone (there is no other window today).
+        // Mutter creates the window at xdg_toplevel creation, before the client's set_app_id arrives, so the class
+        // is usually still empty here. The surface process has exactly one window; a known wrong class is the only
+        // reason to skip it.
+        const cls = win.get_wm_class();
+        if (cls && cls !== SURFACE_APP_ID)
             return;
-        }
         if (this._api.retype === 'window.set_type')
             win.set_type(Meta.WindowType.DOCK);
         else
@@ -108,7 +110,7 @@ class Surface {
             this._client.hide_from_window_list(win);
         win.make_above();
         win.stick();
-        console.log(`Vutric: surface window adopted (${this._api.spawn}, ${this._api.retype}, ${this._api.hide})`);
+        console.log(`Vutric: surface window adopted (${this._api.spawn}, ${this._api.retype}, ${this._api.hide}, class ${cls || 'unset'})`);
         this._windows.add(win);
         win.connect('unmanaged', () => this._windows.delete(win));
         win.connect('shown', () => this._place(win));
