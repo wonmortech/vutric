@@ -487,7 +487,7 @@ fn serve(args: &Args, socket: &str) -> Result<(), String> {
                         while let Ok(m) = rx.try_recv() {
                             match m {
                                 ToSurface::SetImage { id: i, image } if i == id => {
-                                    g.set_image(&image)
+                                    g.set_image(&image);
                                 }
                                 other => pending.insert(0, other),
                             }

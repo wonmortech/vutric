@@ -1,0 +1,9 @@
+{
+  "uuid": "vutric@wonmor.io",
+  "name": "Vutric",
+  "description": "Shows the Vutric fling effect and its cards on GNOME, which has no layer-shell. Telefondan otilgan rasm va fayllar ekranga effekt bilan tushadi. Needs the Vutric app (vutric-daemon).",
+  "shell-version": ["46", "47", "48", "49", "50"],
+  "url": "https://github.com/wonmortech/vutric",
+  "version-name": "0.0.1",
+  "donations": {}
+}
