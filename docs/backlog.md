@@ -21,7 +21,7 @@ Sources:
 
 | # | Item | Source | Status |
 |---|---|---|---|
-| N1 | Try the gallery-first APK on a real phone: gallery, multi-select, "Ulanib yuborish", Settings, forwarding received files | ADR-0008 | [~] the APK is built (W1, ADR-0013: release APK arm64 + x64, 78.2 MB); device run = ADR-0011/0012/0013 checklists, items 1–27; ADR-0014 adds 28–38 (rebuilt with the `:compat` process) |
+| N1 | Try the gallery-first APK on a real phone: gallery, multi-select, "Ulanib yuborish", Settings, forwarding received files | ADR-0008 | [~] the APK is built (W1, ADR-0013: release APK arm64 + x64, 78.2 MB); device run = ADR-0011/0012/0013 checklists, items 1–27; ADR-0014 adds 28–38; rebuilt with the `:compat` process: 86.7 MB |
 | N2 | Preview latency on real Wi-Fi, router WAN unplugged, both directions: p50 < 40 ms, p95 < 80 ms | roadmap 0.2, ADR-0005 | [ ] |
 | N3 | Connect by the link's IP:port with multicast blocked | report 0.2 | [ ] |
 | N4 | iPhone 16 Pro ⇄ Windows with a fresh IPA: same numbers, watch the iOS "Local Network" prompt | TM §4.5 | [ ] |

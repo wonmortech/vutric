@@ -45,7 +45,11 @@ listed (#11). W3 answered all three (PR #15). Their rows for captive portals (R1
   `cargo ndk -t arm64-v8a clippy -p vutric-mobile -- -D warnings` (Android target, the `cfg(unix)` compat code):
   clean. `cargo test -p vutric-mobile`: unit tests plus `tests/catch.rs`, 6.1 s locally (scenario 3 takes
   ~5.4 s, the engine's own 5 s round-trip timeout; every other scenario ~0.1 s).
-- Release APK: see the line added at the end of this ADR.
+- `cargo ndk -t arm64-v8a -t x86_64 --platform 24 ... build -p vutric-mobile --release` then `flutter build apk --release
+  --target-platform android-arm64,android-x64` at commit 15acf0e: passed, Kotlin compiled, 86.7 MB (90 940 122 bytes;
+  ADR-0013's was 78.2 MB, the difference is the compat adapters in `libvutric_mobile.so`). `llvm-nm -D` shows
+  `Java_io_wonmor_vutric_1spike_CompatNative_serve` exported; `aapt2 dump xmltree` shows `CompatService` with
+  `exported=false`, `process=":compat"`; `classes.dex` keeps the `io/wonmor/vutric_spike/CompatNative` name.
 
 ## Not verified (needs a real phone)
 
