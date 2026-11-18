@@ -1,0 +1,21 @@
+[package]
+name = "vutric-m1-tauri"
+description = "M1 desktop UI spike: the settings screen and the Halqa preview in Tauri 2 (WebView2)."
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# A spike, kept out of the main workspace so its dependency tree never reaches Cargo.lock or CI.
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "2.7.5", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.6", features = [] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

@@ -5,11 +5,15 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+include = ["src/**", "fonts/**", "Cargo.toml"]
 repository.workspace = true
 authors.workspace = true
 
 [dependencies]
 bytemuck.workspace = true
+ab_glyph.workspace = true
+qrcode.workspace = true
+tiny-skia.workspace = true
 vutric-core.workspace = true
 wgpu.workspace = true
 

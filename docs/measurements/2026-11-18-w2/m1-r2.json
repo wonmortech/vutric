@@ -1,0 +1,804 @@
+[
+ {
+  "app": "slint",
+  "run": 1,
+  "window_ms": 1613,
+  "first_frame_ms": 1596,
+  "open": {
+   "private_mb": 368.3,
+   "working_set_mb": 399.9,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 428.7,
+   "working_set_mb": 471.6,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "slint",
+   "event": "frames",
+   "count": 600,
+   "fps": 59.9,
+   "p50_ms": 16.62,
+   "p99_ms": 21.75,
+   "max_ms": 39.88
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 20,
+  "perf_tail": null,
+  "exit_ms": 214,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "slint",
+  "run": 2,
+  "window_ms": 279,
+  "first_frame_ms": 270,
+  "open": {
+   "private_mb": 352.6,
+   "working_set_mb": 388.5,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 416.4,
+   "working_set_mb": 460,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "slint",
+   "event": "frames",
+   "count": 600,
+   "fps": 60.0,
+   "p50_ms": 16.66,
+   "p99_ms": 20.91,
+   "max_ms": 39.02
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 18.9,
+  "perf_tail": null,
+  "exit_ms": 96,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "slint",
+  "run": 3,
+  "window_ms": 257,
+  "first_frame_ms": 242,
+  "open": {
+   "private_mb": 353.6,
+   "working_set_mb": 389.3,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 417,
+   "working_set_mb": 460.1,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "slint",
+   "event": "frames",
+   "count": 600,
+   "fps": 60.0,
+   "p50_ms": 16.68,
+   "p99_ms": 21.0,
+   "max_ms": 22.63
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 20.4,
+  "perf_tail": null,
+  "exit_ms": 136,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "slint",
+  "run": 4,
+  "window_ms": 258,
+  "first_frame_ms": 240,
+  "open": {
+   "private_mb": 353.2,
+   "working_set_mb": 390.1,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 411.7,
+   "working_set_mb": 455.5,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "slint",
+   "event": "frames",
+   "count": 600,
+   "fps": 59.9,
+   "p50_ms": 16.57,
+   "p99_ms": 23.39,
+   "max_ms": 27.48
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 15.7,
+  "perf_tail": null,
+  "exit_ms": 131,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "slint",
+  "run": 5,
+  "window_ms": 249,
+  "first_frame_ms": 236,
+  "open": {
+   "private_mb": 352.1,
+   "working_set_mb": 389,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 418.7,
+   "working_set_mb": 461.6,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "slint",
+   "event": "frames",
+   "count": 600,
+   "fps": 59.8,
+   "p50_ms": 16.58,
+   "p99_ms": 22.3,
+   "max_ms": 27.37
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 20.1,
+  "perf_tail": null,
+  "exit_ms": 150,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "slint-sw",
+  "run": 1,
+  "window_ms": 68,
+  "first_frame_ms": 70,
+  "open": {
+   "private_mb": 6.4,
+   "working_set_mb": 20.4,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 6.4,
+   "working_set_mb": 20.4,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "slint",
+   "event": "frames",
+   "count": 600,
+   "fps": 60.7,
+   "p50_ms": 16.4,
+   "p99_ms": 18.1,
+   "max_ms": 18.78
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 4,
+  "perf_tail": "",
+  "exit_ms": 117,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "slint-sw",
+  "run": 2,
+  "window_ms": 137,
+  "first_frame_ms": 147,
+  "open": {
+   "private_mb": 6.5,
+   "working_set_mb": 20.6,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 6.5,
+   "working_set_mb": 20.6,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "slint",
+   "event": "frames",
+   "count": 600,
+   "fps": 60.8,
+   "p50_ms": 16.35,
+   "p99_ms": 17.89,
+   "max_ms": 18.47
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 9.6,
+  "perf_tail": "",
+  "exit_ms": 88,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "slint-sw",
+  "run": 3,
+  "window_ms": 148,
+  "first_frame_ms": 152,
+  "open": {
+   "private_mb": 6.3,
+   "working_set_mb": 20.4,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 6.3,
+   "working_set_mb": 20.4,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "slint",
+   "event": "frames",
+   "count": 600,
+   "fps": 60.6,
+   "p50_ms": 16.42,
+   "p99_ms": 18.04,
+   "max_ms": 30.83
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 10.2,
+  "perf_tail": "",
+  "exit_ms": 98,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "slint-sw",
+  "run": 4,
+  "window_ms": 68,
+  "first_frame_ms": 106,
+  "open": {
+   "private_mb": 6.3,
+   "working_set_mb": 20.4,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 6.3,
+   "working_set_mb": 20.4,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "slint",
+   "event": "frames",
+   "count": 600,
+   "fps": 59.8,
+   "p50_ms": 16.4,
+   "p99_ms": 21.06,
+   "max_ms": 80.35
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 7.6,
+  "perf_tail": "",
+  "exit_ms": 84,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "slint-sw",
+  "run": 5,
+  "window_ms": 132,
+  "first_frame_ms": 141,
+  "open": {
+   "private_mb": 6.3,
+   "working_set_mb": 20.4,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 6.3,
+   "working_set_mb": 4.1,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "slint",
+   "event": "frames",
+   "count": 600,
+   "fps": 30.2,
+   "p50_ms": 16.69,
+   "p99_ms": 414.47,
+   "max_ms": 2242.52
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 5,
+  "perf_tail": "",
+  "exit_ms": 987,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "tauri",
+  "run": 1,
+  "window_ms": 164,
+  "first_frame_ms": 3292,
+  "open": {
+   "private_mb": 183,
+   "working_set_mb": 373,
+   "processes": 8
+  },
+  "after_10s": {
+   "private_mb": 178.2,
+   "working_set_mb": 98.6,
+   "processes": 8
+  },
+  "frames": {},
+  "animates": true,
+  "cpu_pct_of_one_core": 27,
+  "perf_tail": null,
+  "exit_ms": 3381,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "tauri",
+  "run": 2,
+  "window_ms": 107,
+  "first_frame_ms": 2205,
+  "open": {
+   "private_mb": 185.7,
+   "working_set_mb": 376,
+   "processes": 8
+  },
+  "after_10s": {
+   "private_mb": 188.9,
+   "working_set_mb": 381.4,
+   "processes": 8
+  },
+  "frames": {
+   "event": "frames",
+   "count": 600,
+   "fps": 60,
+   "p50_ms": 16.7,
+   "p99_ms": 16.9,
+   "max_ms": 17,
+   "toolkit": "tauri"
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 61.4,
+  "perf_tail": null,
+  "exit_ms": 257,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "tauri",
+  "run": 3,
+  "window_ms": 29,
+  "first_frame_ms": 334,
+  "open": {
+   "private_mb": 182.2,
+   "working_set_mb": 375.8,
+   "processes": 8
+  },
+  "after_10s": {
+   "private_mb": 185,
+   "working_set_mb": 356.8,
+   "processes": 8
+  },
+  "frames": {
+   "event": "frames",
+   "count": 600,
+   "fps": 60,
+   "p50_ms": 16.7,
+   "p99_ms": 16.9,
+   "max_ms": 17,
+   "toolkit": "tauri"
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 38.3,
+  "perf_tail": null,
+  "exit_ms": 425,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "tauri",
+  "run": 4,
+  "window_ms": 30,
+  "first_frame_ms": 319,
+  "open": {
+   "private_mb": 183.8,
+   "working_set_mb": 376.9,
+   "processes": 8
+  },
+  "after_10s": {
+   "private_mb": 186.1,
+   "working_set_mb": 381.5,
+   "processes": 8
+  },
+  "frames": {
+   "event": "frames",
+   "count": 600,
+   "fps": 60,
+   "p50_ms": 16.7,
+   "p99_ms": 16.9,
+   "max_ms": 17,
+   "toolkit": "tauri"
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 27.5,
+  "perf_tail": null,
+  "exit_ms": 242,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "tauri",
+  "run": 5,
+  "window_ms": 45,
+  "first_frame_ms": 348,
+  "open": {
+   "private_mb": 183.5,
+   "working_set_mb": 374.3,
+   "processes": 8
+  },
+  "after_10s": {
+   "private_mb": 186.3,
+   "working_set_mb": 379.4,
+   "processes": 8
+  },
+  "frames": {
+   "event": "frames",
+   "count": 600,
+   "fps": 60,
+   "p50_ms": 16.7,
+   "p99_ms": 16.9,
+   "max_ms": 17,
+   "toolkit": "tauri"
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 81.2,
+  "perf_tail": null,
+  "exit_ms": 201,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "flutter",
+  "run": 1,
+  "window_ms": 1221,
+  "first_frame_ms": 575,
+  "open": {
+   "private_mb": 205.3,
+   "working_set_mb": 191.2,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 206.8,
+   "working_set_mb": 132.3,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "flutter",
+   "event": "frames",
+   "count": 618,
+   "fps": 59.8,
+   "p50_ms": 16.66,
+   "p99_ms": 22.67,
+   "max_ms": 57.94
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 28.7,
+  "perf_tail": null,
+  "exit_ms": 4227,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "flutter",
+  "run": 2,
+  "window_ms": null,
+  "first_frame_ms": null,
+  "open": {
+   "private_mb": 163.5,
+   "working_set_mb": 149.7,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 206.6,
+   "working_set_mb": 192.2,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "flutter",
+   "event": "frames",
+   "count": 636,
+   "fps": 59.9,
+   "p50_ms": 16.66,
+   "p99_ms": 33.29,
+   "max_ms": 50.79
+  },
+  "animates": null,
+  "cpu_pct_of_one_core": 21.8,
+  "perf_tail": null,
+  "exit_ms": null,
+  "left_after_close": {
+   "private_mb": 206.4,
+   "working_set_mb": 191.7,
+   "processes": 1
+  }
+ },
+ {
+  "app": "flutter",
+  "run": 3,
+  "window_ms": 939,
+  "first_frame_ms": 154,
+  "open": {
+   "private_mb": 202.5,
+   "working_set_mb": 188.7,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 204.2,
+   "working_set_mb": 191.2,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "flutter",
+   "event": "frames",
+   "count": 611,
+   "fps": 59.9,
+   "p50_ms": 16.72,
+   "p99_ms": 20.68,
+   "max_ms": 25.72
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 24.3,
+  "perf_tail": null,
+  "exit_ms": 354,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "flutter",
+  "run": 4,
+  "window_ms": 723,
+  "first_frame_ms": 86,
+  "open": {
+   "private_mb": 204.1,
+   "working_set_mb": 190.1,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 205.9,
+   "working_set_mb": 192.9,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "flutter",
+   "event": "frames",
+   "count": 625,
+   "fps": 60.0,
+   "p50_ms": 16.81,
+   "p99_ms": 20.39,
+   "max_ms": 21.8
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 20.1,
+  "perf_tail": null,
+  "exit_ms": 175,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "flutter",
+  "run": 5,
+  "window_ms": 878,
+  "first_frame_ms": 84,
+  "open": {
+   "private_mb": 201.9,
+   "working_set_mb": 188.2,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 205.1,
+   "working_set_mb": 192.2,
+   "processes": 1
+  },
+  "frames": {
+   "toolkit": "flutter",
+   "event": "frames",
+   "count": 613,
+   "fps": 59.9,
+   "p50_ms": 16.85,
+   "p99_ms": 20.34,
+   "max_ms": 21.52
+  },
+  "animates": true,
+  "cpu_pct_of_one_core": 30,
+  "perf_tail": null,
+  "exit_ms": 194,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "localsend",
+  "run": 1,
+  "window_ms": 730,
+  "first_frame_ms": null,
+  "open": {
+   "private_mb": 159.4,
+   "working_set_mb": 152.7,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 167.7,
+   "working_set_mb": 165.3,
+   "processes": 1
+  },
+  "frames": null,
+  "animates": true,
+  "cpu_pct_of_one_core": 1.5,
+  "perf_tail": null,
+  "exit_ms": 249,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "localsend",
+  "run": 2,
+  "window_ms": 357,
+  "first_frame_ms": null,
+  "open": {
+   "private_mb": 159.4,
+   "working_set_mb": 153.3,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 165.8,
+   "working_set_mb": 164.1,
+   "processes": 1
+  },
+  "frames": null,
+  "animates": true,
+  "cpu_pct_of_one_core": 7,
+  "perf_tail": null,
+  "exit_ms": 96,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "localsend",
+  "run": 3,
+  "window_ms": 366,
+  "first_frame_ms": null,
+  "open": {
+   "private_mb": 159.3,
+   "working_set_mb": 153.9,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 167.7,
+   "working_set_mb": 165.9,
+   "processes": 1
+  },
+  "frames": null,
+  "animates": true,
+  "cpu_pct_of_one_core": 4,
+  "perf_tail": null,
+  "exit_ms": 101,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "localsend",
+  "run": 4,
+  "window_ms": 374,
+  "first_frame_ms": null,
+  "open": {
+   "private_mb": 159.2,
+   "working_set_mb": 152.8,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 167,
+   "working_set_mb": 164.6,
+   "processes": 1
+  },
+  "frames": null,
+  "animates": true,
+  "cpu_pct_of_one_core": 5.4,
+  "perf_tail": null,
+  "exit_ms": 104,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ },
+ {
+  "app": "localsend",
+  "run": 5,
+  "window_ms": 343,
+  "first_frame_ms": null,
+  "open": {
+   "private_mb": 159.3,
+   "working_set_mb": 153.3,
+   "processes": 1
+  },
+  "after_10s": {
+   "private_mb": 167.2,
+   "working_set_mb": 165.4,
+   "processes": 1
+  },
+  "frames": null,
+  "animates": true,
+  "cpu_pct_of_one_core": 4,
+  "perf_tail": null,
+  "exit_ms": 100,
+  "left_after_close": {
+   "private_mb": 0,
+   "working_set_mb": 0,
+   "processes": 0
+  }
+ }
+]
