@@ -68,6 +68,7 @@ Sources:
 | C8 | Adapter rules:<br>• clean-room code, no GPL copying<br>• foreign peers are always asked about unless pinned<br>• visible only in receive mode; "everyone" ends after 10 min<br>• sandboxed process for pre-auth parsing<br>• fuzzer per adapter<br>• real-app interop test per adapter<br>• protocol version re-read before writing the adapter | 1+ | [ ] |
 | C9 | Settings `compat.*`: per-adapter `enabled` (LocalSend and browser on by default) and `pinned`: `vutric_core::storage::Compat` (ADR-0054) | 1 | [x] |
 | Cn | Not possible: AirDrop, Continuity, Samsung/Huawei/Mi Share, Xender/SHAREit/Zapya/Send Anywhere/Blip/Feem, Phone Link, Nearby Sharing (ADR-0010 §2) | — | — |
+| C10 | (W3) Compat adapters on the phone: the `vutric-compat` loop as a library (`serve`), run in an Android `:compat` process, driven by `Adapter::attach` over a socket pair (#11) | 1 | [~] ADR-0066; tests `tests/library_mode.rs` (in-memory stream both ways; Unix socket pair in CI); W1 wiring (service, JNI entry, bridge) and an Android build + real LocalSend/KDE Connect on a phone are left |
 
 ## 3. Security (ADR-0005, ADR-0007 §2, report 0.2, TM §3)
 
