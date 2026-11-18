@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Vutric — Sozlamalar</title>
+<style>
+  :root { --night:#040c29; --surface:#0b1640; --line:#1c2a63; --signal:#2f6bff; --glow:#f4d9a6; --text:#eef1fb; --muted:#9aa6cf; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--night); color:var(--text); font-family:"Segoe UI", sans-serif; overflow:hidden; }
+  main { display:flex; gap:20px; padding:20px; height:100%; }
+  .col { width:480px; overflow:auto; padding-right:12px; display:flex; flex-direction:column; gap:12px; }
+  h1 { margin:0; font-size:26px; font-weight:700; }
+  .sub { color:var(--muted); font-size:13px; }
+  .group { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .group h2 { margin:0; font-size:15px; font-weight:600; }
+  .hint { color:var(--muted); font-size:12px; }
+  .seg { display:flex; gap:3px; padding:3px; height:36px; border-radius:10px; background:var(--night); border:1px solid var(--line); }
+  .seg button { flex:1; border:0; border-radius:8px; background:transparent; color:var(--muted); font:13px "Segoe UI"; cursor:pointer; transition:background .14s; }
+  .seg button[aria-pressed="true"] { background:var(--signal); color:#fff; }
+  .row { display:flex; align-items:center; gap:12px; }
+  .row input[type=range] { flex:1; }
+  .path { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .btn { width:120px; height:34px; border:0; border-radius:10px; background:var(--signal); color:#fff; font:13px "Segoe UI"; }
+  .preview { flex:1; display:flex; flex-direction:column; gap:10px; }
+  canvas { flex:1; width:100%; border-radius:14px; background:radial-gradient(circle, #0d1a4d 0%, var(--night) 100%); }
+</style>
+</head>
+<body>
+<main>
+  <section class="col">
+    <h1>Sozlamalar</h1>
+    <div class="sub">Bu kompyuter · Ofis kompyuteri</div>
+    <div class="group"><h2>Effekt</h2><div class="hint">Tizimda harakatni kamaytirish yoqilgan bo'lsa, doim Oddiy ishlatiladi.</div>
+      <div class="seg" data-name="effect"><button aria-pressed="true">Halqa</button><button>Kometa</button><button>Pufak</button><button>Oddiy</button></div></div>
+    <div class="group"><h2>Yuborish zonasi</h2>
+      <div class="seg"><button>Chap</button><button aria-pressed="true">O'ng</button><button>Tepa</button></div></div>
+    <div class="group"><h2>Davomiyligi</h2>
+      <div class="row"><input type="range" min="0.6" max="2" step="0.01" value="1.05" id="dur"><span id="durv" style="width:52px">1.05 s</span></div></div>
+    <div class="group"><h2>Saqlash papkasi</h2>
+      <div class="row"><span class="path">C:\Users\Siz\Downloads\Vutric</span><button class="btn">O'zgartirish</button></div></div>
+    <div class="group"><h2>Qabul qilish</h2>
+      <div class="seg"><button aria-pressed="true">So'rash</button><button>Tanishlardan</button><button>Hammadan</button></div></div>
+    <div class="group"><h2>Qabul qilingandan keyin</h2>
+      <div class="seg"><button aria-pressed="true">Bildirish</button><button>Faylni ochish</button><button>Papka</button><button>Hech narsa</button></div></div>
+    <div class="group"><h2>Tizim bilan birga ishga tushirish</h2>
+      <label class="row"><span class="hint" style="flex:1;font-size:14px">Kompyuter yoqilganda qabul qilishga tayyor</span><input type="checkbox" checked></label></div>
+  </section>
+  <section class="preview">
+    <div class="sub">Ko'rinish</div>
+    <canvas id="halqa"></canvas>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  var T = window.__TAURI__ && window.__TAURI__.core;
+  function log(o) { o.toolkit = "tauri"; if (T) T.invoke("probe", { line: JSON.stringify(o) }); }
+
+  document.querySelectorAll(".seg").forEach(function (seg) {
+    seg.addEventListener("click", function (e) {
+      if (e.target.tagName !== "BUTTON") return;
+      seg.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", String(b === e.target)); });
+      if (seg.dataset.name === "effect") playing = e.target.textContent !== "Oddiy";
+    });
+  });
+  var dur = document.getElementById("dur"), durv = document.getElementById("durv");
+  dur.addEventListener("input", function () { durv.textContent = (+dur.value).toFixed(2) + " s"; });
+
+  var CFG = { travel: 1.05, hold: 1.4, dock: 0.45 }, TOTAL = 2.9;
+  function c01(x) { return Math.max(0, Math.min(1, x)); }
+  function outCubic(x) { return 1 - Math.pow(1 - x, 3); }
+  function inCubic(x) { return x * x * x; }
+  function outBack(x) { return 1 + 2.4 * Math.pow(x - 1, 3) + 1.4 * Math.pow(x - 1, 2); }
+  function spring(s) { return Math.exp(-0.42 * 20.1 * s) * Math.cos(20.1 * 0.908 * s); }
+  function bez(a, b, c, d, e) { var m = 1 - e; return [m*m*m*a[0] + 3*m*m*e*b[0] + 3*m*e*e*c[0] + e*e*e*d[0], m*m*m*a[1] + 3*m*m*e*b[1] + 3*m*e*e*c[1] + e*e*e*d[1]]; }
+  function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+
+  var canvas = document.getElementById("halqa"), ctx = canvas.getContext("2d"), W = 0, H = 0, playing = true;
+  function resize() {
+    var dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    W = r.width; H = r.height; canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  new ResizeObserver(resize).observe(canvas); resize();
+
+  function draw(t) {
+    var ry = Math.min(H * 0.34, 320), rx = ry * 0.42, ch = Math.min(H * 0.36, W * 0.3, 300), cw = ch * 4 / 3;
+    var p0 = [W - rx * 0.55, H * 0.42], p3 = [W * 0.42, H * 0.55], dx = p0[0] - p3[0];
+    var p1 = [p0[0] - dx * 0.25, p0[1] - ry * 0.55], p2 = [p3[0] + dx * 0.2, p3[1] - ry * 0.12];
+    var u = t / CFG.travel, open = c01(u / 0.24), close = c01((u - 0.6) / 0.3);
+    var rs = outBack(open) * (1 - 0.35 * inCubic(close)), ra = c01(open * 3) * (1 - close);
+    ctx.clearRect(0, 0, W, H);
+    if (ra > 0.002) {
+      var r = ry * rs;
+      ctx.save(); ctx.translate(p0[0], p0[1]); ctx.scale(0.42, 1); ctx.globalAlpha = ra;
+      var lens = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      lens.addColorStop(0, "#020616"); lens.addColorStop(0.75, "#081440"); lens.addColorStop(1, "rgba(47,107,255,0.35)");
+      ctx.fillStyle = lens; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.2832); ctx.fill();
+      ctx.shadowColor = "#2f6bff"; ctx.shadowBlur = 28; ctx.lineWidth = 3; ctx.strokeStyle = "#f4d9a6";
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.2832); ctx.stroke();
+      ctx.restore();
+    }
+    var f = c01((u - 0.10) / 0.52), e = outCubic(f);
+    if (f > 0 && f < 1) {
+      for (var k = 1; k <= 4; k++) {
+        var ek = outCubic(c01(f - k * 0.075)); if (ek <= 0) continue;
+        var pk = bez(p0, p1, p2, p3, ek), sk = 0.16 + 0.84 * ek;
+        ctx.save(); ctx.translate(pk[0], pk[1]); ctx.rotate(-0.42 * (1 - ek)); ctx.scale(sk, sk);
+        ctx.globalAlpha = (1 - f) * 0.55 / k; ctx.strokeStyle = k < 3 ? "#6f8ff0" : "#f4d9a6"; ctx.lineWidth = 2 / sk;
+        rr(ctx, -cw / 2, -ch / 2, cw, ch, 16); ctx.stroke(); ctx.restore();
+      }
+    }
+    var pos = bez(p0, p1, p2, p3, e), sc = 0.16 + 0.84 * e, rot = -0.42 * (1 - e), a = c01(f * 5);
+    if (t > 0.651) { var s = spring(t - 0.651); sc = 1 + 0.07 * s; rot = -0.05 * s; }
+    var d = inCubic(c01((t - 2.45) / 0.45));
+    pos = [pos[0] + (W - 36 - pos[0]) * d, pos[1] + (H - 36 - pos[1]) * d]; sc *= 1 - 0.78 * d; a *= 1 - d;
+    if (a > 0.002) {
+      ctx.save(); ctx.translate(pos[0], pos[1]); ctx.rotate(rot); ctx.scale(sc, sc); ctx.globalAlpha = a;
+      ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 42; ctx.shadowOffsetY = 22;
+      var g = ctx.createLinearGradient(-cw / 2, -ch / 2, cw / 4, ch / 2);
+      g.addColorStop(0, "#ffd696"); g.addColorStop(0.45, "#5a3f68"); g.addColorStop(0.75, "#241f45"); g.addColorStop(1, "#151634");
+      rr(ctx, -cw / 2, -ch / 2, cw, ch, 16); ctx.fillStyle = g; ctx.fill();
+      ctx.shadowColor = "transparent"; ctx.lineWidth = 1.5 / sc; ctx.strokeStyle = "rgba(244,217,166,0.55)"; ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  var want = 600, first = 0, last = 0, iv = [], done = false;
+  if (T) T.invoke("want_frames").then(function (n) { want = n; });
+  function frame(now) {
+    if (!first) { first = now; log({ event: "first_frame", unix_ms: Date.now() }); }
+    if (now - first > 1000 && last) iv.push(now - last);
+    last = now;
+    draw(playing ? ((now / 1000) % TOTAL) : 1.3);
+    if (!done && iv.length >= want) {
+      done = true;
+      var v = iv.slice().sort(function (a, b) { return a - b; }), mean = v.reduce(function (a, b) { return a + b; }, 0) / v.length;
+      function p(q) { return v[Math.round((v.length - 1) * q)]; }
+      log({ event: "frames", count: v.length, fps: +(1000 / mean).toFixed(1), p50_ms: +p(0.5).toFixed(2), p99_ms: +p(0.99).toFixed(2), max_ms: +v[v.length - 1].toFixed(2) });
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

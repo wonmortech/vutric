@@ -1,0 +1,254 @@
+// M1 spike: the desktop settings screen and a looping Halqa preview. Same screen, same numbers as the
+// Flutter and Tauri spikes (../README.md), so RAM, cold open and fps compare like for like.
+
+import { Switch, Slider, ScrollView } from "std-widgets.slint";
+
+global Palette {
+    out property <color> night: #040c29;
+    out property <color> surface: #0b1640;
+    out property <color> line: #1c2a63;
+    out property <color> signal: #2f6bff;
+    out property <color> glow: #f4d9a6;
+    out property <color> text: #eef1fb;
+    out property <color> muted: #9aa6cf;
+}
+
+component Segmented inherits Rectangle {
+    in property <[string]> options;
+    in-out property <int> selected: 0;
+    height: 36px;
+    border-radius: 10px;
+    background: Palette.night;
+    border-width: 1px;
+    border-color: Palette.line;
+    HorizontalLayout {
+        padding: 3px;
+        spacing: 3px;
+        for o[i] in options: Rectangle {
+            border-radius: 8px;
+            background: i == selected ? Palette.signal : transparent;
+            animate background { duration: 140ms; }
+            Text {
+                text: o;
+                color: i == selected ? #ffffff : Palette.muted;
+                font-size: 13px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            TouchArea { clicked => { selected = i; } }
+        }
+    }
+}
+
+component Group inherits Rectangle {
+    in property <string> title;
+    in property <string> hint;
+    background: Palette.surface;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: Palette.line;
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+        Text { text: title; color: Palette.text; font-size: 15px; font-weight: 600; }
+        if hint != "": Text { text: hint; color: Palette.muted; font-size: 12px; wrap: word-wrap; }
+        @children
+    }
+}
+
+component Halqa inherits Rectangle {
+    in property <bool> playing: true;
+    // One fling every 2.9 s: travel 1.05 s, hold 1.4 s, dock 0.45 s (crates/vutric-overlay HalqaConfig).
+    property <float> t: playing ? Math.mod(animation-tick() / 1ms, 2900) / 1000 : 1.3;
+    property <float> u: t / 1.05;
+
+    pure function c01(x: float) -> float { return clamp(x, 0, 1); }
+    pure function out-cubic(x: float) -> float { return 1 - Math.pow(1 - x, 3); }
+    pure function in-cubic(x: float) -> float { return x * x * x; }
+    pure function out-back(x: float) -> float {
+        return 1 + 2.4 * Math.pow(x - 1, 3) + 1.4 * Math.pow(x - 1, 2);
+    }
+    pure function spring(s: float) -> float {
+        return Math.exp(-0.42 * 20.1 * s) * Math.cos(20.1 * 0.908 * s * 1rad);
+    }
+    pure function fly(k: float) -> float { return out-cubic(c01((u - 0.10 - k) / 0.52)); }
+    pure function bx(e: float) -> float {
+        return Math.pow(1 - e, 3) * p0x + 3 * Math.pow(1 - e, 2) * e * p1x + 3 * (1 - e) * e * e * p2x + e * e * e * p3x;
+    }
+    pure function by(e: float) -> float {
+        return Math.pow(1 - e, 3) * p0y + 3 * Math.pow(1 - e, 2) * e * p1y + 3 * (1 - e) * e * e * p2y + e * e * e * p3y;
+    }
+
+    property <float> w: self.width / 1px;
+    property <float> h: self.height / 1px;
+    property <float> ry: min(h * 0.34, 320);
+    property <float> rx: ry * 0.42;
+    property <float> card-h: min(h * 0.36, w * 0.30, 300);
+    property <float> card-w: card-h * 4 / 3;
+    property <float> p0x: w - rx * 0.55;
+    property <float> p0y: h * 0.42;
+    property <float> p3x: w * 0.42;
+    property <float> p3y: h * 0.55;
+    property <float> p1x: p0x - (p0x - p3x) * 0.25;
+    property <float> p1y: p0y - ry * 0.55;
+    property <float> p2x: p3x + (p0x - p3x) * 0.2;
+    property <float> p2y: p3y - ry * 0.12;
+
+    property <float> open: c01(u / 0.24);
+    property <float> close: c01((u - 0.6) / 0.3);
+    property <float> ring-scale: out-back(open) * (1 - 0.35 * in-cubic(close));
+    property <float> ring-alpha: c01(open * 3) * (1 - close);
+
+    property <float> f: c01((u - 0.10) / 0.52);
+    property <float> e: out-cubic(f);
+    property <float> landed: t > 0.651 ? spring(t - 0.651) : 0;
+    property <float> dock: in-cubic(c01((t - 2.45) / 0.45));
+    property <float> card-scale: (t > 0.651 ? 1 + 0.07 * landed : 0.16 + 0.84 * e) * (1 - 0.78 * dock);
+    property <float> card-rot: t > 0.651 ? -0.05 * landed : -0.42 * (1 - e);
+    property <float> card-x: bx(e) + (w - 36 - bx(e)) * dock;
+    property <float> card-y: by(e) + (h - 36 - by(e)) * dock;
+    property <float> card-alpha: c01(f * 5) * (1 - dock);
+
+    clip: true;
+    border-radius: 14px;
+    background: @radial-gradient(circle, #0d1a4d 0%, Palette.night 100%);
+
+    // Portal: a circle squashed into the edge-on ellipse, with a soft glow and a sand-blue rim.
+    Rectangle {
+        x: (p0x - ry * ring-scale) * 1px;
+        y: (p0y - ry * ring-scale) * 1px;
+        width: 2 * ry * ring-scale * 1px;
+        height: self.width;
+        opacity: ring-alpha;
+        transform-scale-x: 0.42;
+        border-radius: self.width / 2;
+        background: @radial-gradient(circle, #020616 0%, #081440 75%, #2f6bff59 100%);
+        border-width: 3px;
+        border-color: Palette.glow;
+        drop-shadow-blur: 28px;
+        drop-shadow-color: Palette.signal;
+    }
+
+    for k in 4: Rectangle {
+        property <float> ek: fly(k * 0.075 + 0.075);
+        property <float> s: 0.16 + 0.84 * ek;
+        x: (bx(ek) - card-w * s / 2) * 1px;
+        y: (by(ek) - card-h * s / 2) * 1px;
+        width: card-w * s * 1px;
+        height: card-h * s * 1px;
+        transform-rotation: -0.42 * (1 - ek) * 1rad;
+        visible: f > 0 && f < 1 && ek > 0;
+        opacity: (1 - f) * 0.55 / (k + 1);
+        border-radius: 16px * s;
+        border-width: 2px;
+        border-color: k < 2 ? #6f8ff0 : Palette.glow;
+    }
+
+    Rectangle {
+        x: (card-x - card-w * card-scale / 2) * 1px;
+        y: (card-y - card-h * card-scale / 2) * 1px;
+        width: card-w * card-scale * 1px;
+        height: card-h * card-scale * 1px;
+        transform-rotation: card-rot * 1rad;
+        opacity: card-alpha;
+        visible: card-alpha > 0.002;
+        border-radius: 16px * card-scale;
+        background: @linear-gradient(160deg, #ffd696 0%, #5a3f68 45%, #241f45 75%, #151634 100%);
+        border-width: 1.5px;
+        border-color: #f4d9a68c;
+        drop-shadow-blur: 42px;
+        drop-shadow-offset-y: 22px;
+        drop-shadow-color: #0000008c;
+    }
+}
+
+export component SettingsWindow inherits Window {
+    title: "Vutric — Sozlamalar";
+    preferred-width: 960px;
+    preferred-height: 640px;
+    background: Palette.night;
+    default-font-family: "Segoe UI";
+
+    in-out property <int> effect: 0;
+    in-out property <int> zone: 1;
+    in-out property <float> duration: 1.05;
+    in-out property <int> accept: 0;
+    in-out property <int> after: 0;
+    in-out property <bool> autostart: true;
+
+    HorizontalLayout {
+        padding: 20px;
+        spacing: 20px;
+        ScrollView {
+            width: 480px;
+            VerticalLayout {
+                spacing: 12px;
+                padding-right: 12px;
+                Text { text: "Sozlamalar"; color: Palette.text; font-size: 26px; font-weight: 700; }
+                Text { text: "Bu kompyuter · Ofis kompyuteri"; color: Palette.muted; font-size: 13px; }
+                Group {
+                    title: "Effekt";
+                    hint: "Tizimda harakatni kamaytirish yoqilgan bo'lsa, doim Oddiy ishlatiladi.";
+                    Segmented { options: ["Halqa", "Kometa", "Pufak", "Oddiy"]; selected <=> root.effect; }
+                }
+                Group {
+                    title: "Yuborish zonasi";
+                    Segmented { options: ["Chap", "O'ng", "Tepa"]; selected <=> root.zone; }
+                }
+                Group {
+                    title: "Davomiyligi";
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Slider { minimum: 0.6; maximum: 2.0; value <=> root.duration; }
+                        Text {
+                            text: round(root.duration * 100) / 100 + " s";
+                            color: Palette.text;
+                            vertical-alignment: center;
+                            width: 52px;
+                        }
+                    }
+                }
+                Group {
+                    title: "Saqlash papkasi";
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Text {
+                            text: "C:\\Users\\Siz\\Downloads\\Vutric";
+                            color: Palette.text;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        Rectangle {
+                            width: 120px;
+                            height: 34px;
+                            border-radius: 10px;
+                            background: Palette.signal;
+                            Text { text: "O'zgartirish"; color: #ffffff; font-size: 13px; }
+                            TouchArea { }
+                        }
+                    }
+                }
+                Group {
+                    title: "Qabul qilish";
+                    Segmented { options: ["So'rash", "Tanishlardan", "Hammadan"]; selected <=> root.accept; }
+                }
+                Group {
+                    title: "Qabul qilingandan keyin";
+                    Segmented { options: ["Bildirish", "Faylni ochish", "Papka", "Hech narsa"]; selected <=> root.after; }
+                }
+                Group {
+                    title: "Tizim bilan birga ishga tushirish";
+                    HorizontalLayout {
+                        Text { text: "Kompyuter yoqilganda qabul qilishga tayyor"; color: Palette.muted; vertical-alignment: center; }
+                        Switch { checked <=> root.autostart; }
+                    }
+                }
+            }
+        }
+        VerticalLayout {
+            spacing: 10px;
+            Text { text: "Ko'rinish"; color: Palette.muted; font-size: 13px; }
+            Halqa { playing: root.effect != 3; }
+        }
+    }
+}
