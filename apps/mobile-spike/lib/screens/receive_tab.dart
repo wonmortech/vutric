@@ -73,7 +73,17 @@ Future<void> handleIncoming(BuildContext context, vutric.Incoming next, VoidCall
     ..landing += 1
     ..savedLast = false
     ..update();
-  await SchedulerBinding.instance.endOfFrame;
+  // In the background no frame is drawn, so waiting for one would hang the thrower. There the photo reaches the
+  // screen as a heads-up notification with its thumbnail (A11), and that is what "shown" reports.
+  if (_inFront) {
+    await SchedulerBinding.instance.endOfFrame;
+  } else {
+    await AndroidBridge.instance.notifyIncoming(
+      '${Session.instance.peer?.peerName ?? 'Qurilma'} rasm otdi',
+      p.fileName,
+      jpeg: p.jpeg,
+    );
+  }
   clock.stop();
   c
     ..lastMs = clock.elapsedMicroseconds / 1000
@@ -95,11 +105,22 @@ Future<void> handleIncoming(BuildContext context, vutric.Incoming next, VoidCall
   );
 }
 
+bool get _inFront => WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
 /// The other side offers files: ask (unless the settings already say yes), then save with progress.
 Future<void> _offer(BuildContext context, vutric.FilesOffer offer) async {
   HapticFeedback.mediumImpact();
   final s = Session.instance;
   final peer = s.peer?.peerName ?? 'Qurilma';
+  if (!_inFront) {
+    // The question waits in the app; the notification brings the user to it.
+    unawaited(
+      AndroidBridge.instance.notifyIncoming(
+        '$peer fayl yubormoqda',
+        '${offer.files} ta · ${sizeText(offer.bytes.toDouble())}${offer.autoAccept ? '' : ' · qabul qilasizmi?'}',
+      ),
+    );
+  }
   final yes =
       offer.autoAccept ||
       await showModalBottomSheet<bool>(

@@ -103,6 +103,16 @@ class MainActivity : FlutterActivity() {
                     runOnUiThread { result.success(n) }
                 }
             }
+            "notifyIncoming" -> {
+                askNotifications()
+                IncomingNotice.show(
+                    this,
+                    call.argument<String>("title") ?: "Vutric",
+                    call.argument<String>("text") ?: "",
+                    call.argument<ByteArray>("jpeg"),
+                )
+                result.success(null)
+            }
             "hotspotStart" -> startHotspot(result)
             "hotspotStop" -> {
                 LinkManager.stop()

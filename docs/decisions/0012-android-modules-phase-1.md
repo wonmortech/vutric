@@ -4,7 +4,7 @@
   77.0 MB) and `flutter analyze` is clean; nothing has been tried on a real phone yet.
 - Date: 2026-11-18
 - Implements: [ADR-0009](0009-native-modules-kotlin-swift.md) part 2, phase 1. Builds on [ADR-0011](0011-phone-ui-from-claude-design.md).
-- Backlog: A2, A3, A4, A5, A6, A7, A8.
+- Backlog: A2, A3, A4, A5, A6, A7, A8, A11.
 
 ## Context
 
@@ -26,6 +26,7 @@ need no Rust call of their own, because each one only opens an OS door and hands
 | 7 | **Nearby (A7):** phase 1 is the multicast lock (held only while the app is in front) plus the Rust mDNS discovery already in `vutric-net`. Android `NsdManager` is **not** added yet. It would announce the same service a second time, in a format W3 owns. It is worth adding only if real phones show OEMs that block raw multicast, which the device run will tell. BLE stays with R4 | No duplicate discovery path until a measurement asks for one | `MainActivity.kt` (`vutric/multicast`) |
 | 8 | **First start (A2):** two screens, shown once (`onboarded` in `ui.json`). (1) What Vutric does, with a still picture of the throw. (2) This phone's name plus the permissions. The gallery is asked here; the camera and local network are only explained here, because the OS asks for them when they are first used, with the reason strings from the manifest and Info.plist. Nothing blocks: every permission can be given later in place | A prompt with context gets accepted; a wall of prompts at launch does not | `lib/screens/onboarding.dart` |
 | 9 | **Manual fallback for the scanner (A2):** pasting the pairing link stays the fallback. A typed IP alone cannot connect, because the endpoint id is required; W3 #9 asks for a short code or an address-only hello | Honest fallback today, better one tracked | `scan_page.dart`, W3 #9, `docs/owner-questions.md` |
+| 11 | **Receive in the background (A11):** a photo or file offer arriving while Vutric is not on screen becomes a heads-up notification (high-importance channel "Kelgan rasm va fayllar"; a photo carries its thumbnail as a big picture). A tap opens Qabul. No frame is awaited in the background (none would be drawn, and the thrower would hang); the notification is what "shown" reports. It works while the process lives (open session, or a transfer service running); receiving with the app fully closed needs UniFFI (decision 1) | Never draws over other apps (no `SYSTEM_ALERT_WINDOW`), never leaves the thrower waiting | `IncomingNotice.kt`, `handleIncoming` / `_offer` in `receive_tab.dart` |
 | 10 | App label "Vutric" (was "Vutric spike") | It is what the user sees in the Share sheet and launcher | `AndroidManifest.xml` |
 
 ## Verified
@@ -44,6 +45,7 @@ need no Rust call of their own, because each one only opens an OS door and hands
 7. Revoke the folder grant in system settings: files stay in the Vutric folder and nothing crashes.
 8. Wi-Fi off everywhere → Routersiz → second phone scans the Wi-Fi QR → pairing QR → a throw lands.
 9. Close the session: the hotspot goes away.
+10. App in the background, desktop throws a photo: a heads-up with the thumbnail appears at once, and the desktop shows the result (no timeout); a tap opens Qabul.
 
 ## Consequences
 

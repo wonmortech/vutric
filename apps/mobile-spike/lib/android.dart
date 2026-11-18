@@ -100,6 +100,16 @@ class AndroidBridge {
     }
   }
 
+  /// A heads-up notification for something that arrived while Vutric is not on screen (A11).
+  Future<void> notifyIncoming(String title, String text, {Uint8List? jpeg}) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _ch.invokeMethod<void>('notifyIncoming', {'title': title, 'text': text, 'jpeg': jpeg});
+    } on PlatformException {
+      // No notification permission: the photo is still waiting in the Qabul tab.
+    }
+  }
+
   // ── SafStore ───────────────────────────────────────────────────────────────────────────────────────────────
 
   Future<SafFolder?> pickFolder() async {

@@ -114,20 +114,20 @@ Sources:
 
 | # | Item | Status |
 |---|---|---|
-| A1 | Gallery-first home, multi-select, one send button | [x] |
+| A1 | Gallery-first home, multi-select, one send button | [~] |
 | A2 | Onboarding + permissions; QR scan with manual IP as fallback | [~] |
 | A3 | `ShareEntry`: Share target and sharing shortcuts for paired devices | [~] |
-| A4 | `TransferJob`: user-initiated data transfer job (14+), `dataSync` foreground service before that | [x] |
-| A5 | `VutricTile`: Quick Settings "receive mode" | [x] |
+| A4 | `TransferJob`: user-initiated data transfer job (14+), `dataSync` foreground service before that | [~] |
+| A5 | `VutricTile`: Quick Settings "receive mode" | [~] |
 | A6 | `LinkManager`: hotspot (1), Wi-Fi P2P and Aware (later) | [~] |
 | A7 | `Nearby`: NSD + MulticastLock (1), BLE (R4) | [~] |
-| A8 | `SafStore`: SAF folder and MediaStore move after verification | [x] |
-| A9 | Fling screen: velocity threshold, spring back, haptic | [x] |
-| A10 | History with progress and resend | [x] |
-| A11 | Receive: Halqa in the app when open, otherwise a heads-up notification with a thumbnail; no `SYSTEM_ALERT_WINDOW` | [ ] |
+| A8 | `SafStore`: SAF folder and MediaStore move after verification | [~] |
+| A9 | Fling screen: velocity threshold, spring back, haptic | [~] |
+| A10 | History with progress and resend | [~] |
+| A11 | Receive: Halqa in the app when open, otherwise a heads-up notification with a thumbnail; no `SYSTEM_ALERT_WINDOW` | [~] |
 | A12 | `Companion` (notification mirroring) and `Clipboard`, opt-in | [ ] |
 | A13 | Kotlin `ForeignDiscovery` for LocalSend and KDE Connect | [ ] |
-| A14 | Apply the Claude Design UI (`design/claude-design/`) to every phone screen, improved where it falls short | [x] |
+| A14 | Apply the Claude Design UI (`design/claude-design/`) to every phone screen, improved where it falls short | [~] |
 
 ## 7. iPhone (ADR-0009 §3, roadmap Phase 3)
 
@@ -148,15 +148,15 @@ Sources:
 
 | # | Feature (who has it) | Where it is planned | Status |
 |---|---|---|---|
-| F1 | Send from the Share menu (AirDrop, Quick Share, LocalSend) | A3, I1, D5 | [ ] |
+| F1 | Send from the Share menu (AirDrop, Quick Share, LocalSend) | A3, I1, D5 | [~] |
 | F2 | Device shortcut in the Share sheet (Quick Share) | A3 | [ ] |
 | F3 | Find nearby devices automatically | R1, R4, A7, I4 | [ ] |
 | F4 | No internet, no router | R3, R6, R7 | [ ] |
 | F5 | Different networks over the internet (PairDrop) | R0, R2 | [x] (n0) |
 | F6 | Resume after a drop | protocol | [x] |
 | F7 | Background transfer with the app closed (Quick Share) | A4, D1 | [ ] |
-| F8 | One-tap tile or button | A5, I2, D1 | [ ] |
-| F9 | Progress on the lock screen | A4 notification, I2 | [ ] |
+| F8 | One-tap tile or button | A5, I2, D1 | [~] |
+| F9 | Progress on the lock screen | A4 notification, I2 | [~] |
 | F10 | Siri, Shortcuts, automation; desktop CLI | I3, `net-spike` CLI | [ ] |
 | F11 | PIN mode and auto-accept (LocalSend, Quick Share) | S1, S3, ADR-0007 | [~] (auto-accept setting) |
 | F12 | Clipboard sharing (KDE Connect, Apple) | A12 | [ ] |
