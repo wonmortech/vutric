@@ -4,6 +4,12 @@
 #[allow(clippy::needless_pass_by_value)]
 pub mod api;
 
+// The Share Extension and App Intents on iOS, through UniFFI (ADR-0009 rule 2, ADR-0015): no Flutter engine there.
+#[allow(clippy::needless_pass_by_value)]
+pub mod share;
+
+uniffi::setup_scaffolding!();
+
 // The app process's side of the foreign-app adapters (ADR-0066); iOS does not host them yet.
 #[cfg(not(target_os = "ios"))]
 mod compat_host;

@@ -1,0 +1,20 @@
+[package]
+name = "vutric-uniffi-bindgen"
+description = "Generates the Swift (and later Kotlin) bindings of vutric-mobile; a build tool, never shipped."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/main.rs"
+
+[dependencies]
+uniffi = { version = "=0.32.2", features = ["cli"] }
+
+[lints]
+workspace = true

@@ -16,6 +16,7 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../design/tokens.dart';
 import '../design/widgets.dart';
+import '../ios.dart';
 import '../session.dart';
 import '../transfer_ui.dart';
 import '../ui.dart';
@@ -194,8 +195,11 @@ class SendTabState extends State<SendTab> {
           missing++;
           continue;
         }
-        paths.add(f.path);
-        names.add(await a.titleAsync);
+        final title = await a.titleAsync;
+        // iOS (I6): HEIC goes out as JPEG when the setting says so; Windows opens JPEG without an extra codec.
+        final jpeg = _s.heicToJpeg ? await IosBridge.instance.jpegFromHeic(f.path) : null;
+        paths.add(jpeg?.path ?? f.path);
+        names.add(jpeg == null ? title : heicAsJpegName(title));
       }
       for (final e in _files.entries) {
         paths.add(e.key);

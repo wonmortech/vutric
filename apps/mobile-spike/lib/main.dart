@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'design/themes.g.dart';
 import 'design/tokens.dart';
+import 'ios.dart';
 import 'screens/home_shell.dart';
 import 'screens/onboarding.dart';
 import 'session.dart';
@@ -21,7 +22,7 @@ Future<void> main() async {
   try {
     // iOS: the Rust library is linked into the app itself (-force_load in the Xcode project), not a framework.
     await RustLib.init(externalLibrary: Platform.isIOS ? ExternalLibrary.process(iKnowHowToUseIt: true) : null);
-    await vutric.setSettingsDir(dir: (await getApplicationSupportDirectory()).path);
+    await vutric.setSettingsDir(dir: await settingsDir());
   } catch (e) {
     // A broken build (e.g. the Rust bridge stripped by the linker) says so instead of showing a blank screen.
     runApp(
@@ -37,6 +38,16 @@ Future<void> main() async {
   await Session.instance.loadTransferSettings();
   runApp(const VutricApp());
   await Session.instance.restart();
+}
+
+/// Rust's settings folder. iOS: inside the App Group, so the Share Extension and App Intents see the same paired
+/// devices (ADR-0015); files an older build left in the app's own folder move there once.
+Future<String> settingsDir() async {
+  final own = await getApplicationSupportDirectory();
+  final group = await IosBridge.instance.groupDir();
+  if (group == null) return own.path;
+  await moveIntoGroup(own, Directory(group));
+  return group;
 }
 
 /// The theme for [id]; `auto` is the iOS Native pair following the phone's light/dark setting.

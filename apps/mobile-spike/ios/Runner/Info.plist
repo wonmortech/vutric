@@ -2,6 +2,25 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>VutricAppGroup</key>
+	<string>$(VUTRIC_APP_GROUP)</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>INSendMessageIntent</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.wonmor.vutric</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>vutric</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Vutric finds and connects to your own devices on this Wi-Fi. Files go only to the device you choose, encrypted.</string>
 	<key>NSBonjourServices</key>

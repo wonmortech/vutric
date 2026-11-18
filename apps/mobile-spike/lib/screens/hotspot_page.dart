@@ -5,6 +5,7 @@
 // unpaired, or when the session it carries ends.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -14,6 +15,7 @@ import '../android.dart';
 import '../design/tokens.dart';
 import '../design/widgets.dart';
 import '../i18n.dart';
+import '../ios.dart';
 import '../session.dart';
 import '../src/rust/api.dart' as vutric;
 import '../ui.dart';
@@ -232,7 +234,17 @@ Future<bool> joinHotspot(BuildContext context, vutric.HotspotNet net) async {
   messenger.showSnackBar(SnackBar(content: Text(tr('hotspot.join.wait')), duration: const Duration(seconds: 30)));
   final bridge = AndroidBridge.instance;
   try {
-    await bridge.hotspotJoin(ssid: net.ssid, password: net.password, security: net.security, hidden: net.hidden);
+    // iOS: NEHotspotConfiguration (I5); the same answer codes as Android's LinkManager.
+    if (Platform.isIOS) {
+      await IosBridge.instance.hotspotJoin(
+        ssid: net.ssid,
+        password: net.password,
+        security: net.security,
+        hidden: net.hidden,
+      );
+    } else {
+      await bridge.hotspotJoin(ssid: net.ssid, password: net.password, security: net.security, hidden: net.hidden);
+    }
   } on PlatformException catch (e) {
     messenger
       ..hideCurrentSnackBar()
@@ -251,7 +263,7 @@ Future<bool> joinHotspot(BuildContext context, vutric.HotspotNet net) async {
   // Sockets opened before the join stay on the old network: start the node again on the hotspot.
   await Session.instance.restart();
   Session.instance.onDisconnect = () {
-    bridge.hotspotLeave();
+    Platform.isIOS ? IosBridge.instance.hotspotLeave(net.ssid) : bridge.hotspotLeave();
   };
   return true;
 }

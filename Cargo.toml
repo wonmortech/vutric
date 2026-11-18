@@ -13,6 +13,7 @@ members = [
     "crates/vutric-mobile",
     "apps/overlay-spike",
     "crates/vutric-compat-wormhole",
+    "crates/vutric-mobile/uniffi-bindgen",
 ]
 
 [workspace.package]

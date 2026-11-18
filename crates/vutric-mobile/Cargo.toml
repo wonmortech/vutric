@@ -16,6 +16,9 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 anyhow.workspace = true
 flutter_rust_bridge = "=2.13.0"
 serde_json = "1"
+# Swift (and later Kotlin) bindings for the Share Extension and App Intents (ADR-0009 rule 2, ADR-0015). Only the
+# proc-macros here; the generator is `crates/vutric-mobile/uniffi-bindgen`, so it never lands in the app.
+uniffi = "=0.32.2"
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 vutric-core.workspace = true
 vutric-net = { path = "../vutric-net" }
