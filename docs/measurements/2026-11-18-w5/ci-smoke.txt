@@ -1,0 +1,8 @@
+agent running: yes (pid 2711)
+     io.wonmor.vutric.share(0.0.1)	C6DFBF33-B27B-48E2-983C-E04C3FDDD537	2026-11-18 15:04:04 +0000	/Users/runner/Applications/Vutric.app/Contents/PlugIns/VutricShare.appex
+ (1 plug-in)
+share extension registered: yes
+services entry known to pbs: yes
+frontmost after vutric://send: Finder
+Vutric windows: 
+agent quit: yes
