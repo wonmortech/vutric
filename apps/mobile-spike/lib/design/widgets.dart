@@ -2,6 +2,7 @@
 // outline or brutal), pill buttons, the connected-device pill, result and error notices, the glass tab bar.
 // Screens compose these; they never draw their own buttons or cards.
 
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
@@ -18,8 +19,7 @@ class VLogoMark extends StatelessWidget {
   final Color color;
 
   @override
-  Widget build(BuildContext context) =>
-      CustomPaint(size: Size(size * 26.5 / 30, size), painter: _MarkPainter(color));
+  Widget build(BuildContext context) => CustomPaint(size: Size(size * 26.5 / 30, size), painter: _MarkPainter(color));
 }
 
 class _MarkPainter extends CustomPainter {
@@ -193,11 +193,20 @@ class _VPressableState extends State<VPressable> {
                 widget.onTap!();
               }
             : null,
-        child: AnimatedScale(
-          scale: _down && !context.reducedMotion ? 0.97 : 1,
-          duration: VMotion.fast,
-          curve: VMotion.out,
-          child: widget.child,
+        // Every tappable surface is at least 48 x 48 to the finger (Android) and screen reader, whatever it looks
+        // like: a 36 px circle keeps its look, with the touch area centred around it.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: Center(
+            widthFactor: 1,
+            heightFactor: 1,
+            child: AnimatedScale(
+              scale: _down && !context.reducedMotion ? 0.97 : 1,
+              duration: VMotion.fast,
+              curve: VMotion.out,
+              child: widget.child,
+            ),
+          ),
         ),
       ),
     );
@@ -273,11 +282,22 @@ class VButton extends StatelessWidget {
           border: v.material == VMaterial.brutal ? Border.all(color: v.ink, width: 2) : null,
           boxShadow: v.material == VMaterial.brutal
               ? [BoxShadow(color: v.ink, offset: const Offset(4, 4))]
-              : [BoxShadow(color: v.accent.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8), spreadRadius: -8)],
+              : [
+                  BoxShadow(
+                    color: v.accent.withValues(alpha: 0.35),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                    spreadRadius: -8,
+                  ),
+                ],
         ),
         child: Center(child: content),
       ),
-      VButtonKind.secondary => VSurface(radius: r, color: v.raised, child: Center(child: content)),
+      VButtonKind.secondary => VSurface(
+        radius: r,
+        color: v.raised,
+        child: Center(child: content),
+      ),
       VButtonKind.ghost => Center(child: content),
     };
     return AnimatedOpacity(
@@ -294,7 +314,14 @@ class VButton extends StatelessWidget {
 
 /// A round 36 px glass button (back, close).
 class VCircleButton extends StatelessWidget {
-  const VCircleButton({super.key, required this.icon, required this.onTap, this.label, this.size = 36, this.dark = false});
+  const VCircleButton({
+    super.key,
+    required this.icon,
+    required this.onTap,
+    this.label,
+    this.size = 36,
+    this.dark = false,
+  });
   final IconData icon;
   final VoidCallback onTap;
   final String? label;
@@ -314,7 +341,11 @@ class VCircleButton extends StatelessWidget {
                 decoration: const BoxDecoration(color: Color(0x33FFFFFF), shape: BoxShape.circle),
                 child: Icon(icon, size: 18, color: Colors.white),
               )
-            : VSurface(radius: size / 2, color: v.raised, child: Icon(icon, size: 18, color: v.ink)),
+            : VSurface(
+                radius: size / 2,
+                color: v.raised,
+                child: Icon(icon, size: 18, color: v.ink),
+              ),
       ),
     );
   }
@@ -373,17 +404,24 @@ class VDevicePill extends StatelessWidget {
         children: [
           _Dot(color: lost ? v.muted : v.ok, halo: !lost),
           const SizedBox(width: 8),
+          // Name and platform share one line that shortens as a whole: with large text the code still fits.
           Flexible(
-            child: Text(
-              name,
+            child: Text.rich(
+              TextSpan(
+                text: name,
+                style: v.text(13.5, FontWeight.w500, color: lost ? v.muted : v.ink),
+                children: [
+                  TextSpan(
+                    text: lost
+                        ? ' · uzildi'
+                        : (platform == null || platform!.isEmpty ? '' : ' · ${platformName(platform!)}'),
+                    style: v.text(13.5, FontWeight.w400, color: v.muted),
+                  ),
+                ],
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: v.text(13.5, FontWeight.w500, color: lost ? v.muted : v.ink),
             ),
-          ),
-          Text(
-            lost ? ' · uzildi' : (platform == null || platform!.isEmpty ? '' : ' · ${platformName(platform!)}'),
-            style: v.text(13.5, FontWeight.w400, color: v.muted),
           ),
           if (code != null && !lost) ...[
             const SizedBox(width: 8),
@@ -397,10 +435,16 @@ class VDevicePill extends StatelessWidget {
         ],
       ),
     );
-    return Semantics(
-      label: lost ? '$name bilan aloqa uzildi' : '$name ga ulangan, tekshiruv kodi $code',
-      child: onTap == null ? pill : VPressable(onTap: onTap, child: pill),
-    );
+    // The label says it all; the visible texts are excluded so they are not read a second time. The tap action
+    // stays on VPressable's own node, so a screen reader can still open the session sheet.
+    final label = lost ? '$name bilan aloqa uzildi' : '$name ga ulangan, tekshiruv kodi $code';
+    return onTap == null
+        ? Semantics(label: label, excludeSemantics: true, child: pill)
+        : VPressable(
+            onTap: onTap,
+            semanticLabel: label,
+            child: ExcludeSemantics(child: pill),
+          );
   }
 }
 
@@ -462,7 +506,9 @@ class VResultPill extends StatelessWidget {
                 child: Icon(icon, size: 14, color: Colors.white),
               ),
             const SizedBox(width: 8),
-            Text(text, style: v.text(14, FontWeight.w500)),
+            Flexible(
+              child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: v.text(14, FontWeight.w500)),
+            ),
             if (mono != null) ...[
               Text(' · ', style: v.text(14, FontWeight.w400, color: v.muted)),
               Text(mono!, style: v.text(13, FontWeight.w600, mono: true)),
@@ -500,7 +546,11 @@ class VNotice extends StatelessWidget {
                 height: 22,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-                child: Icon(error ? Icons.priority_high_rounded : Icons.info_outline_rounded, size: 15, color: Colors.white),
+                child: Icon(
+                  error ? Icons.priority_high_rounded : Icons.info_outline_rounded,
+                  size: 15,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -600,7 +650,11 @@ class VEmpty extends StatelessWidget {
             Text(title, textAlign: TextAlign.center, style: v.title),
             if (body != null) ...[
               const SizedBox(height: 8),
-              Text(body!, textAlign: TextAlign.center, style: v.text(14, FontWeight.w400, color: v.muted, height: 1.4)),
+              Text(
+                body!,
+                textAlign: TextAlign.center,
+                style: v.text(14, FontWeight.w400, color: v.muted, height: 1.4),
+              ),
             ],
             if (extra != null) ...[const SizedBox(height: 12), extra!],
           ],
@@ -696,21 +750,30 @@ class VGlassTabBar extends StatelessWidget {
                       child: AnimatedContainer(
                         duration: VMotion.fast,
                         curve: VMotion.out,
-                        height: 52,
+                        constraints: const BoxConstraints(minHeight: 52),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         decoration: BoxDecoration(
                           color: i == index ? v.bgAlt : Colors.transparent,
                           borderRadius: BorderRadius.circular(v.rPill.clamp(0, 28)),
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(t.icon, size: 22, color: i == index ? v.accent : v.ink),
-                            const SizedBox(height: 2),
-                            Text(
-                              t.label,
-                              style: v.text(10.5, FontWeight.w600, color: i == index ? v.accent : v.ink),
-                            ),
-                          ],
+                        // Tab labels grow only to 1.3x, as on iOS: the bar stays one row; the label is still
+                        // read in full by the screen reader (semanticLabel).
+                        child: MediaQuery.withClampedTextScaling(
+                          maxScaleFactor: 1.3,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(t.icon, size: 22, color: i == index ? v.accent : v.ink),
+                              const SizedBox(height: 2),
+                              Text(
+                                t.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: v.text(10.5, FontWeight.w600, color: i == index ? v.accent : v.ink),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -725,7 +788,10 @@ class VGlassTabBar extends StatelessWidget {
           semanticLabel: sideLabel,
           child: SizedBox.square(
             dimension: 60,
-            child: VSurface(radius: v.rPill.clamp(0, 30), child: Icon(sideIcon, size: 24, color: v.ink)),
+            child: VSurface(
+              radius: v.rPill.clamp(0, 30),
+              child: Icon(sideIcon, size: 24, color: v.ink),
+            ),
           ),
         ),
       ],
@@ -743,44 +809,70 @@ class VSegmented extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = context.v;
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(color: v.bgAlt, borderRadius: BorderRadius.circular(v.rPill.clamp(0, 18))),
-      child: Row(
+    // The track looks 36 tall (the handoff) and grows with the text; the touch area is never under 48.
+    final track = math.max(36.0, MediaQuery.textScalerOf(context).scale(13.5) * 1.35 + 12);
+    final touch = math.max(48.0, track);
+    return SizedBox(
+      height: touch,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          for (final (i, l) in labels.indexed)
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  if (i != index) HapticFeedback.selectionClick();
-                  onChanged(i);
-                },
-                child: AnimatedContainer(
-                  duration: VMotion.fast,
-                  curve: VMotion.out,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: i == index ? v.raised : Colors.transparent,
-                    borderRadius: BorderRadius.circular(v.rPill.clamp(0, 16)),
-                    boxShadow: i == index && v.material == VMaterial.glass
-                        ? const [BoxShadow(color: Color(0x1A000000), blurRadius: 6, offset: Offset(0, 2))]
-                        : null,
-                    border: i == index && v.material == VMaterial.brutal ? Border.all(color: v.ink, width: 2) : null,
-                  ),
+          Container(
+            height: track,
+            decoration: BoxDecoration(color: v.bgAlt, borderRadius: BorderRadius.circular(v.rPill.clamp(0, 18))),
+          ),
+          Row(
+            children: [
+              for (final (i, l) in labels.indexed)
+                Expanded(
+                  // The semantics node covers the whole 48-tall touch area, not just the visible segment.
                   child: Semantics(
                     selected: i == index,
                     button: true,
-                    child: Text(l, style: v.text(13.5, i == index ? FontWeight.w600 : FontWeight.w500)),
+                    label: l,
+                    excludeSemantics: true,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (i != index) HapticFeedback.selectionClick();
+                        onChanged(i);
+                      },
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(i == 0 ? 2 : 1, 0, i == labels.length - 1 ? 2 : 1, 0),
+                          child: SizedBox(height: track - 4, child: _segment(v, i, l)),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
+            ],
+          ),
         ],
       ),
     );
   }
+
+  Widget _segment(VutricTokens v, int i, String l) => AnimatedContainer(
+    duration: VMotion.fast,
+    curve: VMotion.out,
+    alignment: Alignment.center,
+    padding: const EdgeInsets.symmetric(horizontal: 6),
+    decoration: BoxDecoration(
+      color: i == index ? v.raised : Colors.transparent,
+      borderRadius: BorderRadius.circular(v.rPill.clamp(0, 16)),
+      boxShadow: i == index && v.material == VMaterial.glass
+          ? const [BoxShadow(color: Color(0x1A000000), blurRadius: 6, offset: Offset(0, 2))]
+          : null,
+      border: i == index && v.material == VMaterial.brutal ? Border.all(color: v.ink, width: 2) : null,
+    ),
+    child: Text(
+      l,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: v.text(13.5, i == index ? FontWeight.w600 : FontWeight.w500),
+    ),
+  );
 }
 
 /// The photo card of S3: rounded image, a 5 px raised ring and the deep drop shadow.

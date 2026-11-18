@@ -109,7 +109,13 @@ void main() {
     });
 
     test('a damaged or older entry still loads', () {
-      final h = HistoryItem.fromJson({'sent': 'yes', 'files': 3, 'seconds': 2, 'at': 'garbage', 'names': [1, 'b']});
+      final h = HistoryItem.fromJson({
+        'sent': 'yes',
+        'files': 3,
+        'seconds': 2,
+        'at': 'garbage',
+        'names': [1, 'b'],
+      });
       expect(h.sent, isFalse);
       expect(h.peer, '');
       expect(h.files, 3);
