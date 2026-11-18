@@ -343,14 +343,22 @@ impl Peer {
         EndpointId(*self.endpoint.id().as_bytes())
     }
 
+    /// Every UDP socket the endpoint listens on (for building hints by hand, R5a).
+    #[must_use]
+    pub fn bound_sockets(&self) -> Vec<std::net::SocketAddr> {
+        self.endpoint.bound_sockets()
+    }
+
     /// The QR payload: our key plus every LAN address we listen on (for networks that drop multicast).
     #[must_use]
     pub fn ticket(&self) -> PairingTicket {
         // Ranked by interface (wired, Wi-Fi, tethering, virtual last); link-local IPv6 goes in without its zone and
         // the dialer expands it to its own interfaces (`lan::expand_link_local`).
-        // iroh leaves out self-assigned addresses when any other exists; add them so a cable shows up (R5a).
+        // iroh leaves out self-assigned addresses when any other exists; add those of cable-only links so a
+        // cable between two computers shows up (R5a, ADR-0068).
         let locals = lan::local_addrs();
-        let extra = lan::self_assigned_addrs(&self.endpoint.bound_sockets(), &locals);
+        let extra =
+            lan::self_assigned_addrs(&self.endpoint.bound_sockets(), &lan::cable_links(&locals));
         let addrs = lan::ticket_addrs(
             self.endpoint.addr().ip_addrs().copied().chain(extra),
             &locals,

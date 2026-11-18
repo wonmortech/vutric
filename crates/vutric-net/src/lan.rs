@@ -249,6 +249,27 @@ pub fn self_assigned_addrs(bound: &[SocketAddr], locals: &[LocalAddr]) -> Vec<So
         .collect()
 }
 
+/// The addresses of interfaces that have nothing but self-assigned addresses: a cable between two computers
+/// (R5a). An interface that also has a DHCP or static address is reached through that one; adding its `fe80::`
+/// too only adds candidates that can stall a dial (seen on Linux CI, ADR-0068).
+#[must_use]
+pub fn cable_links(locals: &[LocalAddr]) -> Vec<LocalAddr> {
+    let self_assigned = |ip: IpAddr| match ip {
+        IpAddr::V4(v4) => v4.is_link_local(),
+        IpAddr::V6(v6) => is_link_local_v6(v6),
+    };
+    locals
+        .iter()
+        .filter(|l| {
+            locals
+                .iter()
+                .filter(|o| o.iface == l.iface)
+                .all(|o| self_assigned(o.ip))
+        })
+        .cloned()
+        .collect()
+}
+
 /// Most dial candidates after link-local expansion.
 pub const MAX_CANDIDATES: usize = 32;
 
@@ -629,6 +650,18 @@ mod tests {
             "0.0.0.0:5000".parse().unwrap(),
             "[::]:5001".parse().unwrap(),
         ];
+        assert!(
+            cable_links(&locals).iter().all(|c| c.iface == 2),
+            "the Wi-Fi link has a real address"
+        );
+        let mixed = vec![
+            l("10.0.0.5", 24, 4, Medium::Wired),
+            l("fe80::5", 64, 4, Medium::Wired),
+        ];
+        assert!(
+            cable_links(&mixed).is_empty(),
+            "fe80 next to a DHCP address stays out"
+        );
         let got = self_assigned_addrs(&bound, &locals);
         assert_eq!(
             got,

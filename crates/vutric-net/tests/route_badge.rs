@@ -56,7 +56,7 @@ async fn lan_session_shows_the_lan_badge() {
 }
 
 /// Backlog R5a: two computers on one cable have only self-assigned addresses, and the QR carries link-local IPv6
-/// without its zone. Here the ticket keeps only its zone-less `fe80::` hints; the dialer expands them to its own
+/// without its zone. Here the ticket has only zone-less `fe80::` hints; the dialer expands them to its own
 /// interfaces and connects. Skipped (with a note) on a host with no link-local IPv6 address.
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
@@ -70,11 +70,18 @@ async fn zone_less_link_local_hint_connects() {
     let other = Peer::bind([34; 32], "Laptop B", Platform::Linux, Reach::Lan)
         .await
         .expect("bind");
+    // What the QR carries for a cable-only link: every self-assigned IPv6 address, zone stripped. Built from all
+    // interfaces here, since this host has no cable (the ticket itself only adds cable-only links).
     let mut ticket = desktop.ticket();
-    ticket.addrs.retain(|a| match a {
-        std::net::SocketAddr::V6(v6) => lan::is_link_local_v6(*v6.ip()) && v6.scope_id() == 0,
-        std::net::SocketAddr::V4(_) => false,
-    });
+    ticket.addrs = lan::self_assigned_addrs(&desktop.bound_sockets(), &lan::local_addrs())
+        .into_iter()
+        .filter_map(|a| match a {
+            std::net::SocketAddr::V6(v6) => Some(std::net::SocketAddr::V6(
+                std::net::SocketAddrV6::new(*v6.ip(), v6.port(), 0, 0),
+            )),
+            std::net::SocketAddr::V4(_) => None,
+        })
+        .collect();
     if ticket.addrs.is_empty() {
         eprintln!("skipped: no link-local IPv6 address on this host");
         desktop.close().await;

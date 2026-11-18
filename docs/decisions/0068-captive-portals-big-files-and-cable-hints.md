@@ -67,8 +67,11 @@ address. A laptop that is on Wi-Fi as well as the cable therefore put no cable a
 
 **Decision.** `lan::self_assigned_addrs(bound, locals)` pairs every self-assigned address of our interfaces with
 the port of the socket bound to the unspecified address of the same family. `Peer::ticket` adds these addresses
-before ranking, so wired links still come first and `MAX_HINTS` still caps the list. The QR may now be a little
-longer; the cap is unchanged.
+only for **cable-only links** (`lan::cable_links`), meaning interfaces whose addresses are all self-assigned. An
+interface that also has a DHCP or static address is reached through that address. The first version added
+`fe80::` for every interface, and on the Ubuntu CI runner that made `vutric-mobile/tests/catch.rs` miss its 8 s
+connect timeout (run 44258986996). Ranking and `MAX_HINTS` are unchanged. `Peer::bound_sockets` is new, so hints
+can be built by hand.
 
 ## 4. The relay page (R2 follow-up)
 
@@ -97,5 +100,5 @@ can see stays complete.
 | `route::tests::bulk_limits_only_apply_to_relayed_paths`, `transfer::tests::relay_guard_waits_for_a_direct_path_then_refuses` (refuses after the wait; allows when the path turns direct after 250 ms) | pass |
 | `relay_path.rs::bulk_verdict_follows_the_live_path`: ticket with the relay only, the session is direct on loopback and a 30 GiB verdict is `Go` | pass |
 | `lan::tests::self_assigned_addresses_join_the_hints` | pass |
-| `route_badge.rs::zone_less_link_local_hint_connects`: the ticket keeps only zone-less `fe80::` hints; the dialer connects and the live path's remote address is `fe80::2638:…` (Wi-Fi link) | pass, 3 runs; before the fix, the ticket had no IPv6 hint at all (`[192.168.100.126, 172.24.112.1, 172.26.144.1, 100.77.9.81]`) |
+| `route_badge.rs::zone_less_link_local_hint_connects` (ignored on Linux, see above): hints are only zone-less `fe80::` addresses, built with `self_assigned_addrs` over all interfaces, since this host has no cable; the dialer connects and the live path's remote address is `fe80::2638:…` (Wi-Fi link) | pass, 3 runs; before the fix, the ticket had no IPv6 hint at all (`[192.168.100.126, 172.24.112.1, 172.26.144.1, 100.77.9.81]`) |
 | fuzz smoke `captive_random_and_near_valid` | pass |
