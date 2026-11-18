@@ -87,13 +87,13 @@ Sources:
 |---|---|---|
 | T1 | On the phone screen: accept mode, gallery + album + keep copy, split by type, subfolder, keep tree, conflicts | [~] |
 | T2 | Save folder of the user's choice: Android SAF (`SafStore`), iPhone Files bookmark, desktop folder dialog; a missing folder falls back to the default and tells the user once. Engine: fallback + told once (ADR-0057); `SaveRules.android_tree` keeps the SAF tree URI + label (#8, test `android_tree_is_kept_and_checked`); SAF/bookmark/dialog = W1/W2 | [~] |
-| T3 | Per-device overrides (`devices`) on the device detail screen | [ ] |
+| T3 | Per-device overrides (`devices`) on the device detail screen. Engine: `DeviceRules`, `rules_for`, `set_device_rules` with id check and cap (ADR-0063, test `device_rules_are_checked_and_bounded`); the screen is W1/W2 | [~] |
 | T4 | Free-space guard (refuse when < 1 GB would remain), checking app storage too on phones. Engine: guard checks target and app storage (ADR-0057) | [~] |
 | T5 | After receiving: notification / open file / open folder / nothing. Engine: `After::action` (ADR-0057); hosts carry it out | [~] |
 | T6 | Unfinished parts kept 7 days (1–30, "delete now"); history 90 days. Engine: `disk::sweep_parts` (ADR-0057); hosts schedule it, history expiry with the history store | [~] |
 | T7 | "Ask" option for name conflicts. Engine: `Conflict::Ask` + `SaveTo.ask` (ADR-0057); screens = W1/W2 | [~] |
 | T8 | Desktop settings window with the same groups in the same order | [ ] |
-| T9 | Versioned schema with migrations from the first release | [~] (`version` field exists) |
+| T9 | Versioned schema with migrations from the first release. Bump rule and one migrate step per version; saving over a newer file keeps its unknown fields and version (ADR-0063, tests `a_newer_file_keeps_what_we_do_not_know`, `round_trip_damaged_and_missing`, `migrate_clamps`) | [x] |
 
 ## 5. Desktop (roadmap Phase 1–2, ADR-0009 §4, ST §3–5)
 

@@ -426,6 +426,9 @@ impl Default for Adapter {
     }
 }
 
+/// Most per-device override entries kept (T3); the rest are dropped by [`Settings::migrate`].
+pub const MAX_DEVICE_RULES: usize = 1024;
+
 /// Most pinned fingerprints kept per adapter.
 pub const MAX_PINNED: usize = 256;
 
@@ -504,7 +507,7 @@ impl Settings {
     pub fn rules_for(&self, device: &str) -> (SaveRules, Accept) {
         let mut save = self.save.clone();
         let mut accept = self.accept;
-        if let Some(d) = self.devices.get(device) {
+        if let Some(d) = self.devices.get(&device.to_ascii_lowercase()) {
             if let Some(f) = &d.folder {
                 save.folder = Some(f.clone());
             }
@@ -566,7 +569,36 @@ impl Settings {
                 .collect();
         }
         self.compat.migrate();
+        let devices = std::mem::take(&mut self.devices);
+        self.devices = devices
+            .into_iter()
+            .filter(|(k, d)| {
+                k.len() == 64
+                    && k.bytes().all(|b| b.is_ascii_hexdigit())
+                    && *d != DeviceRules::default()
+            })
+            .map(|(k, d)| (k.to_ascii_lowercase(), d))
+            .take(MAX_DEVICE_RULES)
+            .collect();
         self
+    }
+
+    /// Sets the overrides for `device` (endpoint id, 64 hex); all-`None` rules remove the entry (T3).
+    /// Returns false, changing nothing, for a malformed id or when [`MAX_DEVICE_RULES`] is reached.
+    pub fn set_device_rules(&mut self, device: &str, rules: DeviceRules) -> bool {
+        if device.len() != 64 || !device.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return false;
+        }
+        let key = device.to_ascii_lowercase();
+        if rules == DeviceRules::default() {
+            self.devices.remove(&key);
+            return true;
+        }
+        if !self.devices.contains_key(&key) && self.devices.len() >= MAX_DEVICE_RULES {
+            return false;
+        }
+        self.devices.insert(key, rules);
+        true
     }
 }
 
@@ -700,6 +732,47 @@ mod tests {
         assert_eq!(date_of_unix(0), "1970-01-01");
         assert_eq!(date_of_unix(951_782_400), "2000-02-29");
         assert_eq!(date_of_unix(1_795_000_000), "2026-11-18");
+    }
+
+    #[test]
+    fn device_rules_are_checked_and_bounded() {
+        let id = "AB".repeat(32);
+        let mut s = Settings::default();
+        let rules = DeviceRules {
+            accept: Some(Accept::Trusted),
+            ..DeviceRules::default()
+        };
+        assert!(s.set_device_rules(&id, rules.clone()));
+        assert_eq!(
+            s.rules_for(&id.to_ascii_lowercase()).1,
+            Accept::Trusted,
+            "ids match in any case"
+        );
+        assert!(!s.set_device_rules("not-an-id", rules.clone()));
+        assert!(
+            s.set_device_rules(&id, DeviceRules::default()),
+            "empty rules remove the entry"
+        );
+        assert!(s.devices.is_empty());
+
+        // A hand-edited file: bad keys and empty entries go, upper-case keys are folded, the count is capped.
+        for i in 0..MAX_DEVICE_RULES + 5 {
+            s.devices.insert(format!("{i:064X}"), rules.clone());
+        }
+        s.devices.insert("short".into(), rules.clone());
+        s.devices.insert("cd".repeat(32), DeviceRules::default());
+        let s = s.migrate();
+        assert_eq!(s.devices.len(), MAX_DEVICE_RULES);
+        assert!(
+            s.devices
+                .keys()
+                .all(|k| k.len() == 64 && *k == k.to_ascii_lowercase())
+        );
+        let mut full = s.clone();
+        assert!(
+            !full.set_device_rules(&"ef".repeat(32), rules),
+            "no room left"
+        );
     }
 
     #[test]
