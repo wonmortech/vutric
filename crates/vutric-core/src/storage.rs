@@ -216,6 +216,37 @@ pub struct SaveRules {
     pub album: String,
     /// Phones: keep the file in the save folder after it went to the gallery.
     pub keep_copy: bool,
+    /// Android: the folder the user picked through the Storage Access Framework (issue #8). Rust still saves
+    /// into `folder`; the phone moves each verified file into this tree. `None` = no picked tree.
+    pub android_tree: Option<AndroidTree>,
+}
+
+/// A Storage Access Framework tree the user granted (Android 11+), as the phone stores it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AndroidTree {
+    /// The tree URI from `ACTION_OPEN_DOCUMENT_TREE` (`content://…`).
+    pub uri: String,
+    /// What the settings screen shows ("SD karta / Vutric").
+    #[serde(default)]
+    pub label: String,
+}
+
+/// Longest SAF tree URI kept.
+pub const MAX_TREE_URI: usize = 2048;
+
+impl AndroidTree {
+    /// Whether the URI is one the phone could have been granted: `content://`, at most [`MAX_TREE_URI`] bytes,
+    /// no whitespace or control characters.
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
+        self.uri.len() <= MAX_TREE_URI
+            && self.uri.len() > "content://".len()
+            && self.uri.starts_with("content://")
+            && !self
+                .uri
+                .chars()
+                .any(|c| c.is_control() || c.is_whitespace())
+    }
 }
 
 impl Default for SaveRules {
@@ -230,6 +261,7 @@ impl Default for SaveRules {
             gallery: true,
             album: "Vutric".into(),
             keep_copy: true,
+            android_tree: None,
         }
     }
 }
@@ -513,6 +545,22 @@ impl Settings {
             "Vutric".clone_into(&mut self.save.album);
         }
         self.save.album = self.save.album.chars().take(64).collect();
+        if self
+            .save
+            .android_tree
+            .as_ref()
+            .is_some_and(|t| !t.is_valid())
+        {
+            self.save.android_tree = None;
+        }
+        if let Some(t) = &mut self.save.android_tree {
+            t.label = t
+                .label
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(64)
+                .collect();
+        }
         self.compat.migrate();
         self
     }
@@ -665,6 +713,38 @@ mod tests {
         assert_eq!(s.version, SETTINGS_VERSION);
         assert_eq!(s.parts_keep_days, 30);
         assert_eq!(s.save.album, "Vutric");
+    }
+
+    #[test]
+    fn android_tree_is_kept_and_checked() {
+        let uri = "content://com.android.externalstorage.documents/tree/primary%3AVutric";
+        let json = format!(
+            r#"{{"save":{{"android_tree":{{"uri":"{uri}","label":"Ichki xotira / Vutric"}}}}}}"#
+        );
+        let s: Settings = serde_json::from_str(&json).unwrap();
+        let s = s.migrate();
+        let tree = s.save.android_tree.clone().expect("kept");
+        assert_eq!(tree.uri, uri);
+        assert_eq!(tree.label, "Ichki xotira / Vutric");
+        let again: Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(again, s);
+
+        let old: Settings = serde_json::from_str(r#"{"save":{"album":"A"}}"#).unwrap();
+        assert_eq!(old.save.android_tree, None, "older files have no tree");
+
+        for bad in [
+            "file:///sdcard",
+            "content://",
+            "content://a b",
+            &format!("content://{}", "x".repeat(3000)),
+        ] {
+            let mut s = Settings::default();
+            s.save.android_tree = Some(AndroidTree {
+                uri: bad.to_owned(),
+                label: String::new(),
+            });
+            assert_eq!(s.migrate().save.android_tree, None, "{bad}");
+        }
     }
 
     #[test]

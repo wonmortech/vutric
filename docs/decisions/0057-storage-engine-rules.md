@@ -38,3 +38,11 @@ All changes are additive: new enum variants, new fields with defaults, new funct
   staging folder once a day, plus a "delete now" button; carry out `After::action`; SAF and iPhone bookmark
   folders (T2) are platform code.
 - **W2:** the same for the desktop window (T8), with a folder dialog.
+
+## Addendum (2026-11-18, issue #8)
+
+`SaveRules.android_tree: Option<AndroidTree { uri, label }>` keeps the Storage Access Framework tree the user
+picked on Android. Rust still writes into `folder` (app storage); the phone moves each verified file into the tree
+(W1 `SafStore`, ADR-0012). `migrate` drops a URI that is not `content://…`, longer than 2048 bytes or contains
+whitespace or control characters, and cuts the label to 64 characters. Older files read as `None`. Test:
+`storage::tests::android_tree_is_kept_and_checked`.
