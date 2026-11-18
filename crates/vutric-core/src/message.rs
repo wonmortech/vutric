@@ -175,6 +175,11 @@ pub enum Message {
     /// "Ring my phone" (ADR-0069, backlog F14): start or stop a loud sound on the other device. Taken only from a
     /// paired device and rate-limited (`crate::ring`).
     Ring(crate::ring::Ring),
+    /// To a paired device only, after pairing: this device's key for BLE rotating ids (ADR-0071), so the other
+    /// side can recognise it nearby. Taken only from a trusted device (`crate::ble::accepts_key`).
+    BleKey {
+        key: crate::ble::BleKey,
+    },
 }
 
 /// Most characters of [`Notice::app`] and [`Notice::title`].
@@ -220,6 +225,7 @@ impl Message {
             Self::Notice(_) => "Notice",
             Self::Clipboard { .. } => "Clipboard",
             Self::Ring(_) => "Ring",
+            Self::BleKey { .. } => "BleKey",
         }
     }
 }
@@ -459,6 +465,11 @@ mod tests {
         assert_eq!(wire[4], 14);
         let wire = crate::frame::encode(&Message::Ring(crate::ring::Ring::Stop)).unwrap();
         assert_eq!(wire[4], 15);
+        let wire = crate::frame::encode(&Message::BleKey {
+            key: crate::ble::BleKey([0; 16]),
+        })
+        .unwrap();
+        assert_eq!(wire[4], 16);
     }
 
     #[test]

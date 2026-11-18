@@ -219,6 +219,40 @@ pub fn adb_devices(data: &[u8]) {
     }
 }
 
+/// BLE from any device in radio range (R4, ADR-0071): advertisement service data, the Wi-Fi Aware / GATT hello,
+/// GATT payloads and a stream of chunks. Decoders never panic, what they accept re-encodes to the same value, the
+/// reassembler never yields more than the cap.
+pub fn ble_frames(data: &[u8]) {
+    use vutric_core::ble::{Advert, BlePayload, LinkHello, MAX_PAYLOAD_BYTES, Reassembler};
+    if let Some(a) = Advert::decode(data) {
+        assert_eq!(Advert::decode(&a.encode()), Some(a));
+    }
+    if let Some(h) = LinkHello::decode(data) {
+        assert_eq!(LinkHello::decode(&h.encode()), Some(h));
+    }
+    if let Ok(p) = BlePayload::decode(data) {
+        assert_eq!(
+            BlePayload::decode(&p.encode().expect("accepted payload re-encodes")).unwrap(),
+            p
+        );
+    }
+    let Some((&step, rest)) = data.split_first() else {
+        return;
+    };
+    let step = usize::from(step).max(4);
+    let mut r = Reassembler::default();
+    for chunk in rest.chunks(step) {
+        match r.push(chunk) {
+            Ok(Some(p)) => {
+                assert!(p.len() <= MAX_PAYLOAD_BYTES);
+                break;
+            }
+            Ok(None) => {}
+            Err(_) => break,
+        }
+    }
+}
+
 /// Everything a magic-wormhole peer or server sends us before and after the key exchange (C7, ADR-0067): mailbox
 /// server frames, the `pake` body, transit hints and file-transfer offers. Bounded output, no panic.
 pub fn wormhole_messages(data: &[u8]) {
@@ -710,6 +744,22 @@ mod smoke {
             b"List of devices attached\nR5CT device usb:1-1 model:SM_G991B\n0A unauthorized\n",
         );
         adb_devices(b"\xff device model:\x01\n x\tdevice\n");
+    }
+
+    #[test]
+    fn ble_frames_structured() {
+        run(ble_frames, 1024, 41);
+        let payload = vutric_core::ble::BlePayload::Link {
+            uri: "vutric://pair?v=2&id=ab".into(),
+        }
+        .encode()
+        .unwrap();
+        let mut wire = vec![24u8];
+        for c in vutric_core::ble::chunks(&payload, 27).unwrap() {
+            wire.extend_from_slice(&c);
+        }
+        ble_frames(&wire);
+        ble_frames(&[1, 5, 1, 2, 3, 4, 5, 6, 7, 8]);
     }
 
     #[test]

@@ -5,6 +5,7 @@
 
 pub mod adb;
 pub mod beacon;
+pub mod ble;
 pub mod captive;
 pub mod code;
 pub mod companion;
