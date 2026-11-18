@@ -5533,6 +5533,7 @@ dependencies = [
  "tokio",
  "vutric-core",
  "vutric-net",
+ "vutric-relay",
 ]
 
 [[package]]

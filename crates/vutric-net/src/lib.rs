@@ -26,6 +26,7 @@ pub mod probe;
 pub mod settings;
 pub mod transfer;
 pub mod trust;
+pub mod usb;
 
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
@@ -628,6 +629,19 @@ fn refused(conn: &Connection) -> bool {
     )
 }
 
+/// A relay URL on `127.0.0.1`, `[::1]` or `localhost`: the loopback relay of a USB cable (ADR-0070).
+fn is_loopback_relay(u: &RelayUrl) -> bool {
+    let Some(host) = u.host_str() else {
+        return false;
+    };
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
 fn short_id(id: &EndpointId) -> String {
     id.to_string()[..8].to_owned()
 }
@@ -749,6 +763,9 @@ impl Session {
         };
         let remote = match p.remote_addr() {
             iroh::TransportAddr::Ip(a) => Some(a.ip()),
+            iroh::TransportAddr::Relay(u) if is_loopback_relay(u) => {
+                return vutric_core::route::Badge::Cable;
+            }
             _ => None,
         };
         lan::badge(Some(p.is_relay()), remote, locals)
@@ -785,14 +802,19 @@ impl Session {
         }
     }
 
-    /// Whether the selected path goes through a relay right now (`false` while no path is chosen).
+    /// Whether the selected path goes through a relay right now (`false` while no path is chosen). A relay on
+    /// this machine's loopback is the USB cable of ADR-0070 (`adb reverse`), not a server on the internet, so it
+    /// does not count: no big-file limit, badge "Kabel".
     #[must_use]
     pub fn is_relayed(&self) -> bool {
         self.conn
             .paths()
             .iter()
             .find(iroh::endpoint::Path::is_selected)
-            .is_some_and(|p| p.is_relay())
+            .is_some_and(|p| {
+                p.is_relay()
+                    && !matches!(p.remote_addr(), iroh::TransportAddr::Relay(u) if is_loopback_relay(u))
+            })
     }
 
     /// Waits up to `wait` for a direct path (a relayed start often turns direct after hole punching). `true`

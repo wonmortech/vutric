@@ -19,6 +19,9 @@ use vutric_core::route::Badge;
 /// What kind of link an address sits on; lower ranks first in the QR.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Medium {
+    /// A USB cable to a phone: Android USB tethering (RNDIS, NCM) or an iPhone's USB link (backlog R5,
+    /// ADR-0070). Ranked first: when it is there, it is the fastest and most private link.
+    Usb,
     Wired,
     WiFi,
     /// A phone hotspot or USB tethering link (ours or the OS's).
@@ -157,6 +160,12 @@ pub fn local_addrs() -> Vec<LocalAddr> {
         .flatten()
         .collect();
         let shown = i.friendly_name.clone().unwrap_or_else(|| i.name.clone());
+        let usb = crate::usb::tether_kind(
+            &names,
+            crate::usb::driver_of(&i.name).as_deref(),
+            i.mac_addr.map(|m| m.octets()),
+        )
+        .is_some();
         let v4 = i
             .ipv4
             .iter()
@@ -172,7 +181,11 @@ pub fn local_addrs() -> Vec<LocalAddr> {
                     prefix,
                     iface: i.index,
                     iface_name: shown.clone(),
-                    medium: classify(&names, wired, wifi, ip),
+                    medium: if usb {
+                        Medium::Usb
+                    } else {
+                        classify(&names, wired, wifi, ip)
+                    },
                 });
             }
         }
@@ -478,6 +491,7 @@ pub fn badge(relayed: Option<bool>, remote: Option<IpAddr>, locals: &[LocalAddr]
     {
         let name = link.iface_name.to_ascii_lowercase();
         return match link.medium {
+            Medium::Usb => Badge::Cable,
             Medium::Tether
                 if ["usb", "ndis", "iphone", "apple mobile"]
                     .iter()
@@ -804,6 +818,8 @@ mod tests {
             badge(Some(false), ip("169.254.99.1"), &locals),
             Badge::Cable
         );
+        let usb = [named("10.42.7.2", 24, "enx0a1b2c3d4e5f", Medium::Usb)];
+        assert_eq!(badge(Some(false), ip("10.42.7.1"), &usb), Badge::Cable);
         assert_eq!(
             badge(Some(false), ip("10.0.7.3"), &locals),
             Badge::DirectLan,

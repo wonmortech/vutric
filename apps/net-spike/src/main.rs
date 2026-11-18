@@ -27,6 +27,11 @@
 //!     Sends one notice, as a phone mirrors a notification.
 //! vutric-net-spike devices [--json]
 //!     Lists the devices this command line has paired with.
+//! vutric-net-spike usb
+//!     Finds a phone on a USB tethering cable (its beacon behind the link's gateway) and connects (ADR-0070).
+//! vutric-net-spike usb --adb [--dir DIR] [--json] [--yes]
+//!     A phone with USB debugging: our relay on loopback, `adb reverse` onto the phone, the pairing link opened
+//!     in its app; then works like `receive`.
 //! ```
 //! Every mode takes `--lan-only` (never use the internet). Connecting modes with `--ticket` also take
 //! `--via-internet`: ignore the link's LAN addresses and reach the peer by its key, relay and lookup server
@@ -75,6 +80,7 @@ struct Args {
     title: String,
     json: bool,
     yes: bool,
+    adb: bool,
 }
 
 impl Args {
@@ -114,6 +120,7 @@ fn parse() -> Result<Args> {
         title: String::new(),
         json: false,
         yes: false,
+        adb: false,
     };
     while let Some(flag) = it.next() {
         match flag.as_str() {
@@ -132,6 +139,7 @@ fn parse() -> Result<Args> {
             "--title" => a.title = it.next().context("--title needs a value")?,
             "--json" => a.json = true,
             "--yes" => a.yes = true,
+            "--adb" => a.adb = true,
             other if other == "-" || !other.starts_with("--") => a.words.push(other.into()),
             other => bail!("unknown argument {other}"),
         }
@@ -195,7 +203,7 @@ fn via(s: &Session) -> String {
 
 /// Shows this peer's pairing QR and link (after waiting for the relay, so the link works from anywhere). With a
 /// secret, a device that scans it pairs (ADR-0064).
-async fn show_qr(peer: &Peer, secret: Option<&LinkSecret>) -> Result<()> {
+async fn show_qr(peer: &Peer, secret: Option<&LinkSecret>) -> Result<String> {
     if peer.reach() == Reach::Anywhere {
         let online = peer.wait_online(Duration::from_secs(8)).await;
         eprintln!(
@@ -214,7 +222,7 @@ async fn show_qr(peer: &Peer, secret: Option<&LinkSecret>) -> Result<()> {
     let qr = QrCode::new(link.as_bytes())?;
     eprintln!("{}", qr.render::<Dense1x2>().quiet_zone(true).build());
     eprintln!("pairing link: {link}");
-    Ok(())
+    Ok(link)
 }
 
 async fn listen(peer: &Peer, a: &Args) -> Result<()> {
@@ -496,6 +504,12 @@ impl Host {
 /// Saves files, shows clipboard text and notices, and rings on a ring, until Ctrl+C. Latency probes are
 /// answered too. Each device gets its own session task.
 async fn receive(peer: &Peer, a: &Args) -> Result<()> {
+    receive_with(peer, a, |_| {}).await
+}
+
+/// [`receive`], calling `pushed` with the pairing link once it is shown (the `usb --adb` mode opens it on the
+/// phone).
+async fn receive_with(peer: &Peer, a: &Args, pushed: impl Fn(&str)) -> Result<()> {
     let dir = match &a.dir {
         Some(d) => d.clone(),
         None => transfer::downloads_dir()?,
@@ -513,7 +527,8 @@ async fn receive(peer: &Peer, a: &Args) -> Result<()> {
         out: Out { json: a.json },
         yes: a.yes,
     });
-    show_qr(peer, Some(&host.secret)).await?;
+    let link = show_qr(peer, Some(&host.secret)).await?;
+    pushed(&link);
     eprintln!(
         "saving into {}; pairing window open for 10 minutes, then only paired devices (Ctrl+C to stop)",
         host.dir.display()
@@ -604,6 +619,49 @@ async fn serve(s: &mut Session, mut admission: Admission, host: &Host) -> Result
     }
 }
 
+/// An offer: saved when the sender is paired (or `--yes`), declined otherwise.
+async fn take_offer(
+    s: &mut Session,
+    offer: transfer::IncomingOffer,
+    admission: Admission,
+    host: &Host,
+) -> Result<()> {
+    let from = s.remote_name.clone();
+    let out = host.out;
+    if admission != Admission::Trusted && !host.yes {
+        out.event(
+            "declined",
+            &from,
+            &offer.names(3).join(", "),
+            &json!({"reason": "not paired (run with --yes to take files from guests)"}),
+        );
+        return transfer::decline(s, &offer).await;
+    }
+    let settings = vutric_net::settings::load(
+        &vutric_net::settings::desktop_dir()?.join(vutric_net::settings::FILE),
+    );
+    let mut to = transfer::SaveTo::for_peer(s, &settings, host.dir.clone(), transfer::today_utc());
+    if host.explicit_dir {
+        to.rules.folder = None; // --dir wins over the settings file
+    }
+    let sum = transfer::receive(s, offer, &to, transfer::log_progress("receiving")).await?;
+    out.event(
+        "files",
+        &from,
+        &format!(
+            "saved {} file(s), {:.1} MB in {:.1} s ({:.1} MB/s, {}){}",
+            sum.files,
+            sum.bytes as f64 / 1e6,
+            sum.elapsed.as_secs_f64(),
+            rate(&sum),
+            via(s),
+            failed_note("failed", &sum.failed)
+        ),
+        &json!({"files": sum.files, "bytes": sum.bytes, "failed": sum.failed}),
+    );
+    Ok(())
+}
+
 type Limits<'a> = (
     &'a mut NoticeLimit,
     &'a mut RingLimit,
@@ -621,39 +679,7 @@ async fn handle(
     let from = s.remote_name.clone();
     let out = host.out;
     if let Some(offer) = transfer::IncomingOffer::from_message(&msg) {
-        if admission != Admission::Trusted && !host.yes {
-            out.event(
-                "declined",
-                &from,
-                &offer.names(3).join(", "),
-                &json!({"reason": "not paired (run with --yes to take files from guests)"}),
-            );
-            return transfer::decline(s, &offer).await;
-        }
-        let settings = vutric_net::settings::load(
-            &vutric_net::settings::desktop_dir()?.join(vutric_net::settings::FILE),
-        );
-        let mut to =
-            transfer::SaveTo::for_peer(s, &settings, host.dir.clone(), transfer::today_utc());
-        if host.explicit_dir {
-            to.rules.folder = None; // --dir wins over the settings file
-        }
-        let sum = transfer::receive(s, offer, &to, transfer::log_progress("receiving")).await?;
-        out.event(
-            "files",
-            &from,
-            &format!(
-                "saved {} file(s), {:.1} MB in {:.1} s ({:.1} MB/s, {}){}",
-                sum.files,
-                sum.bytes as f64 / 1e6,
-                sum.elapsed.as_secs_f64(),
-                rate(&sum),
-                via(s),
-                failed_note("failed", &sum.failed)
-            ),
-            &json!({"files": sum.files, "bytes": sum.bytes, "failed": sum.failed}),
-        );
-        return Ok(());
+        return take_offer(s, offer, admission, host).await;
     }
     let paired = companion::accepts(&msg, admission) || ring::accepts(&msg, admission);
     match msg {
@@ -720,6 +746,107 @@ async fn handle(
     Ok(())
 }
 
+/// `usb`: phones on a USB cable (R5, ADR-0070). Lists the tethering links and asks the phone behind each one who
+/// it is (its beacon), then connects to the first that answers.
+async fn usb_cmd(peer: &Peer) -> Result<()> {
+    let links = vutric_net::usb::usb_links();
+    if links.is_empty() {
+        println!(
+            "no phone on a USB cable (turn on USB tethering, or use `usb --adb` with USB debugging)"
+        );
+        return Ok(());
+    }
+    let beacon = vutric_net::beacon::BeaconService::start(peer.id(), 0, false)?;
+    for l in &links {
+        println!(
+            "{:?} link {} (if{}): ours {:?}, phone at {:?}",
+            l.kind, l.name, l.iface, l.local, l.phone
+        );
+        let Some(found) = vutric_net::usb::find_phone(
+            &beacon,
+            l,
+            vutric_core::beacon::PORT,
+            Duration::from_secs(3),
+        )
+        .await
+        else {
+            println!("  no Vutric answer behind it (is the app open on the phone?)");
+            continue;
+        };
+        let s = peer.connect(found.id, &[found.addr]).await?;
+        println!(
+            "  connected to {} at {}, {:?}, pairing check {}",
+            s.remote_name,
+            found.addr,
+            s.badge(),
+            s.check_code()?
+        );
+        s.close();
+    }
+    Ok(())
+}
+
+/// `usb --adb`: a phone with USB debugging. Runs our relay on loopback, `adb reverse`s its port onto every
+/// authorized phone, opens the pairing link in the phone's app, and then serves like `receive`.
+async fn usb_adb(a: &Args) -> Result<()> {
+    use vutric_net::usb::adb::{Adb, State};
+    let adb = Adb::find()
+        .context("adb not found (PATH, ANDROID_HOME or the Android Studio SDK folder)")?;
+    let phones: Vec<_> = adb
+        .devices()?
+        .into_iter()
+        .filter(|d| d.usb)
+        .inspect(|d| {
+            if d.state == State::Unauthorized {
+                eprintln!("{}: tap \"Allow USB debugging\" on the phone", d.serial);
+            }
+        })
+        .filter(|d| d.state == State::Device)
+        .collect();
+    if phones.is_empty() {
+        bail!("no authorized phone on USB (adb devices -l)");
+    }
+    let relay = vutric_relay::Relay::spawn(&vutric_relay::Config::parse(
+        "[http]\nbind = \"127.0.0.1:0\"",
+    )?)
+    .await?;
+    let port = relay.http_addr().context("relay address")?.port();
+    let relays = vutric_net::Relays {
+        urls: vec![format!("http://127.0.0.1:{port}/")],
+        n0_fallback: false,
+    };
+    let peer = Peer::bind_with(
+        vutric_net::identity_file("net-spike.key")?,
+        &a.name,
+        platform(),
+        Reach::Anywhere,
+        &relays,
+    )
+    .await?;
+    for p in &phones {
+        adb.reverse(&p.serial, port)?;
+        eprintln!(
+            "{} ({}): its 127.0.0.1:{port} now reaches this computer",
+            p.model.as_deref().unwrap_or("phone"),
+            p.serial
+        );
+    }
+    let result = receive_with(&peer, a, |link| {
+        for p in &phones {
+            if let Err(e) = adb.open_link(&p.serial, link) {
+                eprintln!("{}: could not open the link in the app: {e:#}", p.serial);
+            }
+        }
+    })
+    .await;
+    for p in &phones {
+        let _ = adb.remove_reverse(&p.serial, port);
+    }
+    peer.close().await;
+    let _ = relay.shutdown().await;
+    result
+}
+
 /// Flings a photo like the phone does (the same preview, see `vutric_net::preview`).
 async fn fling_photo(s: &mut Session, path: &Path, count: u32) -> Result<()> {
     let bytes = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
@@ -779,7 +906,7 @@ async fn lan_report(peer: &Peer) -> Result<()> {
     Ok(())
 }
 
-const USAGE: &str = "usage: vutric-net-spike listen|send [PATH...]|fling|files PATH...|receive|ring|clipboard TEXT|notice --app APP TEXT|devices|lan \
+const USAGE: &str = "usage: vutric-net-spike listen|send [PATH...]|fling|files PATH...|receive|ring|clipboard TEXT|notice --app APP TEXT|devices|usb [--adb]|lan \
 [--ticket LINK | --discover] [--dir DIR] [--json] [--yes] [--seconds N] [--stop] [--title T] [--name NAME] [--runs N] [--photo PATH [--count N]] [--lan-only] [--via-internet]";
 
 #[tokio::main]
@@ -787,6 +914,9 @@ async fn main() -> Result<()> {
     let a = parse()?;
     if a.mode == "devices" {
         return devices_cmd(&a);
+    }
+    if a.mode == "usb" && a.adb {
+        return usb_adb(&a).await;
     }
     let peer = Peer::bind(
         vutric_net::identity_file("net-spike.key")?,
@@ -803,6 +933,7 @@ async fn main() -> Result<()> {
     let mut exit = 0;
     let result = match a.mode.as_str() {
         "lan" => lan_report(&peer).await,
+        "usb" => usb_cmd(&peer).await,
         "listen" => listen(&peer, &a).await,
         // Without a target, `fling` shows its QR code and throws at whoever connects (a phone that cannot be
         // found over mDNS, such as an iPhone).

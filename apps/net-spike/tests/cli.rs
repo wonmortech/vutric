@@ -21,7 +21,13 @@ fn home(name: &str) -> PathBuf {
 fn cmd(home: &Path, mode: &str) -> Command {
     let mut c = Command::new(BIN);
     c.arg(mode);
-    for k in ["APPDATA", "LOCALAPPDATA", "HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME"] {
+    for k in [
+        "APPDATA",
+        "LOCALAPPDATA",
+        "HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+    ] {
         c.env(k, home);
     }
     c.arg("--lan-only");
@@ -110,7 +116,14 @@ fn a_script_drives_clipboard_notice_ring_and_files() {
 
     let o = run(
         &tx_home,
-        &["notice", "--app", "Telegram", "--title", "Ali", "kelyapman\u{202E}"],
+        &[
+            "notice",
+            "--app",
+            "Telegram",
+            "--title",
+            "Ali",
+            "kelyapman\u{202E}",
+        ],
         &r.link,
     );
     assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
@@ -147,7 +160,12 @@ fn a_ring_nobody_stops_exits_with_three() {
     let (rx_home, tx_home) = (home("rx3"), home("tx3"));
     let r = Receiver::start(&rx_home, &rx_home.join("in"));
     let o = run(&tx_home, &["ring", "--seconds", "1"], &r.link);
-    assert_eq!(o.status.code(), Some(3), "{}", String::from_utf8_lossy(&o.stderr));
+    assert_eq!(
+        o.status.code(),
+        Some(3),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
     assert_eq!(r.next("ring")["seconds"], 1);
     drop(r);
     let _ = std::fs::remove_dir_all(&rx_home);

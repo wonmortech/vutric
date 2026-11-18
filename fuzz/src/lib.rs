@@ -205,6 +205,20 @@ pub fn companion(data: &[u8]) {
     }
 }
 
+/// `adb devices -l` output from another program (R5, ADR-0070): bounded, and every serial it yields is a token
+/// that is safe to pass back to `adb -s`.
+pub fn adb_devices(data: &[u8]) {
+    use vutric_core::adb::{MAX_DEVICES, parse_devices, token_ok};
+    let devices = parse_devices(data);
+    assert!(devices.len() <= MAX_DEVICES);
+    for d in &devices {
+        assert!(token_ok(&d.serial), "serial {:?}", d.serial);
+        if let Some(m) = &d.model {
+            assert!(!m.is_empty() && m.len() <= 64 && !m.chars().any(char::is_control));
+        }
+    }
+}
+
 /// Everything a magic-wormhole peer or server sends us before and after the key exchange (C7, ADR-0067): mailbox
 /// server frames, the `pake` body, transit hints and file-transfer offers. Bounded output, no panic.
 pub fn wormhole_messages(data: &[u8]) {
@@ -687,6 +701,15 @@ mod smoke {
                 pairing_ticket(&v);
             }
         }
+    }
+
+    #[test]
+    fn adb_devices_structured() {
+        run(adb_devices, 512, 37);
+        adb_devices(
+            b"List of devices attached\nR5CT device usb:1-1 model:SM_G991B\n0A unauthorized\n",
+        );
+        adb_devices(b"\xff device model:\x01\n x\tdevice\n");
     }
 
     #[test]
