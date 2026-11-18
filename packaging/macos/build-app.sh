@@ -102,7 +102,11 @@ fi
 
 # The Rust helper (network, transfers, overlay) is W2's crate; bundled as soon as it is on the branch.
 if [[ -f $ROOT/crates/vutric-daemon/Cargo.toml ]]; then
-  rust_universal vutric-daemon vutric-daemon
+  # W2's daemon is on the branch but may not build for macOS yet (W2 #28): bundle it when it does, say so when not.
+  if ! (rust_universal vutric-daemon vutric-daemon); then
+    rm -f "$APP/Contents/MacOS/vutric-daemon"
+    echo "::warning title=Daemon not bundled::crates/vutric-daemon does not build for macOS yet (W2 #28); Vutric.app ships without it."
+  fi
 else
   echo "::notice title=No daemon in this build::crates/vutric-daemon is not on this branch yet; Vutric.app ships the agent, its extensions and the LocalSend / Quick Share bridge, without the daemon."
 fi
