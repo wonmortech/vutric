@@ -1,6 +1,6 @@
 [package]
 name = "vutric-host-mac"
-description = "AppKit side of the Vutric overlay on macOS: a non-activating, click-through NSPanel on every Space, plus the frame-pacing probe."
+description = "macOS host pieces: the non-activating, click-through NSPanel overlay with display-link pacing, its probe, and the foreground LocalSend / Quick Share bridge for the menu-bar agent."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,14 +10,19 @@ authors.workspace = true
 publish = false
 
 [dependencies]
+anyhow.workspace = true
 serde.workspace = true
+serde_json = "1"
+tokio = { version = "1.54.1", features = ["rt", "macros", "io-std", "io-util", "sync"] }
+vutric-compat-localsend = { path = "../vutric-compat-localsend" }
+vutric-core.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
-anyhow.workspace = true
 objc2 = "0.6.5"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [
     "std",
     "objc2-core-foundation",
+    "objc2-quartz-core",
     "NSApplication",
     "NSColor",
     "NSGraphics",
@@ -39,11 +44,16 @@ objc2-foundation = { version = "0.3.2", default-features = false, features = [
     "NSProcessInfo",
     "NSString",
     "NSArray",
+    "NSRunLoop",
+] }
+objc2-quartz-core = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "objc2-core-foundation",
+    "CADisplayLink",
+    "CAFrameRateRange",
 ] }
 pollster.workspace = true
 raw-window-handle.workspace = true
-serde_json = "1"
-vutric-core.workspace = true
 vutric-overlay.workspace = true
 wgpu.workspace = true
 winit.workspace = true
@@ -51,6 +61,10 @@ winit.workspace = true
 [[bin]]
 name = "vutric-mac-probe"
 path = "src/bin/probe/main.rs"
+
+[[bin]]
+name = "vutric-mac-compat"
+path = "src/bin/mac-compat/main.rs"
 
 [lints]
 workspace = true

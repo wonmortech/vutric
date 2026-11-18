@@ -13,6 +13,8 @@
 	<string>Vutric</string>
 	<key>CFBundleExecutable</key>
 	<string>Vutric</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>io.wonmor.vutric</string>
 	<key>CFBundleInfoDictionaryVersion</key>

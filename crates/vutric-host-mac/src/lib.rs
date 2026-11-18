@@ -10,6 +10,7 @@
 //!
 //! [`policy`] and [`pacing`] are pure and tested on every OS; the `AppKit` calls exist on macOS only.
 
+pub mod compat;
 pub mod pacing;
 pub mod policy;
 
@@ -17,6 +18,8 @@ pub use policy::OverlayLevel;
 
 #[cfg(target_os = "macos")]
 mod imp;
+#[cfg(target_os = "macos")]
+pub mod link;
 
 #[cfg(target_os = "macos")]
 pub use imp::*;

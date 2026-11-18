@@ -90,6 +90,12 @@ impl OverlayPanel {
         )
     }
 
+    /// The content view, for [`crate::link::DisplayLink::new`].
+    #[must_use]
+    pub fn ns_view(&self) -> NonNull<c_void> {
+        NonNull::from(&*self.view).cast::<c_void>()
+    }
+
     /// Orders the panel in without activating the app or making the panel key.
     pub fn show(&self) {
         self.panel.orderFrontRegardless();

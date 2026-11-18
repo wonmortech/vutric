@@ -2,6 +2,102 @@
   "sourceLanguage" : "uz",
   "version" : "1.0",
   "strings" : {
+    "menu.compat" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "LocalSend va Quick Share'dan qabul qilish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Receive from LocalSend and Quick Share" } }
+      }
+    },
+    "menu.compat.missing" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Bu yig'ilmada LocalSend yordamchisi yo'q" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This build has no LocalSend helper" } }
+      }
+    },
+    "menu.compat.send" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "LocalSend qurilmasiga yuborish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Send to a LocalSend device" } }
+      }
+    },
+    "menu.compat.none" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Tarmoqda qurilma topilmadi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No devices found on the network" } }
+      }
+    },
+    "compat.send.to" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "%@ ga yuboriladigan fayllarni tanlang" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose files to send to %@" } }
+      }
+    },
+    "compat.offer.title" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "%1$@ %2$lld ta fayl yubormoqchi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%1$@ wants to send %2$lld file(s)" } }
+      }
+    },
+    "compat.offer.code" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Kod: %@ (telefondagi bilan solishtiring)" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Code: %@ (compare with the phone)" } }
+      }
+    },
+    "compat.offer.accept" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Qabul qilish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Accept" } }
+      }
+    },
+    "compat.offer.decline" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Rad etish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Decline" } }
+      }
+    },
+    "compat.text.title" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Telefondan matn keldi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Text from the phone" } }
+      }
+    },
+    "compat.link.title" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Telefondan havola keldi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "A link from the phone" } }
+      }
+    },
+    "compat.text.copy" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Nusxalash" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy" } }
+      }
+    },
+    "compat.text.close" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Yopish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Close" } }
+      }
+    },
+    "share.handing.text" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Matn Vutric'ga uzatilmoqda…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Handing the text to Vutric…" } }
+      }
+    },
+    "share.toolong" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Matn juda uzun (64 KB dan oshmasin)" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The text is too long (64 KB at most)" } }
+      }
+    },
+    "send.text.confirm.title" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Bu matn telefonga yuborilsinmi?" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Send this text to the phone?" } }
+      }
+    },
     "daemon.error.lost" : {
       "localizations" : {
         "uz" : { "stringUnit" : { "state" : "translated", "value" : "xizmat bilan aloqa uzildi" } },

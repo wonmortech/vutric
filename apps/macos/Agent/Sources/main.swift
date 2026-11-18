@@ -9,6 +9,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let link = DaemonLink()
     private let notifier = Notifier()
+    private let compat = CompatLink()
     private var item: NSStatusItem!
     private var state: DaemonLink.State = .starting
     private var queued: [SendRequest] = []
@@ -28,10 +29,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         link.onState = { [weak self] s in self?.update(s) }
         link.onEvent = { [weak self] e in self?.event(e) }
         link.start()
+
+        compat.onEvent = { [weak self] e in self?.compatEvent(e) }
+        if UserDefaults.standard.bool(forKey: Self.compatKey) { compat.start() }
     }
+
+    private static let compatKey = "compatForeground"
 
     func applicationWillTerminate(_: Notification) {
         link.stopHelper()
+        compat.stop()
     }
 
     func application(_: NSApplication, open urls: [URL]) {
@@ -50,6 +57,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(entry("menu.connect", #selector(connectPhone)))
         menu.addItem(entry("menu.send", #selector(pickAndSend)))
+        menu.addItem(.separator())
+        menu.addItem(compatToggle())
+        if compat.isRunning {
+            menu.addItem(compatSendMenu())
+            compat.announce()
+        }
         menu.addItem(.separator())
         let paused: Bool
         if case let .running(p, _, _) = state { paused = p } else { paused = false }
@@ -115,6 +128,98 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         send(r)
     }
 
+    // MARK: - LocalSend and Quick Share (ADR-0117)
+
+    private func compatToggle() -> NSMenuItem {
+        let i = entry("menu.compat", #selector(toggleCompat))
+        i.state = compat.isRunning ? .on : .off
+        if !CompatLink.isBundled {
+            i.action = nil
+            i.toolTip = t("menu.compat.missing")
+        }
+        return i
+    }
+
+    private func compatSendMenu() -> NSMenuItem {
+        let parent = entry("menu.compat.send", nil)
+        let sub = NSMenu()
+        if compat.devices.isEmpty {
+            let none = NSMenuItem(title: t("menu.compat.none"), action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            sub.addItem(none)
+        }
+        for (n, d) in compat.devices.enumerated() {
+            let i = NSMenuItem(title: d.alias, action: #selector(sendToCompatDevice(_:)), keyEquivalent: "")
+            i.target = self
+            i.tag = n
+            sub.addItem(i)
+        }
+        parent.submenu = sub
+        return parent
+    }
+
+    @objc private func toggleCompat() {
+        let on = !compat.isRunning
+        UserDefaults.standard.set(on, forKey: Self.compatKey)
+        if on {
+            if !compat.start() { notifier.failed(reason: t("menu.compat.missing")) }
+        } else {
+            compat.stop()
+        }
+    }
+
+    @objc private func sendToCompatDevice(_ sender: NSMenuItem) {
+        guard compat.devices.indices.contains(sender.tag) else { return }
+        let device = compat.devices[sender.tag]
+        NSApp.activate(ignoringOtherApps: true)
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.message = t("compat.send.to", device.alias)
+        panel.prompt = t("send.confirm.button")
+        guard panel.runModal() == .OK, let r = SendRequest(files: panel.urls) else { return }
+        compat.send(files: r.files, to: device)
+    }
+
+    private func compatEvent(_ e: [String: Any]) {
+        switch e["kind"] as? String {
+        case "offer":
+            guard let session = e["session"] as? String else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            let via = (e["via"] as? String) == "quickshare" ? "Quick Share" : "LocalSend"
+            alert.messageText = t("compat.offer.title", e["alias"] as? String ?? "?", e["files"] as? Int ?? 0)
+            var lines = (e["names"] as? [String]) ?? []
+            if (e["files"] as? Int ?? 0) > lines.count { lines.append("…") }
+            lines.append(ByteCountFormatter.string(fromByteCount: Int64(e["bytes"] as? Int ?? 0), countStyle: .file)
+                + " · " + via)
+            if let code = e["code"] as? String { lines.append(t("compat.offer.code", code)) }
+            alert.informativeText = lines.joined(separator: "\n")
+            alert.addButton(withTitle: t("compat.offer.accept"))
+            alert.addButton(withTitle: t("compat.offer.decline"))
+            compat.decide(session: session, accept: alert.runModal() == .alertFirstButtonReturn)
+        case "text":
+            // Shown, never acted on: no link is opened; the user may copy it (ADR-0065 rules).
+            guard let text = e["text"] as? String, !text.isEmpty else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.messageText = t((e["link"] as? Bool ?? false) ? "compat.link.title" : "compat.text.title")
+            alert.informativeText = SendRequest.preview(text, max: 400)
+            alert.addButton(withTitle: t("compat.text.copy"))
+            alert.addButton(withTitle: t("compat.text.close"))
+            if alert.runModal() == .alertFirstButtonReturn {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            }
+        case "received":
+            let path = e["path"] as? String ?? ""
+            notifier.received(files: 1, folder: (path as NSString).deletingLastPathComponent, from: nil)
+        case "send_failed", "error":
+            notifier.failed(reason: (e["reason"] as? String) ?? (e["message"] as? String) ?? "")
+        default:
+            break
+        }
+    }
+
     @objc private func quit() {
         link.send(["op": "quit"])
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(300)) { NSApp.terminate(nil) }
@@ -128,13 +233,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let urls, let r = SendRequest(files: urls) { confirmAndSend(r) }
     }
 
-    /// Anything that did not come from our own menu is confirmed first (ADR-0112).
+    /// Anything that did not come from our own menu is confirmed first (ADR-0112, ADR-0115).
     private func confirmAndSend(_ r: SendRequest) {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = t("send.confirm.title", r.files.count)
-        alert.informativeText = r.files.prefix(5).map(\.lastPathComponent).joined(separator: "\n")
-            + (r.files.count > 5 ? "\n…" : "")
+        if let text = r.text {
+            alert.messageText = t("send.text.confirm.title")
+            alert.informativeText = SendRequest.preview(text)
+        } else {
+            alert.messageText = t("send.confirm.title", r.files.count)
+            alert.informativeText = r.files.prefix(5).map(\.lastPathComponent).joined(separator: "\n")
+                + (r.files.count > 5 ? "\n…" : "")
+        }
         alert.addButton(withTitle: t("send.confirm.button"))
         alert.addButton(withTitle: t("send.confirm.cancel"))
         if alert.runModal() == .alertFirstButtonReturn { send(r) }
@@ -145,8 +255,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             queued.append(r)
             return
         }
-        // Not in protocol v1 yet: W2 #29.
-        link.send(["op": "send_files", "paths": r.files.map(\.path)])
+        switch r.payload {
+        case let .files(files):
+            // TEMP until W2 #29: not in protocol v1 yet.
+            link.send(["op": "send_files", "paths": files.map(\.path)])
+        case let .text(text):
+            // TEMP until W2 #29 (ADR-0115): the daemon sends `Message::Clipboard` to a paired device (ADR-0065) and
+            // the `.txt` written here to anything else (a guest, LocalSend, Quick Share).
+            var op: [String: Any] = ["op": "send_text", "text": text]
+            if let txt = try? Self.writeTextFile(text) { op["fallback_path"] = txt.path }
+            link.send(op)
+        }
+    }
+
+    /// `~/Library/Caches/io.wonmor.vutric/Outbox/Matn <time>.txt`; files older than a day are removed first.
+    static func writeTextFile(_ text: String) throws -> URL {
+        let fm = FileManager.default
+        let dir = try fm.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent("io.wonmor.vutric/Outbox", isDirectory: true)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let old = Date().addingTimeInterval(-86400)
+        let keys: [URLResourceKey] = [.contentModificationDateKey]
+        for f in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys)) ?? [] {
+            let m = (try? f.resourceValues(forKeys: Set(keys)))?.contentModificationDate
+            if let m, m < old { try? fm.removeItem(at: f) }
+        }
+        let url = dir.appendingPathComponent(SendRequest.textFileName())
+        try Data(text.utf8).write(to: url, options: .atomic)
+        return url
     }
 
     // MARK: - daemon
@@ -198,6 +334,8 @@ enum SMAppServiceHint {
     }
 }
 
+// A write to a helper that has just exited returns EPIPE instead of killing the agent.
+signal(SIGPIPE, SIG_IGN)
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

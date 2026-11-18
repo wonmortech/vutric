@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::process::ExitCode;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -6,6 +8,7 @@ use anyhow::{Context as _, Result, bail};
 use objc2::MainThreadMarker;
 use serde::Serialize;
 use vutric_core::{Gesture, SendZone};
+use vutric_host_mac::link::{DisplayLink, Tick};
 use vutric_host_mac::pacing::{self, Run, RunReport};
 use vutric_host_mac::{OverlayLevel, OverlayPanel, ScreenInfo, WindowInfo};
 use vutric_overlay::{Halqa, HalqaConfig, Palette, Renderer};
@@ -24,8 +27,19 @@ enum Mode {
     Winit,
 }
 
+/// What paces the frames (ADR-0114).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum Pacing {
+    /// Draw as fast as the event loop polls; Fifo's drawable wait paces it (round 1).
+    Fifo,
+    /// Draw once per `CADisplayLink` callback, asking for 80–120 Hz.
+    Link,
+}
+
 #[derive(Debug)]
 struct Args {
+    pacing: Pacing,
     runs: u32,
     level: OverlayLevel,
     mode: Mode,
@@ -37,6 +51,7 @@ struct Args {
 impl Args {
     fn parse() -> Result<Self> {
         let mut a = Self {
+            pacing: Pacing::Fifo,
             runs: 5,
             level: OverlayLevel::default(),
             mode: Mode::Panel,
@@ -57,6 +72,13 @@ impl Args {
                         other => bail!("--window panel|winit, not {other}"),
                     }
                 }
+                "--pacing" => {
+                    a.pacing = match value()?.as_str() {
+                        "fifo" => Pacing::Fifo,
+                        "link" => Pacing::Link,
+                        other => bail!("--pacing fifo|link, not {other}"),
+                    }
+                }
                 "--json" => a.json = Some(value()?.into()),
                 "--interval" => a.interval = value()?.parse()?,
                 "--max-seconds" => a.max_seconds = value()?.parse()?,
@@ -74,6 +96,9 @@ struct Report {
     os: String,
     arch: &'static str,
     mode: Option<Mode>,
+    pacing: Option<Pacing>,
+    /// Median rate the display link delivered, from `1 / (targetTimestamp - timestamp)`.
+    link_hz: Option<f64>,
     frontmost_before: Option<String>,
     screens: Vec<ScreenInfo>,
     refresh_hz: f64,
@@ -113,8 +138,17 @@ struct Active {
     run: Run,
 }
 
+/// Shared with the display-link callback, which runs on the main thread between winit's callbacks.
+#[derive(Default)]
+struct Ticks {
+    pending: bool,
+    periods: Vec<f64>,
+}
+
 struct Probe {
     args: Args,
+    link: Option<DisplayLink>,
+    ticks: Rc<RefCell<Ticks>>,
     report: Report,
     gpu: Option<Gpu>,
     active: Option<Active>,
@@ -290,6 +324,34 @@ impl Probe {
             last: None,
             run: Run::new(self.report.refresh_hz),
         });
+        if let Some(l) = &self.link {
+            self.ticks.borrow_mut().pending = true;
+            l.set_running(true);
+        }
+    }
+
+    fn make_link(&mut self) -> Result<()> {
+        let mtm = MainThreadMarker::new().context("not on the main thread")?;
+        let gpu = self.gpu.as_ref().context("no GPU")?;
+        let view = match (&gpu.panel, &gpu.window) {
+            (Some(p), _) => p.ns_view(),
+            (None, Some(w)) => ns_view(w)?,
+            (None, None) => bail!("no view"),
+        };
+        let ticks = self.ticks.clone();
+        // SAFETY: the view belongs to the panel or window in `gpu`; the link is dropped before it (see `run`).
+        let link = unsafe {
+            DisplayLink::new(mtm, view, move |t: Tick| {
+                let mut s = ticks.borrow_mut();
+                s.pending = true;
+                if t.target > t.timestamp {
+                    s.periods.push(t.target - t.timestamp);
+                }
+            })
+        }
+        .context("CADisplayLink needs macOS 14")?;
+        self.link = Some(link);
+        Ok(())
     }
 
     fn frame(&mut self, event_loop: &ActiveEventLoop) -> Result<()> {
@@ -323,6 +385,9 @@ impl Probe {
         );
         if finished {
             gpu.present(None, t)?;
+            if let Some(l) = &self.link {
+                l.set_running(false);
+            }
             let done = self.active.take().expect("active run");
             self.report.runs.push(done.run.report());
             self.done += 1;
@@ -422,6 +487,12 @@ impl ApplicationHandler for Probe {
         match self.create_gpu(event_loop) {
             Ok(gpu) => {
                 self.gpu = Some(gpu);
+                if self.args.pacing == Pacing::Link
+                    && let Err(e) = self.make_link()
+                {
+                    self.fail(event_loop, &e);
+                    return;
+                }
                 self.next = Instant::now() + Duration::from_millis(900);
             }
             Err(e) => self.fail(event_loop, &e),
@@ -435,13 +506,21 @@ impl ApplicationHandler for Probe {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        let due = match self.args.pacing {
+            Pacing::Fifo => true,
+            Pacing::Link => std::mem::take(&mut self.ticks.borrow_mut().pending),
+        };
         if self.active.is_some()
+            && due
             && let Err(e) = self.frame(event_loop)
         {
             self.fail(event_loop, &e);
             return;
         }
-        if self.active.is_some() {
+        if self.active.is_some() && self.args.pacing == Pacing::Link {
+            // The display link wakes the run loop once per refresh; winit then calls us again.
+            event_loop.set_control_flow(ControlFlow::Wait);
+        } else if self.active.is_some() {
             // Fifo: acquiring the next drawable waits for the display, so polling is paced by the screen.
             event_loop.set_control_flow(ControlFlow::Poll);
         } else {
@@ -459,7 +538,12 @@ pub fn main() -> ExitCode {
         }
     };
     let json = args.json.clone();
-    watchdog(json.clone(), args.mode, args.max_seconds + 15.0);
+    watchdog(
+        json.clone(),
+        args.mode,
+        args.pacing,
+        args.max_seconds + 15.0,
+    );
     let report = run(args);
     let text = serde_json::to_string_pretty(&report).expect("report serialises");
     println!("{text}");
@@ -479,7 +563,7 @@ pub fn main() -> ExitCode {
 
 /// A blocked drawable acquisition never returns to the event loop, so the in-loop timeout cannot fire. This thread
 /// writes an error report and ends the process instead, so CI always gets its JSON.
-fn watchdog(json: Option<std::path::PathBuf>, mode: Mode, after: f32) {
+fn watchdog(json: Option<std::path::PathBuf>, mode: Mode, pacing: Pacing, after: f32) {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs_f32(after));
         let report = Report {
@@ -487,6 +571,7 @@ fn watchdog(json: Option<std::path::PathBuf>, mode: Mode, after: f32) {
             tool: "vutric-mac-probe",
             arch: std::env::consts::ARCH,
             mode: Some(mode),
+            pacing: Some(pacing),
             error: Some(format!(
                 "hung: no exit after {after} s (blocked in the event loop or the GPU)"
             )),
@@ -507,6 +592,7 @@ fn run(args: Args) -> Report {
         tool: "vutric-mac-probe",
         arch: std::env::consts::ARCH,
         mode: Some(args.mode),
+        pacing: Some(args.pacing),
         ..Default::default()
     };
     report.os = vutric_host_mac::os_version();
@@ -535,6 +621,8 @@ fn run(args: Args) -> Report {
     let now = Instant::now();
     let mut probe = Probe {
         args,
+        link: None,
+        ticks: Rc::default(),
         report,
         gpu: None,
         active: None,
@@ -546,7 +634,13 @@ fn run(args: Args) -> Report {
     if let Err(e) = event_loop.run_app(&mut probe) {
         probe.report.error.get_or_insert(format!("event loop: {e}"));
     }
+    drop(probe.link.take());
     drop(probe.gpu.take());
+    let mut periods = std::mem::take(&mut probe.ticks.borrow_mut().periods);
+    if !periods.is_empty() {
+        periods.sort_by(f64::total_cmp);
+        probe.report.link_hz = Some(1.0 / periods[periods.len() / 2]);
+    }
     let hz = probe.report.refresh_hz;
     probe.report.passed = probe.report.error.is_none()
         && !probe.report.runs.is_empty()

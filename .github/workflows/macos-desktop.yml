@@ -18,6 +18,7 @@ on:
       - crates/vutric-compat-quickshare/**
       - apps/macos/**
       - packaging/macos/**
+      - design/claude-design/logo-mark.svg
       - Cargo.lock
       - .github/workflows/macos-*.yml
   push:
@@ -93,7 +94,7 @@ jobs:
   app:
     name: Vutric.app and .dmg
     runs-on: macos-15-intel
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -102,6 +103,16 @@ jobs:
         run: |
           xcodebuild -version
           swift --version
+          rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: macos-app-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: macos-app-
       - name: Swift checks
         run: bash packaging/macos/build-app.sh --test
       - name: Build Vutric.app (universal)
@@ -123,10 +134,15 @@ jobs:
         run: |
           codesign --display --verbose=2 target/macos/Vutric.app 2>&1 | head -20
           codesign --display --entitlements - target/macos/Vutric.app/Contents/PlugIns/VutricShare.appex 2>&1 | tail -8
+          codesign --display --entitlements - target/macos/Vutric.app/Contents/PlugIns/VutricQuickAction.appex 2>&1 | tail -8
+          lipo -info target/macos/Vutric.app/Contents/MacOS/*
           find target/macos/Vutric.app -maxdepth 4 | sort
           ls -la target/macos/*.dmg
-      - name: Smoke test (launch, Share extension registration, vutric://send question)
-        run: bash packaging/macos/smoke.sh target/macos/Vutric.app "$RUNNER_TEMP/smoke"
+      - name: Smoke test (launch, extensions, icon, vutric://send questions, LocalSend / Quick Share bridge)
+        run: |
+          mkdir -p "$RUNNER_TEMP/smoke"
+          cp target/macos/obj/icons/preview.png target/macos/obj/icons/QuickActionTemplate@2x.png "$RUNNER_TEMP/smoke/"
+          bash packaging/macos/smoke.sh target/macos/Vutric.app "$RUNNER_TEMP/smoke"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
