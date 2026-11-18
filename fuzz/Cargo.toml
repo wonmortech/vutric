@@ -23,6 +23,7 @@ vutric-core = { path = "../crates/vutric-core", features = ["arbitrary"] }
 arbitrary = { version = "1.5.0", features = ["derive"] }
 libfuzzer-sys = { version = "0.4.13", optional = true }
 serde_json = "1"
+vutric-compat-localsend = { path = "../crates/vutric-compat-localsend" }
 
 [[bin]]
 name = "frame_stream"
@@ -83,6 +84,30 @@ required-features = ["libfuzzer"]
 [[bin]]
 name = "beacon"
 path = "fuzz_targets/beacon.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "localsend_prepare"
+path = "fuzz_targets/localsend_prepare.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "localsend_announce"
+path = "fuzz_targets/localsend_announce.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "localsend_ipc"
+path = "fuzz_targets/localsend_ipc.rs"
 test = false
 doc = false
 bench = false

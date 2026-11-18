@@ -289,6 +289,102 @@ pub struct Settings {
     pub history_days: Option<u32>,
     /// Overrides by the device's endpoint id (64 hex).
     pub devices: BTreeMap<String, DeviceRules>,
+    /// Other apps' protocols (ADR-0010 part 4, backlog C9).
+    pub compat: Compat,
+}
+
+/// One foreign protocol adapter.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Adapter {
+    /// The adapter may advertise and receive (still only while receive mode is on, ADR-0010 §3.3).
+    pub enabled: bool,
+    /// Certificate or key fingerprints whose offers skip the question (ADR-0010 §3.2). Upper-case hex.
+    pub pinned: Vec<String>,
+}
+
+impl Adapter {
+    const fn on() -> Self {
+        Self {
+            enabled: true,
+            pinned: Vec::new(),
+        }
+    }
+
+    const fn off() -> Self {
+        Self {
+            enabled: false,
+            pinned: Vec::new(),
+        }
+    }
+
+    /// Whether offers from `fingerprint` are accepted without asking.
+    #[must_use]
+    pub fn is_pinned(&self, fingerprint: &str) -> bool {
+        self.pinned
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case(fingerprint))
+    }
+}
+
+impl Default for Adapter {
+    fn default() -> Self {
+        Self::off()
+    }
+}
+
+/// Most pinned fingerprints kept per adapter.
+pub const MAX_PINNED: usize = 256;
+
+/// `compat.*`: `LocalSend` and the browser page on by default; the rest off until the user turns them on,
+/// because they advertise on the network.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Compat {
+    pub localsend: Adapter,
+    pub browser: Adapter,
+    pub quickshare: Adapter,
+    pub kdeconnect: Adapter,
+    pub warpinator: Adapter,
+    pub croc: Adapter,
+    pub wormhole: Adapter,
+}
+
+impl Default for Compat {
+    fn default() -> Self {
+        Self {
+            localsend: Adapter::on(),
+            browser: Adapter::on(),
+            quickshare: Adapter::off(),
+            kdeconnect: Adapter::off(),
+            warpinator: Adapter::off(),
+            croc: Adapter::off(),
+            wormhole: Adapter::off(),
+        }
+    }
+}
+
+impl Compat {
+    fn migrate(&mut self) {
+        for a in [
+            &mut self.localsend,
+            &mut self.browser,
+            &mut self.quickshare,
+            &mut self.kdeconnect,
+            &mut self.warpinator,
+            &mut self.croc,
+            &mut self.wormhole,
+        ] {
+            a.pinned
+                .retain(|p| p.len() == 64 && p.bytes().all(|b| b.is_ascii_hexdigit()));
+            for p in &mut a.pinned {
+                p.make_ascii_uppercase();
+            }
+            a.pinned.sort();
+            a.pinned.dedup();
+            a.pinned.truncate(MAX_PINNED);
+        }
+    }
 }
 
 impl Default for Settings {
@@ -302,6 +398,7 @@ impl Default for Settings {
             parts_keep_days: 7,
             history_days: Some(90),
             devices: BTreeMap::new(),
+            compat: Compat::default(),
         }
     }
 }
@@ -341,6 +438,7 @@ impl Settings {
             "Vutric".clone_into(&mut self.save.album);
         }
         self.save.album = self.save.album.chars().take(64).collect();
+        self.compat.migrate();
         self
     }
 }
@@ -492,5 +590,20 @@ mod tests {
         assert_eq!(s.version, SETTINGS_VERSION);
         assert_eq!(s.parts_keep_days, 30);
         assert_eq!(s.save.album, "Vutric");
+    }
+
+    #[test]
+    fn compat_defaults_and_old_files() {
+        let s = Settings::default();
+        assert!(s.compat.localsend.enabled && s.compat.browser.enabled);
+        assert!(!s.compat.quickshare.enabled && !s.compat.croc.enabled);
+        // A file from before `compat` existed gets the defaults.
+        let old: Settings = serde_json::from_str(r#"{"version":1}"#).unwrap();
+        assert_eq!(old.compat, Compat::default());
+        let mut s = Settings::default();
+        s.compat.localsend.pinned = vec!["ab".repeat(32), "AB".repeat(32), "zz".into()];
+        let s = s.migrate();
+        assert_eq!(s.compat.localsend.pinned, vec!["AB".repeat(32)]);
+        assert!(s.compat.localsend.is_pinned(&"ab".repeat(32)));
     }
 }

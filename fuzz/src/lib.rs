@@ -239,6 +239,72 @@ pub fn beacon(data: &[u8]) {
     assert_eq!(&b.encode()[..], data);
 }
 
+/// `LocalSend` `prepare-upload` from a foreign sender (ADR-0054): bounded, every kept name is already safe to
+/// save, ids match their keys, checksums are 64 lower-case hex.
+pub fn localsend_prepare(data: &[u8]) {
+    use vutric_compat_localsend::proto;
+    let Ok(p) = proto::parse_prepare_upload(data) else {
+        return;
+    };
+    assert!(!p.files.is_empty() && p.files.len() <= proto::MAX_FILES);
+    assert!(p.info.alias.chars().count() <= 64 && !p.info.alias.is_empty());
+    for (k, f) in &p.files {
+        assert_eq!(k, &f.id);
+        assert!(k.chars().count() <= proto::MAX_TEXT);
+        assert_eq!(
+            filename::sanitize(&f.file_name),
+            f.file_name,
+            "name stays sanitized"
+        );
+        check_name(&f.file_name);
+        if let Some(h) = &f.sha256 {
+            assert!(
+                h.len() == 64
+                    && h.bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            );
+        }
+        assert!(
+            f.preview
+                .as_ref()
+                .is_none_or(|p| p.len() <= proto::MAX_PREVIEW)
+        );
+    }
+    let again = proto::parse_prepare_upload(&serde_json::to_vec(&p).unwrap()).expect("re-parses");
+    assert_eq!(again, p, "parsing is idempotent");
+}
+
+/// `LocalSend` multicast announcements, `register` bodies and query strings.
+pub fn localsend_announce(data: &[u8]) {
+    use vutric_compat_localsend::proto;
+    for info in [proto::parse_announcement(data), proto::parse_register(data)]
+        .into_iter()
+        .flatten()
+    {
+        assert!(info.version.starts_with('2'));
+        assert!(!info.alias.chars().any(char::is_control));
+        assert_ne!(info.port, Some(0));
+    }
+    if let Ok(q) = std::str::from_utf8(data) {
+        let m = proto::query(q);
+        assert!(m.len() <= 16);
+        assert!(m.values().all(|v| v.chars().count() <= proto::MAX_TEXT));
+    }
+}
+
+/// What the daemon reads from the adapter process, which is untrusted after it has parsed foreign bytes.
+pub fn localsend_ipc(data: &[u8]) {
+    use vutric_compat_localsend::ipc;
+    if let Some(m) = ipc::parse::<ipc::FromAdapter>(data) {
+        let line = ipc::line(&m);
+        assert_eq!(
+            ipc::parse::<ipc::FromAdapter>(&line[..line.len() - 1]),
+            Some(m)
+        );
+    }
+    let _ = ipc::parse::<ipc::ToAdapter>(data);
+}
+
 #[cfg(test)]
 mod smoke {
     //! Deterministic stand-in for libFuzzer on stable: random inputs plus valid frames with bytes flipped.
@@ -365,7 +431,9 @@ mod smoke {
         filename(b"CON .txt");
         filename(b"com1 .tar.gz");
         // libFuzzer, CI run 44214498931: a device name cut to the stem limit, then prefixed with `_`.
-        filename(include_bytes!("../regressions/filename-device-at-limit.bin"));
+        filename(include_bytes!(
+            "../regressions/filename-device-at-limit.bin"
+        ));
         filename(format!("{} .jpg", "a".repeat(119)).as_bytes());
     }
 
@@ -386,6 +454,25 @@ mod smoke {
             let i = (r.next() as usize) % v.len();
             v[i] = r.next() as u8;
             beacon(&v);
+        }
+    }
+
+    #[test]
+    fn localsend_random_and_near_valid() {
+        run(localsend_announce, 512, 31);
+        run(localsend_ipc, 256, 37);
+        run(localsend_prepare, 1024, 41);
+        let ok = br#"{"info":{"alias":"A","version":"2.2","deviceType":"mobile","port":53317,"protocol":"https"},"files":{"a":{"id":"a","fileName":"CON .txt","size":5,"fileType":"text/plain","sha256":"00000000000000000000000000000000000000000000000000000000000000AA"}}}"#;
+        localsend_prepare(ok);
+        localsend_announce(br#"{"alias":"A","version":"2.0","announce":true}"#);
+        let mut r = Rng(43);
+        for _ in 0..RUNS {
+            let mut v = ok.to_vec();
+            let i = (r.next() as usize) % v.len();
+            let pool = br#"{}[]":,.0a\ "#;
+            v[i] = pool[(r.next() as usize) % pool.len()];
+            localsend_prepare(&v);
+            localsend_announce(&v);
         }
     }
 

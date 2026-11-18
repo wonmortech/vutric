@@ -6,6 +6,7 @@ members = [
     "crates/vutric-host-win",
     "crates/vutric-net",
     "crates/vutric-relay",
+    "crates/vutric-compat-localsend",
     "apps/net-spike",
     "crates/vutric-mobile",
     "apps/overlay-spike",

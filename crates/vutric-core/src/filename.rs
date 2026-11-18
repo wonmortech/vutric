@@ -182,7 +182,7 @@ mod tests {
         let out = sanitize(&dev);
         assert!(out.starts_with("_LPT3."), "{out}");
         assert_eq!(out.chars().count(), MAX_STEM_CHARS + 1 + MAX_EXT_CHARS);
-        let dev_dot = format!("CON{}.{}", ".".repeat(1) + &"y".repeat(115) + " .z", "b");
+        let dev_dot = format!("CON.{} .z.b", "y".repeat(115));
         assert!(sanitize(&dev_dot).chars().count() <= MAX_STEM_CHARS + 1 + MAX_EXT_CHARS);
     }
 

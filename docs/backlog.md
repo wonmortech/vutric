@@ -57,7 +57,7 @@ Sources:
 
 | # | Adapter | Phase | Status |
 |---|---|---|---|
-| C1 | LocalSend v2.1, send and receive: desktop, Android; iOS in 3; macOS in 5 | 1 | [ ] |
+| C1 | LocalSend v2.1 (now v2.2, re-read 2026-11-18), send and receive: desktop, Android; iOS in 3; macOS in 5. Built in `crates/vutric-compat-localsend` (ADR-0054); real-app test waits for M5 | 1 | [~] |
 | C2 | Browser page, no app needed, upload and download (LocalSend "Web share" / qrcp) | 1 | [ ] |
 | C3 | Quick Share LAN mode (NearDrop `PROTOCOL.md`): Windows 1, Linux 2, macOS 5; labelled "eksperimental" until it has survived 2 Quick Share releases | 1/2/5 | [ ] |
 | C4 | KDE Connect v8, share plugin: desktop, Android | 2 | [ ] |
@@ -65,7 +65,7 @@ Sources:
 | C6 | croc (PAKE, relay) | 2 | [ ] |
 | C7 | magic-wormhole (mailbox + transit) | 2 | [ ] |
 | C8 | Adapter rules:<br>• clean-room code, no GPL copying<br>• foreign peers are always asked about unless pinned<br>• visible only in receive mode; "everyone" ends after 10 min<br>• sandboxed process for pre-auth parsing<br>• fuzzer per adapter<br>• real-app interop test per adapter<br>• protocol version re-read before writing the adapter | 1+ | [ ] |
-| C9 | Settings `compat.*`: per-adapter `enabled` (LocalSend and browser on by default) and `pinned` | 1 | [ ] |
+| C9 | Settings `compat.*`: per-adapter `enabled` (LocalSend and browser on by default) and `pinned`: `vutric_core::storage::Compat` (ADR-0054) | 1 | [x] |
 | Cn | Not possible: AirDrop, Continuity, Samsung/Huawei/Mi Share, Xender/SHAREit/Zapya/Send Anywhere/Blip/Feem, Phone Link, Nearby Sharing (ADR-0010 §2) | — | — |
 
 ## 3. Security (ADR-0005, ADR-0007 §2, report 0.2, TM §3)
@@ -164,7 +164,7 @@ Sources:
 | F14 | Ring my phone (KDE Connect) | Kotlin + Swift module, after Phase 1 | [ ] |
 | F15 | Phone as a mouse for the PC (KDE Connect) | Flutter + daemon input, later | [ ] |
 | F16 | Receive with no app, from a browser link (LocalSend, PairDrop) | C2 | [ ] |
-| F17 | LocalSend compatibility | C1 | [ ] |
+| F17 | LocalSend compatibility | C1 | [~] |
 | F18 | "Wow" throw effect (Canopy Portal, Mac only) | overlay | [x] Windows |
 | F19 | Simple first screen with no setup (LocalSend lesson) | A1, A2 | [~] |
 
