@@ -26,6 +26,8 @@ else
     echo "note: vutric-daemon not built (W2 branch not merged yet); packaging the Linux pieces only"
     has_daemon=0
 fi
+strip --strip-unneeded "$stage/usr/libexec/vutric/vutric-surface"
+[ "$has_daemon" = 0 ] || strip --strip-unneeded "$stage/usr/bin/vutric-daemon"
 install -Dm0644 "$pkg/systemd/vutric.service" "$stage/usr/lib/systemd/user/vutric.service"
 install -Dm0644 "$pkg/applications/io.wonmor.Vutric.desktop" "$stage/usr/share/applications/io.wonmor.Vutric.desktop"
 install -Dm0644 "$pkg/metainfo/io.wonmor.Vutric.metainfo.xml" "$stage/usr/share/metainfo/io.wonmor.Vutric.metainfo.xml"
@@ -40,11 +42,13 @@ mkdir -p "$stage/usr/share/gnome-shell/extensions"
 cp -r "$root/apps/gnome-extension/$ext" "$stage/usr/share/gnome-shell/extensions/$ext"
 find "$stage/usr/share/gnome-shell" -type d -exec chmod 0755 {} + -o -type f -exec chmod 0644 {} +
 install -Dm0644 "$pkg/debian/copyright" "$stage/usr/share/doc/vutric/copyright"
-gzip -9n -c "$pkg/debian/changelog" > "$stage/usr/share/doc/vutric/changelog.Debian.gz"
-chmod 0644 "$stage/usr/share/doc/vutric/changelog.Debian.gz"
+# Native package (no Debian revision), so the changelog is changelog.gz, not changelog.Debian.gz.
+gzip -9n -c "$pkg/debian/changelog" > "$stage/usr/share/doc/vutric/changelog.gz"
+chmod 0644 "$stage/usr/share/doc/vutric/changelog.gz"
 
 size=$(du -sk "$stage/usr" | cut -f1)
 mkdir -p "$stage/DEBIAN"
+(cd "$stage" && find usr -type f -print0 | sort -z | xargs -0 md5sum) > "$stage/DEBIAN/md5sums"
 {
     echo "Package: vutric"
     echo "Version: $version"

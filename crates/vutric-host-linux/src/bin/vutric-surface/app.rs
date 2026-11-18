@@ -383,15 +383,34 @@ fn serve(args: &Args, socket: &str) -> Result<(), String> {
     let hits: Arc<Mutex<Vec<Hit>>> = Arc::default();
     let host = {
         let (w, hits) = (Arc::clone(&writer), Arc::clone(&hits));
-        Host::connect(move |m| {
+        let connected = Host::connect(move |m| {
             if let Mouse::Up(x, y) = m
                 && let Some(id) =
                     hit_test(&hits.lock().unwrap_or_else(PoisonError::into_inner), x, y)
             {
                 send(&w, &FromSurface::Clicked { id });
             }
-        })
-        .map_err(|e| e.to_string())?
+        });
+        match connected {
+            Ok(h) => h,
+            Err(e) => {
+                // The daemon (or the extension's caller) only sees the socket, not our stderr.
+                let env = |k: &str| std::env::var(k).unwrap_or_else(|_| "-".into());
+                let message = format!(
+                    "wayland connect: {e} (WAYLAND_SOCKET={}, WAYLAND_DISPLAY={}, XDG_RUNTIME_DIR={})",
+                    env("WAYLAND_SOCKET"),
+                    env("WAYLAND_DISPLAY"),
+                    env("XDG_RUNTIME_DIR")
+                );
+                send(
+                    &writer,
+                    &FromSurface::Error {
+                        message: message.clone(),
+                    },
+                );
+                return Err(message);
+            }
+        }
     };
     let backend = args
         .backend
