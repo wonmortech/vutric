@@ -121,7 +121,10 @@ async fn one_side_declining_stores_nothing() {
                 .await
                 .expect("accept");
             s.pair_code().await.expect("code");
-            s.pair_finish(false).await.expect("finish")
+            let both = s.pair_finish(false).await.expect("finish");
+            // A "no" usually ends the session: close gracefully, so the answer is not lost in the close.
+            s.finish().await;
+            both
         }
     });
     let mut s = phone

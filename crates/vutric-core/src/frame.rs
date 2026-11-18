@@ -46,6 +46,12 @@ impl Decoder {
         self.buf.extend_from_slice(bytes);
     }
 
+    /// Bytes held that are not yet a whole message (for limits and for the fuzzer's buffer check).
+    #[must_use]
+    pub fn buffered(&self) -> usize {
+        self.buf.len()
+    }
+
     /// Returns the next complete message, `Ok(None)` if more bytes are needed.
     ///
     /// An oversized length prefix is an error before its body is buffered, so a hostile peer cannot make us

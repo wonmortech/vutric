@@ -7,9 +7,41 @@ const MAX_STEM_CHARS: usize = 120;
 const MAX_EXT_CHARS: usize = 16;
 const FALLBACK: &str = "vutric-file";
 
-const WINDOWS_RESERVED: [&str; 22] = [
-    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
-    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+/// DOS device names, matched case-insensitively on the part before the first dot with trailing spaces removed
+/// (Win32 ignores them: `nul .txt` is the NUL device). `COM¹`–`COM³` and `LPT¹`–`LPT³` are reserved too.
+const WINDOWS_RESERVED: [&str; 32] = [
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "CONIN$",
+    "CONOUT$",
+    "COM0",
+    "COM1",
+    "COM2",
+    "COM3",
+    "COM4",
+    "COM5",
+    "COM6",
+    "COM7",
+    "COM8",
+    "COM9",
+    "COM\u{b9}",
+    "COM\u{b2}",
+    "COM\u{b3}",
+    "LPT0",
+    "LPT1",
+    "LPT2",
+    "LPT3",
+    "LPT4",
+    "LPT5",
+    "LPT6",
+    "LPT7",
+    "LPT8",
+    "LPT9",
+    "LPT\u{b9}",
+    "LPT\u{b2}",
+    "LPT\u{b3}",
 ];
 
 /// Returns a bare file name (never a path) that is valid on Windows, Linux and macOS.
@@ -42,17 +74,23 @@ pub fn sanitize(name: &str) -> String {
         .split('.')
         .next()
         .unwrap_or_default()
+        .trim_end()
         .to_ascii_uppercase();
     if WINDOWS_RESERVED.contains(&device.as_str()) {
         stem.insert(0, '_');
     }
 
+    // Cutting the extension can leave trailing spaces, which Windows silently drops (found by `fuzz/`).
+    let ext = ext.map(|e| {
+        e.chars()
+            .take(MAX_EXT_CHARS)
+            .collect::<String>()
+            .trim_end_matches(|c: char| c == '.' || c.is_whitespace())
+            .to_owned()
+    });
     match ext {
-        Some(ext) => {
-            let ext: String = ext.chars().take(MAX_EXT_CHARS).collect();
-            format!("{stem}.{ext}")
-        }
-        None => stem,
+        Some(ext) if !ext.is_empty() => format!("{stem}.{ext}"),
+        _ => stem,
     }
 }
 
@@ -103,6 +141,22 @@ mod tests {
     fn trims_trailing_dots_and_spaces() {
         assert_eq!(sanitize("photo.jpg. . "), "photo.jpg");
         assert_eq!(sanitize("  .hidden"), "hidden");
+    }
+
+    #[test]
+    fn a_cut_extension_never_ends_in_a_space() {
+        assert_eq!(sanitize(&format!("a.b{}c", " ".repeat(20))), "a.b");
+        assert_eq!(sanitize(&format!("x.{}y", " ".repeat(20))), "x");
+    }
+
+    #[test]
+    fn device_names_with_spaces_and_newer_ones() {
+        assert_eq!(sanitize("com1 .tar.gz"), "_com1 .tar.gz");
+        assert_eq!(sanitize("NUL  .txt"), "_NUL.txt");
+        assert_eq!(sanitize("conin$"), "_conin$");
+        assert_eq!(sanitize("COM\u{b2}.log"), "_COM\u{b2}.log");
+        assert_eq!(sanitize("lpt0"), "_lpt0");
+        assert_eq!(sanitize("COM10.txt"), "COM10.txt");
     }
 
     #[test]

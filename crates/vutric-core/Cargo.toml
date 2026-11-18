@@ -13,6 +13,11 @@ blake3.workspace = true
 postcard.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+arbitrary = { workspace = true, optional = true }
+
+[features]
+# Structure-aware fuzzing (`fuzz/`): derives `arbitrary::Arbitrary` for every wire type.
+arbitrary = ["dep:arbitrary"]
 
 [lints]
 workspace = true

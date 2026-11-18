@@ -604,6 +604,8 @@ impl Session {
     /// Sends this user's answer ("the digits match") and waits for the other user's. Returns true only when
     /// both confirmed; only then may the host store the peer in its trust list with
     /// [`vutric_core::trust::PairMethod::Code`]. Waits up to [`PAIR_CONFIRM_TIMEOUT`] for the other user.
+    /// To end the session after a "no", call [`Self::finish`], not [`Self::close`], so the answer reaches the
+    /// other side before the connection goes.
     pub async fn pair_finish(&mut self, confirmed: bool) -> Result<bool> {
         self.send(&Message::PairResult { confirmed }).await?;
         let theirs = tokio::time::timeout(PAIR_CONFIRM_TIMEOUT, self.recv())

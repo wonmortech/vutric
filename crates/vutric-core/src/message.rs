@@ -18,6 +18,7 @@ pub const MAX_PATH_BYTES: usize = 1024;
 pub const MAX_MIME_BYTES: usize = 128;
 
 /// One file of an offer. The bytes follow on a data stream of their own (see `docs/protocol.md`).
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OfferEntry {
     /// Relative path, `/`-separated: `IMG_2041.jpg` or `Trip/day 1/IMG_2041.jpg`. Hostile until sanitized.
@@ -26,6 +27,7 @@ pub struct OfferEntry {
     pub mime: String,
 }
 
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Platform {
     Android,
@@ -37,6 +39,7 @@ pub enum Platform {
 
 /// How the item left the phone. The desktop uses it so the entry matches the throw: a hard, angled flick enters
 /// fast and tilted; a soft one drifts in.
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Gesture {
     /// Release speed in logical pixels per second on the phone, always ≥ 0.
@@ -57,6 +60,7 @@ impl Gesture {
     }
 }
 
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PreviewFormat {
     Jpeg,
@@ -64,6 +68,7 @@ pub enum PreviewFormat {
     Png,
 }
 
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Preview {
     pub format: PreviewFormat,
@@ -75,6 +80,7 @@ pub struct Preview {
 
 /// Opens a fling. Sent on the control stream together with the preview, before any file byte, so the desktop
 /// can start the effect immediately.
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FlingStart {
     pub id: FlingId,
@@ -88,6 +94,7 @@ pub struct FlingStart {
     pub preview: Option<Preview>,
 }
 
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Message {
     /// First message on every connection, in both directions.
@@ -176,6 +183,7 @@ impl Message {
     }
 }
 
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FailReason {
     HashMismatch,
