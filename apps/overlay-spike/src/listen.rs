@@ -118,15 +118,27 @@ async fn refuse(s: &mut Session, id: FlingId, reason: FailReason) -> Result<()> 
 }
 
 async fn save_files(s: &mut Session, offer: transfer::IncomingOffer) -> Result<()> {
-    let dir = transfer::downloads_dir()?;
+    let settings = vutric_net::settings::load(
+        &vutric_net::settings::desktop_dir()?.join(vutric_net::settings::FILE),
+    );
+    let to = transfer::SaveTo::for_peer(
+        s,
+        &settings,
+        transfer::downloads_dir()?,
+        transfer::today_utc(),
+    );
     vutric_net::say(format!(
         "{} sends {} file(s), {:.1} MB -> {}",
         s.remote_name,
         offer.total_files,
         offer.total_bytes as f64 / 1e6,
-        dir.display()
+        to.rules
+            .folder
+            .as_ref()
+            .unwrap_or(&to.default_folder)
+            .display()
     ));
-    let sum = transfer::receive(s, offer, &dir, transfer::log_progress("receiving")).await?;
+    let sum = transfer::receive(s, offer, &to, transfer::log_progress("receiving")).await?;
     vutric_net::say(format!(
         "saved {} file(s), {:.1} MB in {:.1} s{}",
         sum.files,

@@ -484,6 +484,48 @@ pub struct FilesOffer {
     pub bytes: u64,
     /// The first few paths, to show.
     pub names: Vec<String>,
+    /// The user's settings say yes without asking (accept rule and this device's override).
+    pub auto_accept: bool,
+}
+
+// ---- Settings (ADR-0007 part 4) ----
+
+fn settings_path() -> &'static Mutex<Option<std::path::PathBuf>> {
+    static PATH: Mutex<Option<std::path::PathBuf>> = Mutex::new(None);
+    &PATH
+}
+
+/// Where this phone keeps its settings file (the app's support folder). Call once at start.
+pub fn set_settings_dir(dir: String) {
+    *settings_path().lock().expect("settings lock") =
+        Some(std::path::Path::new(&dir).join(vutric_net::settings::FILE));
+}
+
+fn load_settings() -> vutric_net::settings::Settings {
+    settings_path()
+        .lock()
+        .expect("settings lock")
+        .as_deref()
+        .map(vutric_net::settings::load)
+        .unwrap_or_default()
+}
+
+/// The settings as JSON (every field present, defaults filled in), for the Settings screen.
+pub fn get_settings() -> Result<String> {
+    Ok(serde_json::to_string(&load_settings())?)
+}
+
+/// Saves settings edited on the Settings screen. Invalid JSON is rejected whole, never half-applied; values out of
+/// range are clamped.
+pub fn put_settings(json: String) -> Result<()> {
+    let s: vutric_net::settings::Settings =
+        serde_json::from_str(&json).context("settings are not valid")?;
+    let path = settings_path()
+        .lock()
+        .expect("settings lock")
+        .clone()
+        .context("settings folder not set")?;
+    vutric_net::settings::save(&path, &s.migrate())
 }
 
 /// What arrived on the open session: a photo thrown at this phone, or files offered to it.
@@ -509,10 +551,13 @@ pub fn next_incoming() -> Result<Incoming> {
         loop {
             let msg = guard.recv().await?;
             if let Some(offer) = transfer::IncomingOffer::from_message(&msg) {
+                let (_, accept) = load_settings().rules_for(&guard.remote_id().to_string());
                 let files = FilesOffer {
                     files: offer.total_files,
                     bytes: offer.total_bytes,
                     names: offer.names(5),
+                    // Only paired devices, checked by key, ever reach a session: the sender is trusted.
+                    auto_accept: accept.auto(true, offer.total_bytes),
                 };
                 *pending_slot().lock().expect("pending lock") = Some((Arc::clone(&s), offer));
                 return Ok(Incoming {
@@ -693,11 +738,14 @@ pub fn send_files(
 /// Accepts the offer [`next_incoming`] returned and saves it under `dir` (folders kept). Each file appears
 /// only once its hash matched; an interrupted transfer resumes where it stopped when sent again. Progress goes
 /// to `sink`; its last event has `done` and `saved`. Cancelled by [`disconnect`].
-pub fn receive_files(dir: String, sink: StreamSink<TransferProgress>) -> Result<()> {
+pub fn receive_files(dir: String, date: String, sink: StreamSink<TransferProgress>) -> Result<()> {
+    let settings = load_settings();
     let (at, s, offer) = take_offer()?;
     let (on, last) = reporter(&sink);
     let r = runtime().block_on(cancellable(at, async {
-        transfer::receive(&mut *s.lock().await, offer, std::path::Path::new(&dir), on).await
+        let mut session = s.lock().await;
+        let to = transfer::SaveTo::for_peer(&session, &settings, dir.into(), date);
+        transfer::receive(&mut session, offer, &to, on).await
     }));
     let sum = forget_on_error(&s, r)?;
     sink.add(finished(&last, sum))

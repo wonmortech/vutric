@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vutric texnologiya tanlovi</title>
+<style>
+:root{
+  --bg:#f6f4ef; --bg2:#ffffff; --ink:#16181d; --ink2:#4a4f5a; --ink3:#8a8f9a;
+  --line:#dcd8cf; --cobalt:#2f5bea; --cobalt2:#dfe7ff; --sand:#c79a4a; --sand2:#f5ead4;
+  --ok:#1f9d63; --ok2:#dcf3e8; --warn:#c7821a; --warn2:#fbefd9; --bad:#c2453b; --bad2:#f8e1de;
+  --kt:#7f52ff; --kt2:#ece5ff; --sw:#e0472f; --sw2:#fde4df;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.06);
+  --r:14px; --mono:ui-monospace,SFMono-Regular,Consolas,"Cascadia Code",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1115; --bg2:#171a21; --ink:#eef0f4; --ink2:#b4b9c4; --ink3:#7b818d;
+    --line:#2a2f39; --cobalt:#6f8fff; --cobalt2:#1c2547; --sand:#e0b56a; --sand2:#2d2517;
+    --ok:#3fcf8e; --ok2:#123326; --warn:#f0a83a; --warn2:#33270f; --bad:#ef6b60; --bad2:#3a1916;
+    --kt:#a98bff; --kt2:#241b42; --sw:#ff7a62; --sw2:#3a1a14;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1115; --bg2:#171a21; --ink:#eef0f4; --ink2:#b4b9c4; --ink3:#7b818d;
+  --line:#2a2f39; --cobalt:#6f8fff; --cobalt2:#1c2547; --sand:#e0b56a; --sand2:#2d2517;
+  --ok:#3fcf8e; --ok2:#123326; --warn:#f0a83a; --warn2:#33270f; --bad:#ef6b60; --bad2:#3a1916;
+  --kt:#a98bff; --kt2:#241b42; --sw:#ff7a62; --sw2:#3a1a14;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+header.hero{padding:64px 0 40px;position:relative}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.eyebrow{font:600 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt)}
+#tb{font:600 12px/1 var(--mono);padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg2);color:var(--ink2);cursor:pointer}
+h1{font-size:clamp(32px,6vw,56px);line-height:1.05;letter-spacing:-.02em;margin:16px 0 18px;max-width:860px}
+h1 em{font-style:normal;color:var(--cobalt)}
+.lead{font-size:clamp(17px,2.2vw,20px);color:var(--ink2);max-width:760px;margin:0}
+.verdict{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.chip{display:inline-flex;gap:8px;align-items:center;padding:8px 14px;border-radius:999px;font-weight:600;font-size:14px;border:1px solid var(--line);background:var(--bg2)}
+.chip i{width:10px;height:10px;border-radius:50%;display:inline-block}
+nav.toc{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+nav.toc .wrap{display:flex;gap:6px;overflow-x:auto;padding-top:10px;padding-bottom:10px;scrollbar-width:none}
+nav.toc a{flex:none;font-size:13px;color:var(--ink2);text-decoration:none;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg2)}
+nav.toc a:hover{color:var(--cobalt);border-color:var(--cobalt)}
+section{padding:56px 0;border-bottom:1px solid var(--line)}
+h2{font-size:clamp(24px,3.6vw,34px);letter-spacing:-.01em;margin:6px 0 10px}
+h3{font-size:18px;margin:0 0 8px}
+.num{font:600 12px/1 var(--mono);color:var(--sand);letter-spacing:.1em}
+p.sub{color:var(--ink2);max-width:780px;margin:0 0 26px}
+.card{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:22px}
+.card p{margin:0;color:var(--ink2);font-size:15px}
+.card ul{margin:8px 0 0;padding-left:18px;color:var(--ink2);font-size:15px}
+.card .k{font:600 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;display:block}
+.grid{display:grid;gap:16px}
+.g3{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))}
+.fig{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:18px;margin:0 0 18px;overflow:hidden}
+.fig svg{width:100%;height:auto;display:block}
+.fig figcaption{font-size:13px;color:var(--ink3);margin-top:10px}
+.svg-scroll{overflow-x:auto}
+.svg-scroll svg{min-width:760px}
+svg text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--ink)}
+svg .t2{fill:var(--ink2)} svg .t3{fill:var(--ink3)} svg .mono{font-family:var(--mono)}
+svg .tc{fill:var(--cobalt)} svg .ts{fill:var(--sand)} svg .tk{fill:var(--kt)} svg .tw{fill:var(--sw)} svg .tok{fill:var(--ok)} svg .tb{fill:var(--bad)}
+svg .box{fill:var(--bg);stroke:var(--line);stroke-width:1.5}
+svg .grp{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:4 5}
+svg .boxc{fill:var(--cobalt2);stroke:var(--cobalt);stroke-width:1.5}
+svg .boxs{fill:var(--sand2);stroke:var(--sand);stroke-width:1.5}
+svg .boxok{fill:var(--ok2);stroke:var(--ok);stroke-width:1.5}
+svg .boxw{fill:var(--warn2);stroke:var(--warn);stroke-width:1.5}
+svg .boxb{fill:var(--bad2);stroke:var(--bad);stroke-width:1.5}
+svg .boxk{fill:var(--kt2);stroke:var(--kt);stroke-width:1.5}
+svg .boxsw{fill:var(--sw2);stroke:var(--sw);stroke-width:1.5}
+svg .ln{stroke:var(--ink3);stroke-width:1.5;fill:none}
+svg .lnc{stroke:var(--cobalt);stroke-width:2;fill:none}
+svg .lnk{stroke:var(--kt);stroke-width:2;fill:none}
+svg .lnw{stroke:var(--sw);stroke-width:2;fill:none}
+svg .lnok{stroke:var(--ok);stroke-width:2.5;fill:none}
+svg .lnb{stroke:var(--bad);stroke-width:2.5;fill:none}
+svg .dash{stroke-dasharray:5 5}
+svg .flow{stroke-dasharray:6 8;animation:flow 1.2s linear infinite}
+svg .life{stroke:var(--line);stroke-width:1.5;stroke-dasharray:3 4}
+svg .grid-l{stroke:var(--line);stroke-width:1}
+svg .areaok{fill:var(--ok2);opacity:.7}
+svg .areab{fill:var(--bad2);opacity:.7}
+@keyframes flow{to{stroke-dashoffset:-28}}
+@keyframes ping{0%{r:6;opacity:.8}100%{r:42;opacity:0}}
+svg .ping{fill:none;stroke:var(--cobalt);stroke-width:2;animation:ping 2.4s ease-out infinite}
+svg .ping.d2{animation-delay:.8s}
+@media (prefers-reduced-motion: reduce){svg .flow,svg .ping{animation:none}}
+table{width:100%;border-collapse:collapse;font-size:14px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--bg2);box-shadow:var(--shadow);margin-bottom:18px}
+.tbl table{min-width:720px}
+th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);background:var(--bg);font-weight:600}
+tr:last-child td{border-bottom:0}
+td code,p code,li code,span code{font-family:var(--mono);font-size:.86em;background:var(--bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;white-space:nowrap}
+td.c{text-align:center}
+tr.win td{background:color-mix(in srgb,var(--ok2) 55%,transparent)}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.y{background:var(--ok2);color:var(--ok)} .p{background:var(--warn2);color:var(--warn)} .n{background:var(--bad2);color:var(--bad)}
+.kt{background:var(--kt2);color:var(--kt)} .sw{background:var(--sw2);color:var(--sw)} .rs{background:var(--sand2);color:var(--sand)} .fl{background:var(--cobalt2);color:var(--cobalt)}
+.note{border-left:3px solid var(--sand);background:var(--sand2);padding:14px 16px;border-radius:0 10px 10px 0;color:var(--ink);font-size:15px;margin:18px 0}
+.note.c{border-color:var(--cobalt);background:var(--cobalt2)}
+.note.b{border-color:var(--bad);background:var(--bad2)}
+.rule{display:grid;grid-template-columns:44px 1fr;gap:14px;align-items:start}
+.rule b.n{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font:700 18px/1 var(--mono);background:var(--cobalt2);color:var(--cobalt)}
+.steps{counter-reset:s;display:grid;gap:12px;margin:0;padding:0;list-style:none}
+.steps li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.steps li::before{content:counter(s);width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:700 14px/1 var(--mono);background:var(--cobalt);color:#fff}
+.steps li b{display:block}
+.steps li span{color:var(--ink2);font-size:15px}
+footer{padding:40px 0 60px;color:var(--ink3);font-size:13px}
+@media (max-width:640px){header.hero{padding:40px 0 28px} section{padding:40px 0} .card{padding:18px}}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="topbar">
+      <span class="eyebrow">Vutric · texnologiya tavsiyasi · 2026-11-18</span>
+      <button id="tb" type="button">Mavzu: avto</button>
+    </div>
+    <h1>Vau effekt, <em>kam RAM</em> va hamma raqobatchilarning funksiyalari bitta ilovada</h1>
+    <p class="lead">Bu hujjat Vutric'da qaysi texnologiya qayerda ishlatilishini, nega aynan u tanlanganini va qaysi variantlar rad etilganini tushuntiradi. Asosiy g'oya: hamma mantiq bitta Rust yadroda yashaydi, UI esa har platformada o'zining eng kuchli joyida chiziladi.</p>
+    <div class="verdict">
+      <span class="chip"><i style="background:var(--sand)"></i>Rust yadro + iroh</span>
+      <span class="chip"><i style="background:var(--cobalt)"></i>Flutter UI (telefon + desktop)</span>
+      <span class="chip"><i style="background:var(--ink3)"></i>wgpu overlay + kartalar</span>
+      <span class="chip"><i style="background:var(--kt)"></i>Kotlin modullar</span>
+      <span class="chip"><i style="background:var(--sw)"></i>Swift modullar</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc"><div class="wrap">
+  <a href="#s1">1 · Mezonlar</a>
+  <a href="#s2">2 · Umumiy xarita</a>
+  <a href="#s3">3 · Desktop jarayonlari</a>
+  <a href="#s4">4 · Overlay kartalar</a>
+  <a href="#s5">5 · Desktop UI tanlovi</a>
+  <a href="#s6">6 · Kotlin (Android)</a>
+  <a href="#s7">7 · Swift (iOS)</a>
+  <a href="#s8">8 · Bog'lanish qatlami</a>
+  <a href="#s9">9 · Raqobatchilar</a>
+  <a href="#s10">10 · LocalSend</a>
+  <a href="#s11">11 · Xavflar</a>
+  <a href="#s12">12 · Spike va o'lchov</a>
+  <a href="#s13">13 · Yo'l xaritasi</a>
+</div></nav>
+
+<main>
+
+<section id="s1"><div class="wrap">
+  <span class="num">01</span>
+  <h2>Mezonlar: nimaga qarab tanlaymiz</h2>
+  <p class="sub">Egasining talabi (2026-11-18): loyiha uzoq muddatli va qayta yozish muammo emas. Yuklab olish hajmi katta bo'lsa ham mayli. Lekin ishlash paytida RAM kam bo'lishi, real foydalanishda silliq va tez ishlashi, effekt esa "vau" bo'lishi kerak.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Mezon</th><th>Muhimligi</th><th>Texnologiyaga ta'siri</th></tr></thead>
+    <tbody>
+      <tr><td><b>Vau effekt</b></td><td><span class="pill y">eng yuqori</span></td><td>UI'ni GPU'da o'zi chizadigan texnologiya kerak: wgpu va Flutter (Impeller/Skia). Oddiy native vidjetlar yetmaydi.</td></tr>
+      <tr><td><b>Ishlayotganda kam RAM</b></td><td><span class="pill y">eng yuqori</span></td><td>Doim ishlaydigan qism faqat Rust'da bo'lishi kerak. Og'ir UI faqat ochilganda ishlaydi. Doim ochiq turadigan webview (Tauri, Electron) mos emas.</td></tr>
+      <tr><td><b>Silliq va tez</b></td><td><span class="pill y">eng yuqori</span></td><td>Hamma OS'da bir xil renderer kerak. Linux'dagi WebKitGTK kabi zaif joy bo'lmasligi lozim.</td></tr>
+      <tr><td><b>Hamma raqobatchi funksiyalari</b></td><td><span class="pill y">yuqori</span></td><td>Ko'p funksiya OS ichida yashaydi (Share, tile, Live Activity). Ular uchun <b>Kotlin va Swift</b> modullar kerak.</td></tr>
+      <tr><td><b>Yuklab olish hajmi</b></td><td><span class="pill p">past</span></td><td>Flutter runtime va ikki xil bog'lanish (FRB + UniFFI) hajmni oshiradi. Bu qabul qilinadi.</td></tr>
+      <tr><td><b>Qayta yozish narxi</b></td><td><span class="pill p">past</span></td><td>Natija yaxshiroq bo'lsa, ekranlarni qayta yozishga tayyormiz.</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section id="s2"><div class="wrap">
+  <span class="num">02</span>
+  <h2>Umumiy xarita: bitta yadro, har joyda eng kuchli UI</h2>
+  <p class="sub">Har bir qurilmada Rust yadroning o'z nusxasi ishlaydi, lekin kod bitta. UI va OS integratsiyasi har platformada o'z tilida yoziladi. Biznes mantiqining hech bir qismi UI'da emas, hammasi yadroda.</p>
+  <figure class="fig svg-scroll">
+  <svg viewBox="0 0 1000 600" role="img" aria-label="Vutric umumiy arxitekturasi">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ink3)"/></marker>
+      <marker id="ahc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--cobalt)"/></marker>
+    </defs>
+    <rect class="grp" x="14" y="56" width="330" height="530" rx="16"/>
+    <text x="30" y="82" font-size="12" font-weight="700" class="t3 mono">DESKTOP · WINDOWS · LINUX · MACOS</text>
+    <rect class="grp" x="656" y="56" width="330" height="530" rx="16"/>
+    <text x="672" y="82" font-size="12" font-weight="700" class="t3 mono">TELEFON · ANDROID · IOS</text>
+
+    <path class="lnc flow" d="M180 50 C 180 20, 820 20, 820 50" marker-end="url(#ahc)"/>
+    <rect x="404" y="14" width="192" height="26" rx="13" class="boxc"/>
+    <text x="500" y="32" font-size="12" text-anchor="middle" class="tc" font-weight="700">QUIC · TLS 1.3 · E2E</text>
+
+    <rect class="boxs" x="34" y="100" width="290" height="96" rx="12"/>
+    <text x="50" y="124" font-size="15" font-weight="700">Rust daemon</text>
+    <text x="226" y="124" font-size="11" class="tok mono" font-weight="700">DOIM ISHLAYDI</text>
+    <text x="50" y="146" font-size="13" class="t2">tray, toast, autostart, IPC server</text>
+    <text x="50" y="166" font-size="13" class="t2">uzatish menejeri, ishonch ro'yxati</text>
+    <text x="50" y="186" font-size="12" class="t3">taxminan 15–30 MB RAM</text>
+
+    <rect class="box" x="34" y="214" width="290" height="96" rx="12"/>
+    <text x="50" y="238" font-size="15" font-weight="700">wgpu overlay</text>
+    <text x="242" y="238" font-size="11" class="ts mono" font-weight="700">ILIQ OYNA</text>
+    <text x="50" y="260" font-size="13" class="t2">Halqa "otish" effekti, 60 fps</text>
+    <text x="50" y="280" font-size="13" class="t2">qabul kartasi, progress, "tushish"</text>
+    <text x="50" y="300" font-size="12" class="t3">daemon jarayonining ichida</text>
+
+    <rect class="boxc dash" x="34" y="340" width="290" height="96" rx="12"/>
+    <text x="50" y="364" font-size="15" font-weight="700">Flutter desktop</text>
+    <text x="196" y="364" font-size="11" class="tc mono" font-weight="700">FAQAT OCHILGANDA</text>
+    <text x="50" y="386" font-size="13" class="t2">sozlamalar, tarix, qurilmalar</text>
+    <text x="50" y="406" font-size="13" class="t2">alohida jarayon, yopilsa RAM 0</text>
+    <text x="50" y="426" font-size="12" class="t3">daemon bilan IPC (named pipe)</text>
+
+    <rect class="box" x="34" y="466" width="290" height="100" rx="12"/>
+    <text x="50" y="490" font-size="15" font-weight="700">OS integratsiya</text>
+    <text x="50" y="512" font-size="13" class="t2">Explorer menyu, Share contract</text>
+    <text x="50" y="532" font-size="13" class="t2">Nautilus/Dolphin, StatusNotifier</text>
+    <text x="50" y="552" font-size="12" class="t3">Rust (windows-rs, zbus)</text>
+
+    <rect class="boxs" x="384" y="200" width="232" height="200" rx="16"/>
+    <text x="500" y="230" font-size="17" font-weight="800" text-anchor="middle">Rust yadro</text>
+    <text x="500" y="250" font-size="11" text-anchor="middle" class="t3 mono">bir xil kod, har qurilmada</text>
+    <rect class="box" x="402" y="264" width="196" height="36" rx="8"/>
+    <text x="500" y="287" font-size="13" text-anchor="middle">vutric-core · protokol</text>
+    <rect class="box" x="402" y="306" width="196" height="36" rx="8"/>
+    <text x="500" y="329" font-size="13" text-anchor="middle">vutric-net · iroh, mDNS</text>
+    <rect class="box" x="402" y="348" width="196" height="36" rx="8"/>
+    <text x="500" y="371" font-size="13" text-anchor="middle">uzatish · BLAKE3, resume</text>
+
+    <path class="ln" d="M324 148 C 360 148, 360 240, 384 240" marker-end="url(#ah)"/>
+    <path class="ln" d="M324 262 L 384 290" marker-end="url(#ah)"/>
+    <text x="336" y="196" font-size="11" class="t3">ichida</text>
+    <path class="lnc dash" d="M300 340 C 300 320, 300 210, 324 196" marker-end="url(#ahc)"/>
+    <text x="250" y="330" font-size="11" class="tc">IPC</text>
+    <path class="ln" d="M324 510 C 360 510, 360 400, 400 400" marker-end="url(#ah)"/>
+
+    <rect class="boxc" x="676" y="100" width="290" height="96" rx="12"/>
+    <text x="692" y="124" font-size="15" font-weight="700">Flutter UI</text>
+    <text x="692" y="146" font-size="13" class="t2">galereya, ulanish, sozlamalar</text>
+    <text x="692" y="166" font-size="13" class="t2">"otish" ekrani, tarix</text>
+    <text x="692" y="186" font-size="12" class="t3">Impeller, custom shader</text>
+
+    <rect class="boxk" x="676" y="214" width="290" height="96" rx="12"/>
+    <text x="692" y="238" font-size="15" font-weight="700">Kotlin modullar</text>
+    <text x="886" y="238" font-size="11" class="tk mono" font-weight="700">ANDROID</text>
+    <text x="692" y="260" font-size="13" class="t2">servis, tile, Share, Direct Share</text>
+    <text x="692" y="280" font-size="13" class="t2">hotspot, Wi-Fi Direct, BLE</text>
+    <text x="692" y="300" font-size="12" class="t3">6-bo'lim</text>
+
+    <rect class="boxsw" x="676" y="340" width="290" height="96" rx="12"/>
+    <text x="692" y="364" font-size="15" font-weight="700">Swift modullar</text>
+    <text x="928" y="364" font-size="11" class="tw mono" font-weight="700">IOS</text>
+    <text x="692" y="386" font-size="13" class="t2">Bonjour, PhotoKit, hotspot ulanish</text>
+    <text x="692" y="406" font-size="13" class="t2">App Intents, Core Bluetooth</text>
+    <text x="692" y="426" font-size="12" class="t3">7-bo'lim</text>
+
+    <rect class="boxsw dash" x="676" y="466" width="290" height="100" rx="12"/>
+    <text x="692" y="490" font-size="15" font-weight="700">iOS extension'lar</text>
+    <text x="692" y="512" font-size="13" class="t2">Share Extension, Live Activity</text>
+    <text x="692" y="532" font-size="13" class="t2">Widget, alohida jarayonlar</text>
+    <text x="692" y="552" font-size="12" class="t3">App Group orqali umumiy papka</text>
+
+    <path class="lnc" d="M676 148 C 640 148, 640 240, 616 240" marker-end="url(#ahc)"/>
+    <text x="630" y="196" font-size="11" class="tc" text-anchor="end">FRB</text>
+    <path class="lnk" d="M676 262 L 616 290"/>
+    <path class="lnw" d="M676 388 C 640 388, 640 340, 616 340"/>
+    <path class="lnw" d="M676 516 C 630 516, 630 380, 616 380"/>
+    <text x="636" y="306" font-size="11" class="tk">UniFFI</text>
+    <text x="636" y="452" font-size="11" class="tw">UniFFI</text>
+  </svg>
+  <figcaption>1-chizma. Ko'k: Flutter UI. Qum rang: Rust. Binafsha: Kotlin. Qizil-to'q sariq: Swift. Uzuq chiziqli quti faqat kerak bo'lganda ishlaydigan qismni bildiradi. Ikki qurilma orasida faqat shifrlangan QUIC oqimi bor.</figcaption>
+  </figure>
+
+  <div class="grid g3">
+    <div class="card"><span class="k ts">Rust</span><h3>Hamma mantiq shu yerda</h3><p>Protokol, juftlash, uzatish, sozlamalar sxemasi va fayl nomi xavfsizligi. Bir marta yoziladi va bir marta testlanadi, keyin har platformada bir xil ishlaydi.</p></div>
+    <div class="card"><span class="k tc">Flutter</span><h3>Ko'rinadigan "vau" qatlam</h3><p>Telefonda asosiy UI, desktopda katta oynalar. Bitta dizayn tili va bitta komponentlar to'plami, hammasi GPU'da chiziladi.</p></div>
+    <div class="card"><span class="k tk">Kotlin · Swift</span><h3>OS ichidagi eshiklar</h3><p>Flutter yetib bormaydigan joylar: Share sheet, tile, fon servisi, hotspot, BLE, Live Activity. Modullar yupqa: faqat OS API'ni yadroga ulaydi.</p></div>
+  </div>
+</div></section>
+
+<section id="s3"><div class="wrap">
+  <span class="num">03</span>
+  <h2>Desktop: doim ishlaydigan qism va kerak bo'lganda ochiladigan qism</h2>
+  <p class="sub">Foydalanuvchi kunining deyarli hammasida Vutric ko'rinmaydi: u tray'da turadi va fayl kutadi. Shu vaqtda faqat yengil Rust daemon ishlashi kerak. Og'ir UI faqat foydalanuvchi oynani ochganda yuklanadi, oyna yopilganda esa uning jarayoni butunlay tugaydi.</p>
+  <figure class="fig svg-scroll">
+  <svg viewBox="0 0 1000 370" role="img" aria-label="Bir kunlik RAM grafigi, taxminiy">
+    <text x="60" y="28" font-size="14" font-weight="700">Bir ish kuni davomida RAM (taxminiy model, o'lchov emas)</text>
+    <line class="grid-l" x1="60" y1="60" x2="960" y2="60"/>
+    <line class="grid-l" x1="60" y1="130" x2="960" y2="130"/>
+    <line class="grid-l" x1="60" y1="200" x2="960" y2="200"/>
+    <line class="grid-l" x1="60" y1="270" x2="960" y2="270"/>
+    <line class="ln" x1="60" y1="320" x2="960" y2="320"/>
+    <text x="50" y="64" font-size="11" text-anchor="end" class="t3 mono">200</text>
+    <text x="50" y="134" font-size="11" text-anchor="end" class="t3 mono">150</text>
+    <text x="50" y="204" font-size="11" text-anchor="end" class="t3 mono">100</text>
+    <text x="50" y="274" font-size="11" text-anchor="end" class="t3 mono">50</text>
+    <text x="50" y="324" font-size="11" text-anchor="end" class="t3 mono">0 MB</text>
+    <text x="60" y="344" font-size="11" class="t3 mono">09:00</text>
+    <text x="285" y="344" font-size="11" class="t3 mono">11:00</text>
+    <text x="510" y="344" font-size="11" class="t3 mono">13:00</text>
+    <text x="735" y="344" font-size="11" class="t3 mono">15:00</text>
+    <text x="920" y="344" font-size="11" class="t3 mono">17:00</text>
+    <path class="areab" d="M60 320 L60 116 L960 116 L960 320 Z"/>
+    <path class="lnb" d="M60 116 L960 116"/>
+    <text x="640" y="106" font-size="13" class="tb" font-weight="700">webview ilova doim ochiq · ~160 MB</text>
+    <path class="areaok" d="M60 320 L60 292 L250 292 L250 286 L270 286 L270 292 L420 292 L420 200 L500 200 L500 292 L640 292 L640 286 L660 286 L660 292 L960 292 L960 320 Z"/>
+    <path class="lnok" d="M60 292 L250 292 L250 286 L270 286 L270 292 L420 292 L420 200 L500 200 L500 292 L640 292 L640 286 L660 286 L660 292 L960 292"/>
+    <text x="70" y="282" font-size="13" class="tok" font-weight="700">Vutric daemon · ~20 MB</text>
+    <rect x="418" y="168" width="84" height="24" rx="6" class="boxc"/>
+    <text x="460" y="185" font-size="11" text-anchor="middle" class="tc" font-weight="700">sozlamalar</text>
+    <text x="260" y="270" font-size="11" text-anchor="middle" class="t2">otish</text>
+    <text x="650" y="270" font-size="11" text-anchor="middle" class="t2">otish</text>
+    <text x="512" y="236" font-size="11" class="t3">Flutter oynasi yopildi → RAM qaytdi</text>
+  </svg>
+  <figcaption>2-chizma. Yashil maydon qanchalik kichik bo'lsa, foydalanuvchi ilovani shunchalik "yengil" deb his qiladi. Raqamlar muhandislik bahosi, haqiqiy qiymat 12-bo'limdagi spike'da o'lchanadi.</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>Jarayon</th><th>Qachon ishlaydi</th><th>Nima qiladi</th><th>Texnologiya</th><th>RAM maqsadi</th></tr></thead>
+    <tbody>
+      <tr><td><b>vutric-daemon</b></td><td>doim (autostart)</td><td>tarmoq, uzatish, tray, toast, IPC server</td><td><span class="pill rs">Rust</span> <code>tray-icon</code>, <code>windows-rs</code>, <code>zbus</code></td><td>≤ 30 MB</td></tr>
+      <tr><td><b>overlay</b> (daemon ichida)</td><td>oyna doim bor, chizish faqat effekt paytida</td><td>Halqa effekti, qabul kartasi, progress</td><td><span class="pill rs">Rust</span> <code>wgpu</code> + DirectComposition</td><td>bo'sh turganda +5–15 MB</td></tr>
+      <tr><td><b>vutric-app</b></td><td>foydalanuvchi ochganda</td><td>sozlamalar, tarix, qurilmalar, katta yuborish oynasi</td><td><span class="pill fl">Flutter desktop</span></td><td>ochiq: ≤ 120 MB, yopiq: 0</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note c"><b>Tauri'ni daemon bilan bitta jarayonda qilish taklifi nega qaytarib olindi:</b> bitta jarayonda webview yo doim yuklangan turadi, yo uni har ochishda qayta yaratish kerak bo'ladi. Ikkala holatda ham "doim yengil" maqsadi buziladi. Boshlang'ich brief'dagi alohida jarayon modeli to'g'ri edi.</div>
+</div></section>
+
+<section id="s4"><div class="wrap">
+  <span class="num">04</span>
+  <h2>Overlay kartalar: tez chiqishi kerak bo'lgan hamma narsa</h2>
+  <p class="sub">"Qabul qilasizmi?" so'rovi, progress va "fayl tushdi" belgisi bir zumda chiqishi kerak. Flutter oynasini ochish bir necha yuz millisekund oladi. Overlay esa allaqachon iliq va ekranda turibdi, shuning uchun bu kartalarni overlay chizadi. Natijada effekt va karta bitta uzluksiz sahnaga aylanadi.</p>
+  <figure class="fig svg-scroll">
+  <svg viewBox="0 0 1000 470" role="img" aria-label="Qabul qilish ketma-ketligi">
+    <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink2)"/></marker></defs>
+    <rect class="boxc" x="40" y="20" width="160" height="40" rx="10"/><text x="120" y="45" font-size="14" text-anchor="middle" font-weight="700">Telefon</text>
+    <rect class="boxs" x="300" y="20" width="160" height="40" rx="10"/><text x="380" y="45" font-size="14" text-anchor="middle" font-weight="700">Rust daemon</text>
+    <rect class="box" x="560" y="20" width="160" height="40" rx="10"/><text x="640" y="45" font-size="14" text-anchor="middle" font-weight="700">wgpu overlay</text>
+    <rect class="boxok" x="820" y="20" width="140" height="40" rx="10"/><text x="890" y="45" font-size="14" text-anchor="middle" font-weight="700">Foydalanuvchi</text>
+    <line class="life" x1="120" y1="60" x2="120" y2="450"/>
+    <line class="life" x1="380" y1="60" x2="380" y2="450"/>
+    <line class="life" x1="640" y1="60" x2="640" y2="450"/>
+    <line class="life" x1="890" y1="60" x2="890" y2="450"/>
+    <path class="ln" d="M120 96 L376 96" marker-end="url(#a2)"/><text x="248" y="88" font-size="12" text-anchor="middle">Offer: 12 ta rasm + ko'rinish</text>
+    <path class="ln" d="M380 132 L636 132" marker-end="url(#a2)"/><text x="508" y="124" font-size="12" text-anchor="middle">karta chiz (ishonchli emas)</text>
+    <rect class="boxw" x="652" y="146" width="226" height="40" rx="8"/><text x="765" y="164" font-size="12" text-anchor="middle" font-weight="700">kartaga bosish yoqiladi</text><text x="765" y="179" font-size="11" text-anchor="middle" class="t2 mono">WS_EX_TRANSPARENT olinadi</text>
+    <path class="ln" d="M640 210 L886 210" marker-end="url(#a2)"/><text x="763" y="202" font-size="12" text-anchor="middle">karta 1 kadrda ko'rinadi</text>
+    <path class="ln" d="M890 246 L384 246" marker-end="url(#a2)"/><text x="637" y="238" font-size="12" text-anchor="middle">"Qabul qilish" bosildi</text>
+    <path class="ln" d="M380 282 L124 282" marker-end="url(#a2)"/><text x="252" y="274" font-size="12" text-anchor="middle">Accept</text>
+    <path class="lnc flow" d="M120 318 L376 318"/><text x="248" y="310" font-size="12" text-anchor="middle" class="tc">4 ta parallel QUIC stream</text>
+    <path class="ln" d="M380 354 L636 354" marker-end="url(#a2)"/><text x="508" y="346" font-size="12" text-anchor="middle">progress halqasi</text>
+    <path class="ln" d="M380 396 L636 396" marker-end="url(#a2)"/><text x="508" y="388" font-size="12" text-anchor="middle">hash mos → "tushish" animatsiyasi</text>
+    <rect class="boxok" x="652" y="410" width="226" height="34" rx="8"/><text x="765" y="432" font-size="12" text-anchor="middle" font-weight="700">bosish yana o'chadi · toast "Ochish"</text>
+  </svg>
+  <figcaption>3-chizma. Fayl ishonchli qurilmadan kelsa, karta so'rov o'rniga darhol progressni ko'rsatadi (ADR-0007, auto-accept). Fokus olinmaydi, shuning uchun foydalanuvchi boshqa ilovada yozishda davom etadi.</figcaption>
+  </figure>
+  <div class="grid g3">
+    <div class="card"><span class="k tok">Afzallik</span><h3>Bir zumda</h3><p>Overlay oynasi doim tayyor. Kartani chizish bitta kadr, ya'ni 16 ms'dan kam vaqt oladi.</p></div>
+    <div class="card"><span class="k tc">Afzallik</span><h3>Bitta sahna</h3><p>Fayl halqadan "uchib chiqadi", karta shu halqadan ochiladi va progress shu halqada aylanadi. Oddiy oyna bunday uzluksiz effekt bera olmaydi.</p></div>
+    <div class="card"><span class="k" style="color:var(--warn)">Tekshirilishi kerak</span><h3>Bosish va fokus</h3><p>Karta ustida bosish yoqilganda ham fokus olinmasligi kerak (<code>WS_EX_NOACTIVATE</code>). Klaviatura kerak bo'lmagani uchun bu mumkin bo'lishi kerak, lekin spike bilan isbotlanadi.</p></div>
+  </div>
+</div></section>
+
+<section id="s5"><div class="wrap">
+  <span class="num">05</span>
+  <h2>Desktop katta oynalari uchun UI tanlovi</h2>
+  <p class="sub">Flutter desktop boshlang'ich brief'da tanlangan edi (<code>original-brief.md:87</code>), lekin hech qaysi ADR'da asoslanmagan edi. Quyida to'rtta variant sening mezonlaring bo'yicha solishtirilgan. RAM raqamlari taxmin, ular spike'da o'lchanadi.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Variant</th><th>Vau effekt</th><th>Ochiq oynada RAM</th><th>Win + Linux silliqligi</th><th>Telefon bilan umumiy kod</th><th>Asosiy xavf</th></tr></thead>
+    <tbody>
+      <tr class="win"><td><b>Flutter desktop</b> ✓ tanlov</td><td><span class="pill y">kuchli</span> GPU, shader</td><td><span class="pill p">o'rtacha</span> ~50–100 MB</td><td><span class="pill y">bir xil</span> o'zi chizadi</td><td><span class="pill y">ha</span> dizayn va komponentlar</td><td>Tray va tizim plugin'lari zaif, lekin ular daemon'da bo'lgani uchun bu muhim emas</td></tr>
+      <tr><td>Tauri 2</td><td><span class="pill y">kuchli</span> CSS, WebGL</td><td><span class="pill n">yuqori</span> ~80–150 MB</td><td><span class="pill n">Linux zaif</span> WebKitGTK</td><td><span class="pill n">yo'q</span></td><td>RAM va Linux'dagi animatsiya sifati</td></tr>
+      <tr><td>Slint (Rust)</td><td><span class="pill p">o'rtacha</span></td><td><span class="pill y">past</span> ~10–30 MB</td><td><span class="pill y">yaxshi</span></td><td><span class="pill n">yo'q</span></td><td>Murakkab shader effektlarni qurish qiyin</td></tr>
+      <tr><td>O'z wgpu UI'miz</td><td><span class="pill y">eng kuchli</span></td><td><span class="pill y">past</span></td><td><span class="pill y">yaxshi</span></td><td><span class="pill n">yo'q</span></td><td>Matn kiritish, IME, accessibility va scroll'ni o'zimiz yozamiz: bir yillik ish</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid g2">
+    <div class="card"><span class="k tok">Nega Flutter desktop yutdi</span><ul>
+      <li>Telefon allaqachon Flutter'da, demak bitta dizayn tili va bitta komponentlar to'plami bo'ladi.</li>
+      <li>UI GPU'da chiziladi, shuning uchun Windows, Linux va macOS'da bir xil silliq ishlaydi.</li>
+      <li>Uning zaif tomonlari (tray, autostart, toast) Rust daemon'da hal qilinadi.</li>
+      <li>Alohida jarayonda ishlaydi va yopilsa RAM'ni butunlay qaytaradi.</li>
+      <li>LocalSend aynan Flutter desktop'da qurilgan va hamma platformada ishlaydi. Bu shu toifadagi ilova uchun real isbot (10-bo'lim).</li>
+    </ul></div>
+    <div class="card"><span class="k tb">Nega Tauri rad etildi</span><ul>
+      <li>Uning asosiy ustunligi, HTML dizaynni to'g'ridan-to'g'ri ishlatish, bizda muhim emas, chunki qayta yozishga tayyormiz.</li>
+      <li>WebView2 bir nechta jarayon ochadi, shuning uchun ochiq oynada RAM eng yuqori.</li>
+      <li>Ubuntu'da (Phase 2) WebKitGTK animatsiya va blur'ni sekinroq chizadi.</li>
+    </ul></div>
+  </div>
+  <div class="note">Overlay har qanday holatda <b>wgpu</b>'da qoladi. Eng kuchli "vau" Flutter'da emas, overlay'da. U allaqachon o'lchangan: 60.3 fps va birorta o'tkazib yuborilgan vblank yo'q (ADR-0004).</div>
+</div></section>
+
+<section id="s6"><div class="wrap">
+  <span class="num">06</span>
+  <h2>Android: Flutter UI + Kotlin modullar</h2>
+  <p class="sub">Ekranni Flutter chizadi. Lekin Quick Share va KDE Connect beradigan funksiyalarning ko'pi Android tizimining ichida yashaydi: Quick Settings tile, Share sheet'dagi qurilma yorliqlari, fonda uzatish, hotspot. Ularni faqat Kotlin'da to'g'ri yozish mumkin.</p>
+  <figure class="fig svg-scroll">
+  <svg viewBox="0 0 1000 450" role="img" aria-label="Android qatlamlari">
+    <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink3)"/></marker></defs>
+    <text x="20" y="30" font-size="12" font-weight="700" class="t3 mono">ANDROID TIZIMI · KIRISH ESHIKLARI</text>
+    <rect class="box" x="20" y="44" width="180" height="56" rx="10"/><text x="110" y="68" font-size="13" text-anchor="middle" font-weight="700">Quick Settings</text><text x="110" y="88" font-size="11" text-anchor="middle" class="t3">tile: "Vutric qabul"</text>
+    <rect class="box" x="216" y="44" width="180" height="56" rx="10"/><text x="306" y="68" font-size="13" text-anchor="middle" font-weight="700">Share sheet</text><text x="306" y="88" font-size="11" text-anchor="middle" class="t3">+ qurilma yorlig'i</text>
+    <rect class="box" x="412" y="44" width="180" height="56" rx="10"/><text x="502" y="68" font-size="13" text-anchor="middle" font-weight="700">Bildirishnoma</text><text x="502" y="88" font-size="11" text-anchor="middle" class="t3">progress, "Ochish"</text>
+    <rect class="box" x="608" y="44" width="180" height="56" rx="10"/><text x="698" y="68" font-size="13" text-anchor="middle" font-weight="700">Wi-Fi / BLE</text><text x="698" y="88" font-size="11" text-anchor="middle" class="t3">hotspot, P2P, e'lon</text>
+    <rect class="box" x="804" y="44" width="176" height="56" rx="10"/><text x="892" y="68" font-size="13" text-anchor="middle" font-weight="700">Galereya</text><text x="892" y="88" font-size="11" text-anchor="middle" class="t3">MediaStore</text>
+    <path class="ln" d="M110 100 L110 150" marker-end="url(#a3)"/>
+    <path class="ln" d="M306 100 L306 150" marker-end="url(#a3)"/>
+    <path class="ln" d="M502 100 L502 150" marker-end="url(#a3)"/>
+    <path class="ln" d="M698 100 L698 150" marker-end="url(#a3)"/>
+    <path class="ln" d="M892 100 L892 150" marker-end="url(#a3)"/>
+    <rect class="boxk" x="20" y="152" width="960" height="132" rx="14"/>
+    <text x="36" y="176" font-size="12" font-weight="700" class="tk mono">KOTLIN MODULLAR · YUPQA, MANTIQSIZ</text>
+    <rect class="box" x="36" y="190" width="150" height="78" rx="9"/><text x="111" y="214" font-size="12" text-anchor="middle" font-weight="700">VutricTile</text><text x="111" y="234" font-size="11" text-anchor="middle" class="t3 mono">TileService</text><text x="111" y="252" font-size="11" text-anchor="middle" class="t3">qabulni yoqish</text>
+    <rect class="box" x="198" y="190" width="150" height="78" rx="9"/><text x="273" y="214" font-size="12" text-anchor="middle" font-weight="700">ShareEntry</text><text x="273" y="234" font-size="11" text-anchor="middle" class="t3 mono">ACTION_SEND</text><text x="273" y="252" font-size="11" text-anchor="middle" class="t3">sharing shortcuts</text>
+    <rect class="box" x="360" y="190" width="150" height="78" rx="9"/><text x="435" y="214" font-size="12" text-anchor="middle" font-weight="700">TransferJob</text><text x="435" y="234" font-size="11" text-anchor="middle" class="t3 mono">user-initiated job</text><text x="435" y="252" font-size="11" text-anchor="middle" class="t3">UI yopiq bo'lsa ham</text>
+    <rect class="box" x="522" y="190" width="150" height="78" rx="9"/><text x="597" y="214" font-size="12" text-anchor="middle" font-weight="700">LinkManager</text><text x="597" y="234" font-size="11" text-anchor="middle" class="t3 mono">LocalOnlyHotspot</text><text x="597" y="252" font-size="11" text-anchor="middle" class="t3">WifiP2p, Aware</text>
+    <rect class="box" x="684" y="190" width="140" height="78" rx="9"/><text x="754" y="214" font-size="12" text-anchor="middle" font-weight="700">Nearby</text><text x="754" y="234" font-size="11" text-anchor="middle" class="t3 mono">BLE, NsdManager</text><text x="754" y="252" font-size="11" text-anchor="middle" class="t3">MulticastLock</text>
+    <rect class="box" x="836" y="190" width="130" height="78" rx="9"/><text x="901" y="214" font-size="12" text-anchor="middle" font-weight="700">Companion</text><text x="901" y="234" font-size="11" text-anchor="middle" class="t3 mono">CDM, Notif.</text><text x="901" y="252" font-size="11" text-anchor="middle" class="t3">fon huquqlari</text>
+    <rect class="boxc" x="20" y="320" width="450" height="64" rx="12"/>
+    <text x="245" y="346" font-size="14" text-anchor="middle" font-weight="700">Flutter UI (Activity)</text>
+    <text x="245" y="366" font-size="12" text-anchor="middle" class="t2">galereya, ulanish, sozlamalar · faqat ekranda</text>
+    <rect class="boxs" x="530" y="320" width="450" height="64" rx="12"/>
+    <text x="755" y="346" font-size="14" text-anchor="middle" font-weight="700">libvutric.so (Rust)</text>
+    <text x="755" y="366" font-size="12" text-anchor="middle" class="t2">bitta kutubxona: FRB + UniFFI eksportlari</text>
+    <path class="lnk" d="M300 284 L300 320"/><text x="310" y="306" font-size="11" class="tk">Pigeon</text>
+    <path class="lnk" d="M700 284 L700 320"/><text x="710" y="306" font-size="11" class="tk">UniFFI</text>
+    <path class="lnc" d="M470 352 L530 352"/><text x="500" y="344" font-size="11" text-anchor="middle" class="tc">FRB</text>
+    <text x="500" y="424" font-size="13" text-anchor="middle" class="t2">UI yopiq bo'lsa ham uzatish davom etadi: TransferJob → UniFFI → Rust. Flutter ekranni ochganda holatni Rust'dan o'qiydi.</text>
+  </svg>
+  <figcaption>4-chizma. Kotlin modullar o'z holatini saqlamaydi: hamma narsani Rust'dan so'raydi va Rust'ga yozadi. Shu sababli Flutter va Kotlin hech qachon bir-biriga zid holatda bo'lmaydi.</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>Kotlin modul</th><th>Android API</th><th>Foydalanuvchi nima oladi</th><th>Kimdan o'rganilgan</th><th>Bosqich</th></tr></thead>
+    <tbody>
+      <tr><td><b>TransferJob</b></td><td><code>JobScheduler</code> user-initiated data transfer (Android 14+), eski versiyalarda foreground service</td><td>Ilova yopilsa yoki ekran o'chsa ham katta video uzatilishda davom etadi</td><td>Quick Share</td><td>Phase 1</td></tr>
+      <tr><td><b>ShareEntry</b></td><td><code>ACTION_SEND</code>, <code>SEND_MULTIPLE</code>, sharing shortcuts</td><td>Har ilovaning Share menyusida Vutric bor, "Ofis kompyuteri" kabi qurilmalar esa to'g'ridan-to'g'ri yorliq sifatida chiqadi</td><td>AirDrop, Quick Share</td><td>Phase 1</td></tr>
+      <tr><td><b>VutricTile</b></td><td><code>TileService</code></td><td>Ekranni pastga surib, bitta tegish bilan "qabul qilish rejimi"ni yoqish</td><td>Quick Share</td><td>Phase 1</td></tr>
+      <tr><td><b>LinkManager</b></td><td><code>LocalOnlyHotspot</code>, <code>WifiP2pManager</code>, <code>WifiAwareManager</code></td><td>Router va internet bo'lmagan joyda ham to'liq Wi-Fi tezligi</td><td>Quick Share</td><td>Phase 1 (hotspot), keyin P2P</td></tr>
+      <tr><td><b>Nearby</b></td><td><code>BluetoothLeAdvertiser/Scanner</code>, <code>NsdManager</code>, <code>MulticastLock</code></td><td>QR'siz avtomatik topish: yaqindagi qurilma ro'yxatda o'zi paydo bo'ladi</td><td>AirDrop, Quick Share</td><td>Phase 1 (mDNS), BLE: R4</td></tr>
+      <tr><td><b>Companion</b></td><td><code>CompanionDeviceManager</code>, <code>NotificationListenerService</code></td><td>Juftlangan PC uchun fonda ishlash huquqi va bildirishnomalarni PC'ga ko'chirish</td><td>KDE Connect, Phone Link</td><td>Phase 1+ (ixtiyoriy)</td></tr>
+      <tr><td><b>Clipboard</b></td><td><code>ClipboardManager</code> (faqat ilova oldingi planda bo'lganda o'qiladi)</td><td>Nusxa olingan matnni PC'ga bitta tegish bilan yuborish</td><td>KDE Connect, Apple</td><td>keyinroq</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section id="s7"><div class="wrap">
+  <span class="num">07</span>
+  <h2>iOS: Flutter UI + Swift modullar va extension'lar</h2>
+  <p class="sub">iOS eng yopiq platforma (AIRDROP-ALTERNATIVA, 5-bo'lim), shuning uchun bu yerda Swift yanada muhim. Share Extension va Live Activity asosiy ilovadan <b>alohida jarayonlarda</b> ishlaydi va qattiq xotira limitiga ega. Flutter engine'ni u yerga olib kirish xato bo'ladi.</p>
+  <figure class="fig svg-scroll">
+  <svg viewBox="0 0 1000 440" role="img" aria-label="iOS jarayonlari">
+    <defs><marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ink3)"/></marker></defs>
+    <rect class="grp" x="20" y="20" width="440" height="300" rx="16"/>
+    <text x="36" y="46" font-size="12" font-weight="700" class="t3 mono">1-JARAYON · ASOSIY ILOVA</text>
+    <rect class="boxc" x="40" y="62" width="400" height="70" rx="12"/><text x="240" y="90" font-size="14" text-anchor="middle" font-weight="700">Flutter UI</text><text x="240" y="112" font-size="12" text-anchor="middle" class="t2">galereya, ulanish, otish ekrani, sozlamalar</text>
+    <rect class="boxsw" x="40" y="146" width="400" height="80" rx="12"/><text x="56" y="170" font-size="13" font-weight="700">Swift modullar</text>
+    <text x="56" y="192" font-size="12" class="t2 mono">NWBrowser · PhotoKit · NEHotspotConfiguration</text>
+    <text x="56" y="212" font-size="12" class="t2 mono">CoreBluetooth · App Intents · ActivityKit</text>
+    <rect class="boxs" x="40" y="240" width="400" height="62" rx="12"/><text x="240" y="266" font-size="14" text-anchor="middle" font-weight="700">Vutric.xcframework (Rust)</text><text x="240" y="286" font-size="12" text-anchor="middle" class="t2">FRB (Dart uchun) + UniFFI (Swift uchun)</text>
+    <rect class="grp" x="540" y="20" width="440" height="140" rx="16"/>
+    <text x="556" y="46" font-size="12" font-weight="700" class="t3 mono">2-JARAYON · SHARE EXTENSION</text>
+    <rect class="boxsw" x="560" y="60" width="200" height="82" rx="12"/><text x="660" y="88" font-size="13" text-anchor="middle" font-weight="700">SwiftUI ekran</text><text x="660" y="108" font-size="11" text-anchor="middle" class="t2">qurilma tanlash</text><text x="660" y="126" font-size="11" text-anchor="middle" class="t2">Flutter YO'Q</text>
+    <rect class="boxs" x="772" y="60" width="190" height="82" rx="12"/><text x="867" y="88" font-size="13" text-anchor="middle" font-weight="700">Rust (UniFFI)</text><text x="867" y="108" font-size="11" text-anchor="middle" class="t2">bir xil yadro</text><text x="867" y="126" font-size="11" text-anchor="middle" class="t3">xotira limiti qattiq</text>
+    <rect class="grp" x="540" y="180" width="440" height="140" rx="16"/>
+    <text x="556" y="206" font-size="12" font-weight="700" class="t3 mono">3-JARAYON · WIDGET EXTENSION</text>
+    <rect class="boxsw" x="560" y="220" width="200" height="82" rx="12"/><text x="660" y="248" font-size="13" text-anchor="middle" font-weight="700">Live Activity</text><text x="660" y="268" font-size="11" text-anchor="middle" class="t2">Dynamic Island,</text><text x="660" y="286" font-size="11" text-anchor="middle" class="t2">qulf ekranida progress</text>
+    <rect class="boxsw" x="772" y="220" width="190" height="82" rx="12"/><text x="867" y="248" font-size="13" text-anchor="middle" font-weight="700">Widget</text><text x="867" y="268" font-size="11" text-anchor="middle" class="t2">"PC'ga yuborish"</text><text x="867" y="286" font-size="11" text-anchor="middle" class="t2">tugmasi</text>
+    <rect class="boxok" x="230" y="356" width="540" height="62" rx="12"/>
+    <text x="500" y="382" font-size="14" text-anchor="middle" font-weight="700">App Group umumiy papkasi</text>
+    <text x="500" y="402" font-size="12" text-anchor="middle" class="t2">ishonch ro'yxati, kalitlar (Keychain group), sozlamalar, navbatdagi fayllar</text>
+    <path class="ln" d="M240 320 L320 356" marker-end="url(#a4)" marker-start="url(#a4)"/>
+    <path class="ln" d="M760 160 C 800 200, 760 330, 680 356" marker-end="url(#a4)" marker-start="url(#a4)"/>
+    <path class="ln dash" d="M460 120 C 500 120, 500 260, 560 260" marker-end="url(#a4)"/>
+    <text x="474" y="196" font-size="11" class="t3">yangilash</text>
+  </svg>
+  <figcaption>5-chizma. Uchala jarayon bitta App Group papkasini va bitta Keychain guruhini bo'lishadi. Shuning uchun Share Extension'dan yuborilgan fayl ham o'sha juftlangan kalit bilan shifrlanadi.</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>Swift qism</th><th>iOS API</th><th>Foydalanuvchi nima oladi</th><th>Kimdan o'rganilgan</th><th>Bosqich</th></tr></thead>
+    <tbody>
+      <tr><td><b>Share Extension</b></td><td><code>NSExtension</code> share, SwiftUI</td><td>Photos, Files va Safari: istalgan joydan "Vutric" orqali bitta tegish bilan yuborish</td><td>AirDrop</td><td>Phase 3</td></tr>
+      <tr><td><b>Live Activity</b></td><td><code>ActivityKit</code></td><td>Katta video ketayotganda progress Dynamic Island'da ko'rinadi, ilovani ochish shart emas</td><td>iOS tizim uslubi</td><td>Phase 3</td></tr>
+      <tr><td><b>App Intents</b></td><td><code>AppIntents</code></td><td>Siri va Shortcuts: "Oxirgi rasmni ofis kompyuteriga yubor", Action button'ga bog'lash</td><td>Apple ekotizimi</td><td>Phase 3</td></tr>
+      <tr><td><b>Topish</b></td><td><code>NWBrowser</code> (Bonjour), <code>CoreBluetooth</code></td><td>Bitta Wi-Fi'da PC o'zi chiqadi, BLE bilan yonma-yon turgan qurilma topiladi</td><td>AirDrop</td><td>Phase 3</td></tr>
+      <tr><td><b>Hotspot ulanish</b></td><td><code>NEHotspotConfiguration</code></td><td>Android yoki PC ochgan hotspot'ga QR orqali avtomatik ulanish (tasdiq so'raladi)</td><td>Quick Share</td><td>Phase 3</td></tr>
+      <tr><td><b>Galereya</b></td><td><code>PhotoKit</code>, HEIC→JPEG</td><td>Ilova ichidagi galereya va Windows'da ochiladigan format</td><td>AirDrop</td><td>Phase 3</td></tr>
+      <tr><td><b>Wi-Fi Aware</b></td><td>iOS 26 Wi-Fi Aware framework</td><td>iPhone'lar orasida routersiz to'g'ridan-to'g'ri ulanish</td><td>AWDL o'rnida</td><td>R6, keyinroq</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note b"><b>iOS cheklovlari (halol):</b> ilova fonda uzoq vaqt QUIC orqali fayl qabul qila olmaydi, chunki fon vaqti qisqa. Boshqa ilovalarning bildirishnomalarini o'qib bo'lmaydi. Clipboard faqat ilova ochiq bo'lganda va "Paste" ruxsati bilan o'qiladi. Shuning uchun iPhone qabul qiluvchi bo'lganda ilova ochiq turishi kerak. Yuborishda esa Share Extension va Live Activity bu cheklovni deyarli sezdirmaydi.</div>
+</div></section>
+
+<section id="s8"><div class="wrap">
+  <span class="num">08</span>
+  <h2>Bog'lanish qatlami: bitta Rust, uchta til</h2>
+  <p class="sub">Bog'lovchi kod qo'lda yozilmaydi, generatsiya qilinadi. Biror tilda yangi funksiya kerak bo'lsa, u avval Rust'ga qo'shiladi, keyin hamma tilga avtomatik chiqadi.</p>
+  <figure class="fig svg-scroll">
+  <svg viewBox="0 0 1000 320" role="img" aria-label="Bog'lanish generatorlari">
+    <defs><marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink3)"/></marker></defs>
+    <rect class="boxs" x="40" y="110" width="220" height="100" rx="14"/>
+    <text x="150" y="146" font-size="16" text-anchor="middle" font-weight="800">vutric-core</text>
+    <text x="150" y="168" font-size="12" text-anchor="middle" class="t2">vutric-net</text>
+    <text x="150" y="190" font-size="12" text-anchor="middle" class="t3 mono">#[frb] · #[uniffi::export]</text>
+    <rect class="boxc" x="380" y="30" width="200" height="60" rx="12"/><text x="480" y="56" font-size="14" text-anchor="middle" font-weight="700">flutter_rust_bridge</text><text x="480" y="76" font-size="11" text-anchor="middle" class="t2">stream, async, Dart tiplari</text>
+    <rect class="boxk" x="380" y="130" width="200" height="60" rx="12"/><text x="480" y="156" font-size="14" text-anchor="middle" font-weight="700">UniFFI → Kotlin</text><text x="480" y="176" font-size="11" text-anchor="middle" class="t2">servis, tile, job</text>
+    <rect class="boxsw" x="380" y="230" width="200" height="60" rx="12"/><text x="480" y="256" font-size="14" text-anchor="middle" font-weight="700">UniFFI → Swift</text><text x="480" y="276" font-size="11" text-anchor="middle" class="t2">extension, intents</text>
+    <path class="ln" d="M260 140 L380 60" marker-end="url(#a5)"/>
+    <path class="ln" d="M260 160 L380 160" marker-end="url(#a5)"/>
+    <path class="ln" d="M260 180 L380 260" marker-end="url(#a5)"/>
+    <rect class="box" x="700" y="30" width="250" height="60" rx="12"/><text x="825" y="56" font-size="14" text-anchor="middle" font-weight="700">Dart (Flutter UI)</text><text x="825" y="76" font-size="11" text-anchor="middle" class="t2">telefon va desktop</text>
+    <rect class="box" x="700" y="130" width="250" height="60" rx="12"/><text x="825" y="156" font-size="14" text-anchor="middle" font-weight="700">Kotlin modullar</text><text x="825" y="176" font-size="11" text-anchor="middle" class="t2">Android</text>
+    <rect class="box" x="700" y="230" width="250" height="60" rx="12"/><text x="825" y="256" font-size="14" text-anchor="middle" font-weight="700">Swift modullar</text><text x="825" y="276" font-size="11" text-anchor="middle" class="t2">iOS</text>
+    <path class="ln" d="M580 60 L700 60" marker-end="url(#a5)"/>
+    <path class="ln" d="M580 160 L700 160" marker-end="url(#a5)"/>
+    <path class="ln" d="M580 260 L700 260" marker-end="url(#a5)"/>
+    <path class="lnk dash" d="M950 72 C 980 100, 980 130, 950 150"/>
+    <path class="lnw dash" d="M950 66 C 1000 130, 1000 220, 950 250"/>
+    <text x="928" y="114" font-size="11" class="tk" text-anchor="end">Pigeon</text>
+    <text x="940" y="214" font-size="11" class="tw" text-anchor="end">Pigeon</text>
+  </svg>
+  <figcaption>6-chizma. Pigeon faqat UI hodisalari uchun ishlatiladi (masalan, "tile bosildi, Flutter ekranini och"). Ma'lumot va holat har doim Rust orqali o'tadi.</figcaption>
+  </figure>
+  <div class="grid g3">
+    <div class="card rule"><b class="n">1</b><div><h3>Mantiq faqat Rust'da</h3><p>Kotlin, Swift va Dart'da biznes qoidasi yozilmaydi. Ular faqat OS API'ni chaqiradi va natijani yadroga beradi.</p></div></div>
+    <div class="card rule"><b class="n">2</b><div><h3>Bitta kutubxona</h3><p>Android'da bitta <code>libvutric.so</code>, iOS'da bitta <code>xcframework</code>. FRB va UniFFI eksportlari bitta binarda turadi, yadro ikki marta yuklanmaydi.</p></div></div>
+    <div class="card rule"><b class="n">3</b><div><h3>Holatning bitta egasi</h3><p>Sozlamalar sxemasining egasi Rust (ADR-0008, 12-qaror). UI faqat o'qiydi va butun JSON'ni qaytarib yozadi.</p></div></div>
+  </div>
+</div></section>
+
+<section id="s9"><div class="wrap">
+  <span class="num">09</span>
+  <h2>Raqobatchilar funksiyalari: hammasi bitta ilovada</h2>
+  <p class="sub">Har bir funksiya qaysi raqobatchida borligi, har platformada qanchalik mumkinligi va uni qaysi qatlam bajarishi ko'rsatilgan. Belgilar: ✓ to'liq, ◐ cheklangan, ✗ OS ruxsat bermaydi.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Funksiya</th><th>Kimda bor</th><th class="c">Android</th><th class="c">iOS</th><th class="c">Windows</th><th class="c">Linux</th><th>Qatlam</th></tr></thead>
+    <tbody>
+      <tr><td>Share menyudan yuborish</td><td>AirDrop, Quick Share, LocalSend</td><td class="c">✓</td><td class="c">✓</td><td class="c">◐</td><td class="c">◐</td><td><span class="pill kt">Kotlin</span> <span class="pill sw">Swift</span> <span class="pill rs">Rust</span></td></tr>
+      <tr><td>Share sheet'da qurilma yorlig'i</td><td>Quick Share</td><td class="c">✓</td><td class="c">◐</td><td class="c">✗</td><td class="c">✗</td><td><span class="pill kt">Kotlin</span></td></tr>
+      <tr><td>Yaqin qurilmani avtomatik topish</td><td>AirDrop, Quick Share, LocalSend</td><td class="c">✓</td><td class="c">◐</td><td class="c">✓</td><td class="c">◐</td><td><span class="pill rs">Rust</span> mDNS + BLE modullar</td></tr>
+      <tr><td>Internetsiz, routersiz uzatish</td><td>AirDrop, Quick Share</td><td class="c">✓</td><td class="c">◐</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill kt">Kotlin</span> hotspot · <span class="pill rs">Rust</span></td></tr>
+      <tr><td>Har xil tarmoq, internet orqali</td><td>PairDrop</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill rs">Rust</span> iroh relay</td></tr>
+      <tr><td>Uzilsa davom ettirish</td><td>kam uchraydi</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill rs">Rust</span></td></tr>
+      <tr><td>Fonda uzatish (ilova yopiq)</td><td>Quick Share</td><td class="c">✓</td><td class="c">◐</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill kt">Kotlin</span> TransferJob · daemon</td></tr>
+      <tr><td>Bitta tegishli tile yoki tugma</td><td>Quick Share</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td class="c">◐</td><td><span class="pill kt">Kotlin</span> tile · <span class="pill sw">Swift</span> widget · tray</td></tr>
+      <tr><td>Qulf ekranida progress</td><td>iOS tizimi</td><td class="c">✓</td><td class="c">✓</td><td class="c">—</td><td class="c">—</td><td>bildirishnoma · <span class="pill sw">Live Activity</span></td></tr>
+      <tr><td>Siri, Shortcuts, avtomatlashtirish</td><td>Apple</td><td class="c">◐</td><td class="c">✓</td><td class="c">◐</td><td class="c">◐</td><td><span class="pill sw">App Intents</span> · CLI</td></tr>
+      <tr><td>PIN bilan himoya, avtomatik qabul</td><td>LocalSend, Quick Share</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill rs">Rust</span> ishonch ro'yxati</td></tr>
+      <tr><td>Clipboard almashish</td><td>KDE Connect, Apple</td><td class="c">◐</td><td class="c">◐</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill rs">Rust</span> + OS modul</td></tr>
+      <tr><td>Bildirishnomalarni PC'ga ko'chirish</td><td>KDE Connect, Phone Link</td><td class="c">✓</td><td class="c">✗</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill kt">NotificationListener</span></td></tr>
+      <tr><td>Telefonni topish (jiringlatish)</td><td>KDE Connect</td><td class="c">✓</td><td class="c">◐</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill kt">Kotlin</span> · <span class="pill sw">Swift</span></td></tr>
+      <tr><td>Telefon PC uchun sichqoncha sifatida</td><td>KDE Connect</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td class="c">◐</td><td><span class="pill fl">Flutter</span> + daemon input</td></tr>
+      <tr><td>Ilovasiz qabul (brauzer havolasi)</td><td>LocalSend, PairDrop</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill rs">Rust</span> lokal HTTPS</td></tr>
+      <tr><td>LocalSend bilan moslik</td><td>LocalSend</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill rs">Rust</span> protokol adapteri (10-bo'lim)</td></tr>
+      <tr class="win"><td><b>Vau "otish" effekti</b></td><td>Canopy Portal (faqat Mac)</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill rs">wgpu overlay</span> · <span class="pill fl">Flutter shader</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">Oxirgi qator Vutric'ning o'ziga xos joyi: hech bir raqobatchi Windows, Linux, Android va iOS'da birdaniga bunday effekt bermaydi. Qolgan funksiyalar esa bitta ilovada yig'iladi. Har bir raqobatchida ulardan faqat bir qismi bor.</div>
+</div></section>
+
+<section id="s10"><div class="wrap">
+  <span class="num">10</span>
+  <h2>LocalSend: eng yaqin ochiq raqobatchi</h2>
+  <p class="sub">LocalSend AirDrop'ning eng mashhur ochiq kodli alternativasi. U hamma platformada ishlaydi, shu jumladan iOS'da. Biz uni yengishimiz kerak, lekin undan o'rganadigan narsa ham ko'p. Bundan tashqari, LocalSend Vutric bilan bir xil UI texnologiyasida, ya'ni Flutter'da yozilgan.</p>
+
+  <figure class="fig svg-scroll">
+  <svg viewBox="0 0 1000 420" role="img" aria-label="LocalSend va Vutric protokoli">
+    <defs><marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink2)"/></marker></defs>
+    <text x="20" y="28" font-size="13" font-weight="700" class="t3 mono">LOCALSEND · bitta LAN ichida</text>
+    <rect class="box" x="20" y="44" width="200" height="56" rx="10"/><text x="120" y="68" font-size="13" text-anchor="middle" font-weight="700">1 · Topish</text><text x="120" y="88" font-size="11" text-anchor="middle" class="t2">UDP multicast, port 53317</text>
+    <rect class="box" x="264" y="44" width="200" height="56" rx="10"/><text x="364" y="68" font-size="13" text-anchor="middle" font-weight="700">2 · Zaxira topish</text><text x="364" y="88" font-size="11" text-anchor="middle" class="t2">subnet'ni HTTP bilan skanerlash</text>
+    <rect class="box" x="508" y="44" width="200" height="56" rx="10"/><text x="608" y="68" font-size="13" text-anchor="middle" font-weight="700">3 · Taklif</text><text x="608" y="88" font-size="11" text-anchor="middle" class="t2 mono">POST prepare-upload</text>
+    <rect class="box" x="752" y="44" width="228" height="56" rx="10"/><text x="866" y="68" font-size="13" text-anchor="middle" font-weight="700">4 · Uzatish</text><text x="866" y="88" font-size="11" text-anchor="middle" class="t2 mono">POST upload · HTTPS (TLS)</text>
+    <path class="ln" d="M220 72 L264 72" marker-end="url(#a6)"/><path class="ln" d="M464 72 L508 72" marker-end="url(#a6)"/><path class="ln" d="M708 72 L752 72" marker-end="url(#a6)"/>
+    <rect class="boxb" x="20" y="116" width="960" height="34" rx="8"/>
+    <text x="500" y="138" font-size="12" text-anchor="middle" class="tb" font-weight="700">ikkala qurilma bitta tarmoqda bo'lmasa yoki multicast yopiq bo'lsa, bu yo'l ishlamaydi</text>
+
+    <text x="20" y="196" font-size="13" font-weight="700" class="tc mono">VUTRIC · istalgan tarmoq</text>
+    <rect class="boxc" x="20" y="212" width="200" height="56" rx="10"/><text x="120" y="236" font-size="13" text-anchor="middle" font-weight="700">1 · Topish</text><text x="120" y="256" font-size="11" text-anchor="middle" class="t2">QR · mDNS · BLE · kalit</text>
+    <rect class="boxc" x="264" y="212" width="200" height="56" rx="10"/><text x="364" y="236" font-size="13" text-anchor="middle" font-weight="700">2 · Yo'l tanlash</text><text x="364" y="256" font-size="11" text-anchor="middle" class="t2">LAN → hotspot → NAT → relay</text>
+    <rect class="boxc" x="508" y="212" width="200" height="56" rx="10"/><text x="608" y="236" font-size="13" text-anchor="middle" font-weight="700">3 · Offer</text><text x="608" y="256" font-size="11" text-anchor="middle" class="t2">ko'rinish rasmi, BLAKE3</text>
+    <rect class="boxc" x="752" y="212" width="228" height="56" rx="10"/><text x="866" y="236" font-size="13" text-anchor="middle" font-weight="700">4 · Uzatish</text><text x="866" y="256" font-size="11" text-anchor="middle" class="t2">QUIC, 4 stream, resume</text>
+    <path class="lnc" d="M220 240 L264 240"/><path class="lnc" d="M464 240 L508 240"/><path class="lnc" d="M708 240 L752 240"/>
+    <rect class="boxok" x="20" y="284" width="960" height="34" rx="8"/>
+    <text x="500" y="306" font-size="12" text-anchor="middle" class="tok" font-weight="700">har xil tarmoq, internetsiz yoki uzilish bo'lsa ham ishlaydi, uzatish uzilgan joyidan davom etadi</text>
+
+    <rect class="boxs" x="300" y="348" width="400" height="54" rx="12"/>
+    <text x="500" y="372" font-size="13" text-anchor="middle" font-weight="700">LocalSend adapteri (Vutric daemon ichida)</text>
+    <text x="500" y="390" font-size="11" text-anchor="middle" class="t2">LAN'da LocalSend v2 protokolida ham gapiradi</text>
+    <path class="ln dash" d="M200 150 C 200 340, 280 375, 300 375"/>
+    <path class="ln dash" d="M800 318 C 800 360, 720 375, 700 375"/>
+  </svg>
+  <figcaption>7-chizma. Yuqorida LocalSend yo'li, pastda Vutric yo'li. Adapter orqali Vutric foydalanuvchisi do'stida LocalSend o'rnatilgan bo'lsa ham unga fayl yubora oladi. Bu bozorga kirishni osonlashtiradi.</figcaption>
+  </figure>
+
+  <div class="tbl"><table>
+    <thead><tr><th>Jihat</th><th>LocalSend</th><th>Vutric</th><th>Kim kuchli</th></tr></thead>
+    <tbody>
+      <tr><td>Platformalar</td><td>Windows, macOS, Linux, Android, iOS</td><td>shu beshtasi (ADR-0003 tartibida)</td><td><span class="pill p">teng</span></td></tr>
+      <tr><td>UI texnologiyasi</td><td>Flutter (telefon va desktop)</td><td>Flutter + wgpu overlay + Kotlin/Swift modullar</td><td><span class="pill y">Vutric</span></td></tr>
+      <tr><td>Topish</td><td>UDP multicast, zaxira sifatida subnet skanerlash</td><td>QR, mDNS, BLE, saqlangan kalit</td><td><span class="pill y">Vutric</span></td></tr>
+      <tr><td>Bitta LAN'dan tashqarida</td><td>ishlamaydi</td><td>NAT teshish va relay, end-to-end shifrlangan</td><td><span class="pill y">Vutric</span></td></tr>
+      <tr><td>Router va internetsiz</td><td>yo'q (umumiy tarmoq kerak)</td><td>hotspot, keyinroq Wi-Fi Direct va Wi-Fi Aware</td><td><span class="pill y">Vutric</span></td></tr>
+      <tr><td>Transport</td><td>HTTPS REST, self-signed sertifikat</td><td>QUIC (iroh), TLS 1.3, parallel stream'lar</td><td><span class="pill y">Vutric</span></td></tr>
+      <tr><td>Uzilsa davom ettirish</td><td>yo'q, fayl qaytadan yuboriladi</td><td>yetishmayotgan qismlargina so'raladi va BLAKE3 bilan tekshiriladi</td><td><span class="pill y">Vutric</span></td></tr>
+      <tr><td>Ilovasiz qabul (brauzer orqali)</td><td>bor ("Web share")</td><td>rejada</td><td><span class="pill n">LocalSend</span></td></tr>
+      <tr><td>PIN, avtomatik qabul, sevimlilar</td><td>bor</td><td>ishonch ro'yxati, auto-accept (ADR-0007)</td><td><span class="pill p">teng</span></td></tr>
+      <tr><td>Hamjamiyat va tanilganlik</td><td>katta, ko'p yuklab olingan</td><td>yangi</td><td><span class="pill n">LocalSend</span></td></tr>
+      <tr><td>Vau effekt</td><td>oddiy ro'yxat va progress</td><td>Halqa "otish" effekti, overlay kartalar</td><td><span class="pill y">Vutric</span></td></tr>
+      <tr><td>OS ichiga kirish</td><td>Share target bor, tile va Live Activity yo'q</td><td>tile, Direct Share, Live Activity, App Intents</td><td><span class="pill y">Vutric</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="grid g3">
+    <div class="card"><span class="k tok">Undan olamiz</span><h3>Isbotlangan g'oyalar</h3><ul>
+      <li><b>Web share:</b> qabul qiluvchida ilova bo'lmasa, brauzer havolasi orqali yuborish.</li>
+      <li><b>PIN rejimi:</b> begona tarmoqda yuborishdan oldin PIN so'rash.</li>
+      <li><b>Sodda bosh ekran:</b> birinchi ochilishda hech qanday sozlash talab qilinmaydi.</li>
+    </ul></div>
+    <div class="card"><span class="k tc">Moslik</span><h3>LocalSend adapteri</h3><p>Daemon LAN'da LocalSend v2 protokolini ham tushunadi: Vutric uni topadi, unga yuboradi va undan qabul qiladi. Bu ixtiyoriy qatlam, asosiy protokol QUIC bo'lib qoladi. Roadmap'da u "Later" bo'limida turibdi. Taklif: uni Phase 1 dan keyin darhol qilish.</p></div>
+    <div class="card"><span class="k ts">O'lchov uchun etalon</span><h3>LocalSend'ni spike'ga qo'shamiz</h3><p>LocalSend Flutter desktop'da ishlaydi, demak uning RAM va ochilish vaqti bizning Flutter desktop oynamiz uchun real etalon bo'ladi. U ham 12-bo'limdagi o'lchov jadvaliga qo'shiladi.</p></div>
+  </div>
+  <div class="note c"><b>Qisqasi:</b> LocalSend bitta LAN ichida yaxshi va oddiy ishlaydi. Vutric shu oddiylikni saqlaydi va unga istalgan tarmoq, internetsiz ulanish, resume, OS ichidagi eshiklar hamda vau effektni qo'shadi. LocalSend bilan moslik esa uning foydalanuvchilarini biz tomonga o'tkazish uchun ko'prik bo'ladi.</div>
+</div></section>
+
+<section id="s11"><div class="wrap">
+  <span class="num">11</span>
+  <h2>Xavflar va ularni qanday yopamiz</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Xavf</th><th>Ehtimol</th><th>Ta'sir</th><th>Yechim yoki tekshiruv</th></tr></thead>
+    <tbody>
+      <tr><td>Overlay kartasiga bosish fokusni olib qo'yadi</td><td><span class="pill p">o'rta</span></td><td>yozayotgan foydalanuvchi to'xtab qoladi</td><td>Spike: <code>WS_EX_NOACTIVATE</code> + hit-test faqat karta hududida. Bu ishlamasa, karta Flutter'ning kichik oynasida ochiladi.</td></tr>
+      <tr><td>Flutter desktop sovuq ochilishi sekin</td><td><span class="pill p">o'rta</span></td><td>"tez" taassurot buziladi</td><td>Tez kerak bo'lgan hamma narsa overlay'da, Flutter faqat katta oynalar uchun. Ochilish vaqti spike'da o'lchanadi.</td></tr>
+      <tr><td>Flutter desktop'da Impeller holati</td><td><span class="pill p">o'rta</span></td><td>shader effektlarda farq bo'lishi mumkin</td><td>Spike'da Windows va Ubuntu'da Impeller va Skia solishtiriladi.</td></tr>
+      <tr><td>iOS Share Extension xotira limiti</td><td><span class="pill y">past</span></td><td>extension yopilib qoladi</td><td>Flutter ishlatilmaydi. Rust faylni oqim bilan o'qiydi, butun faylni xotiraga olmaydi.</td></tr>
+      <tr><td>FRB va UniFFI bitta binarda</td><td><span class="pill p">o'rta</span></td><td>build murakkablashadi</td><td>Bitta crate ikkala eksportni beradi. CI'da <code>nm</code> bilan ikkala belgi ham borligi tekshiriladi (iOS'dagi mavjud naqsh kabi).</td></tr>
+      <tr><td>Android 14+ fon cheklovlari</td><td><span class="pill p">o'rta</span></td><td>katta uzatish to'xtab qoladi</td><td>User-initiated data transfer job ishlatiladi, eski Android'da esa <code>dataSync</code> turidagi foreground service.</td></tr>
+      <tr><td>LocalSend protokoli o'zgarishi</td><td><span class="pill y">past</span></td><td>adapter buziladi</td><td>Adapter alohida modul bo'ladi, uning testlari LocalSend'ning ochiq protokol hujjatiga bog'lanadi.</td></tr>
+      <tr><td>Uchta UI tili (Dart, Kotlin, Swift)</td><td><span class="pill y">aniq</span></td><td>ko'proq kod va bilim talab qiladi</td><td>Kotlin va Swift qatlamlari yupqa va mantiqsiz bo'ladi: har modulda 1 ta API va 1 ta test.</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section id="s12"><div class="wrap">
+  <span class="num">12</span>
+  <h2>Spike: qarorni raqam bilan tasdiqlash</h2>
+  <p class="sub">Loyiha qoidasi "avval o'lcha". Bu hujjatdagi RAM va tezlik raqamlari taxmin. ADR-0009 yozilishidan oldin ular quyidagi spike bilan o'lchanadi.</p>
+  <ol class="steps">
+    <li><div><b>Bitta ekran, uch variant</b><span>Sozlamalar ekrani va Halqa animatsiyasi Flutter desktop, Tauri va Slint'da quriladi. Dizayn hammasida bir xil bo'ladi.</span></div></li>
+    <li><div><b>Etalon</b><span>O'sha mashinada LocalSend'ning o'zi ham o'lchanadi: u tayyor Flutter desktop ilovasi.</span></div></li>
+    <li><div><b>Overlay karta</b><span>wgpu overlay'da "Qabul qilasizmi?" kartasi chiziladi. Hit-test faqat karta ustida bo'lishi va fokus olinmasligi tekshiriladi.</span></div></li>
+    <li><div><b>O'lchov</b><span>Intel UHD 730 (2560×1440) va Ubuntu'da o'lchanadi: RAM (bo'sh, ochiq, yopilgandan keyin), sovuq ochilish, fps va p99 kadr vaqti.</span></div></li>
+    <li><div><b>ADR-0009</b><span>Natijalar jadvali bilan qaror yoziladi. Egasi OK bergandan keyin dizayn desktop'ga joylanadi.</span></div></li>
+  </ol>
+  <div class="tbl" style="margin-top:18px"><table>
+    <thead><tr><th>O'lchov</th><th>Maqsad</th><th>Qanday o'lchanadi</th></tr></thead>
+    <tbody>
+      <tr><td>Daemon bo'sh turganda RAM</td><td>≤ 30 MB</td><td>Windows Private Bytes, Linux PSS, 10 daqiqalik o'rtacha</td></tr>
+      <tr><td>Desktop UI ochiq turganda RAM</td><td>≤ 120 MB va LocalSend'dan kam</td><td>xuddi shu usul, sozlamalar ekrani ochiq holda</td></tr>
+      <tr><td>UI yopilgandan keyin</td><td>daemon darajasiga qaytadi</td><td>jarayonlar ro'yxati + RAM</td></tr>
+      <tr><td>Overlay karta paydo bo'lishi</td><td>≤ 16 ms</td><td>Offer kelgan paytdan birinchi present'gacha</td></tr>
+      <tr><td>UI sovuq ochilishi</td><td>≤ 400 ms</td><td>tray bosilgan paytdan birinchi kadrgacha</td></tr>
+      <tr><td>Animatsiya silliqligi</td><td>60 fps, p99 &lt; 16.7 ms</td><td>ADR-0004 dagi usul</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section id="s13"><div class="wrap">
+  <span class="num">13</span>
+  <h2>Yo'l xaritasi: qaysi qism qachon</h2>
+  <p class="sub">Platforma tartibi o'zgarmaydi (ADR-0003). Bu yerda faqat har bosqichda qaysi qatlam qo'shilishi ko'rsatilgan.</p>
+  <figure class="fig svg-scroll">
+  <svg viewBox="0 0 1000 330" role="img" aria-label="Yo'l xaritasi">
+    <line class="ln" x1="30" y1="70" x2="970" y2="70"/>
+    <circle cx="95" cy="70" r="10" fill="var(--sand)"/><circle class="ping" cx="95" cy="70" r="6"/><circle class="ping d2" cx="95" cy="70" r="6"/>
+    <circle cx="300" cy="70" r="10" fill="var(--cobalt)"/>
+    <circle cx="510" cy="70" r="10" fill="var(--ink3)"/>
+    <circle cx="720" cy="70" r="10" fill="var(--sw)"/>
+    <circle cx="915" cy="70" r="10" fill="var(--ink3)"/>
+    <text x="95" y="40" font-size="13" text-anchor="middle" font-weight="700">Spike 0.3</text>
+    <text x="300" y="40" font-size="13" text-anchor="middle" font-weight="700">Phase 1</text>
+    <text x="510" y="40" font-size="13" text-anchor="middle" font-weight="700">Phase 2</text>
+    <text x="720" y="40" font-size="13" text-anchor="middle" font-weight="700">Phase 3–4</text>
+    <text x="915" y="40" font-size="13" text-anchor="middle" font-weight="700">Phase 5</text>
+    <rect class="boxs" x="20" y="98" width="150" height="210" rx="12"/>
+    <text x="34" y="124" font-size="12" font-weight="700">UI o'lchovi</text>
+    <text x="34" y="148" font-size="12" class="t2">Flutter / Tauri</text>
+    <text x="34" y="166" font-size="12" class="t2">/ Slint</text>
+    <text x="34" y="184" font-size="12" class="t2">+ LocalSend etalon</text>
+    <text x="34" y="208" font-size="12" class="t2">overlay karta</text>
+    <text x="34" y="232" font-size="12" class="t2">ADR-0009</text>
+    <rect class="boxc" x="190" y="98" width="220" height="210" rx="12"/>
+    <text x="204" y="124" font-size="12" font-weight="700">Windows + Android</text>
+    <text x="204" y="148" font-size="12" class="t2">daemon, tray, toast</text>
+    <text x="204" y="166" font-size="12" class="t2">overlay kartalar</text>
+    <text x="204" y="184" font-size="12" class="t2">Flutter desktop oynalar</text>
+    <text x="204" y="208" font-size="12" class="tk">Kotlin: TransferJob,</text>
+    <text x="204" y="226" font-size="12" class="tk">Share, tile, hotspot</text>
+    <text x="204" y="250" font-size="12" class="t2">Explorer menyu, MSIX</text>
+    <text x="204" y="274" font-size="12" class="ts">keyin: LocalSend adapter</text>
+    <rect class="box" x="430" y="98" width="160" height="210" rx="12"/>
+    <text x="444" y="124" font-size="12" font-weight="700">Ubuntu + Android</text>
+    <text x="444" y="148" font-size="12" class="t2">host-wlr, GNOME</text>
+    <text x="444" y="166" font-size="12" class="t2">Flutter Linux</text>
+    <text x="444" y="184" font-size="12" class="t2">Nautilus/Dolphin</text>
+    <text x="444" y="208" font-size="12" class="tk">Kotlin: BLE, P2P</text>
+    <rect class="boxsw" x="610" y="98" width="220" height="210" rx="12"/>
+    <text x="624" y="124" font-size="12" font-weight="700">Windows/Linux + iOS</text>
+    <text x="624" y="148" font-size="12" class="tw">Swift: Share Extension</text>
+    <text x="624" y="166" font-size="12" class="tw">Live Activity, Widget</text>
+    <text x="624" y="184" font-size="12" class="tw">App Intents, PhotoKit</text>
+    <text x="624" y="202" font-size="12" class="tw">NEHotspot, Bonjour</text>
+    <text x="624" y="226" font-size="12" class="t2">TestFlight</text>
+    <rect class="box" x="850" y="98" width="130" height="210" rx="12"/>
+    <text x="864" y="124" font-size="12" font-weight="700">macOS</text>
+    <text x="864" y="148" font-size="12" class="t2">NSPanel overlay</text>
+    <text x="864" y="166" font-size="12" class="t2">Flutter macOS</text>
+    <text x="864" y="184" font-size="12" class="t2">Swift share</text>
+  </svg>
+  <figcaption>8-chizma. Kotlin modullar Phase 1 dan, Swift modullar Phase 3 dan boshlanadi. Ikkalasi ham bir xil Rust yadroni chaqiradi.</figcaption>
+  </figure>
+</div></section>
+
+</main>
+<footer><div class="wrap">
+  Manbalar: Vutric repo (<code>docs/architecture.md</code>, ADR-0003…0008, <code>docs/roadmap.md</code>, <code>docs/research/original-brief.md</code>) va <a href="airdrop-alternativa.html"><code>airdrop-alternativa.html</code></a>. LocalSend ma'lumotlari uning ochiq protokol hujjati va ilovasidan olingan, adapterni yozishdan oldin protokolning joriy versiyasi qayta tekshiriladi. RAM va ochilish vaqti raqamlari taxmin, ular 12-bo'limdagi spike'da o'lchanadi. iOS cheklovlari Apple'ning hozirgi siyosatiga asoslangan va har relizda qayta tekshiriladi.
+</div></footer>
+<script>
+(function(){
+  var b=document.getElementById('tb'),r=document.documentElement,m=['avto','yorug\'','qorong\'i'],i=0;
+  function apply(){if(i===0)r.removeAttribute('data-theme');else r.setAttribute('data-theme',i===1?'light':'dark');b.textContent='Mavzu: '+m[i];}
+  try{var s=localStorage.getItem('vs-theme');if(s){i=+s||0;apply();}}catch(e){}
+  b.addEventListener('click',function(){i=(i+1)%3;apply();try{localStorage.setItem('vs-theme',i)}catch(e){}});
+})();
+</script>
+</body>
+</html>

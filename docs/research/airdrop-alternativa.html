@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AirDrop hamma joyda</title>
+<meta name="description" content="AirDrop qanday ishlaydi va Windows, Linux, Android'da shunday tajribani qanday qurish mumkin: protokollar, tezliklar, platforma cheklovlari va Vutric arxitekturasi.">
+<style>
+:root{
+  --bg:#f6f4ef; --bg2:#ffffff; --ink:#16181d; --ink2:#4a4f5a; --ink3:#8a8f9a;
+  --line:#dcd8cf; --cobalt:#2f5bea; --cobalt2:#dfe7ff; --sand:#c79a4a; --sand2:#f5ead4;
+  --ok:#1f9d63; --ok2:#dcf3e8; --warn:#c7821a; --warn2:#fbefd9; --bad:#c2453b; --bad2:#f8e1de;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.06);
+  --r:14px; --mono:ui-monospace,SFMono-Regular,Consolas,"Cascadia Code",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1115; --bg2:#171a21; --ink:#eef0f4; --ink2:#b4b9c4; --ink3:#7b818d;
+    --line:#2a2f39; --cobalt:#6f8fff; --cobalt2:#1c2547; --sand:#e0b56a; --sand2:#2d2517;
+    --ok:#3fcf8e; --ok2:#123326; --warn:#f0a83a; --warn2:#33270f; --bad:#ef6b60; --bad2:#3a1916;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1115; --bg2:#171a21; --ink:#eef0f4; --ink2:#b4b9c4; --ink3:#7b818d;
+  --line:#2a2f39; --cobalt:#6f8fff; --cobalt2:#1c2547; --sand:#e0b56a; --sand2:#2d2517;
+  --ok:#3fcf8e; --ok2:#123326; --warn:#f0a83a; --warn2:#33270f; --bad:#ef6b60; --bad2:#3a1916;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+header.hero{padding:72px 0 40px;position:relative;overflow:hidden}
+.eyebrow{font:600 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt)}
+h1{font-size:clamp(32px,6vw,58px);line-height:1.05;letter-spacing:-.02em;margin:14px 0 18px;max-width:820px}
+h1 em{font-style:normal;color:var(--cobalt)}
+.lead{font-size:clamp(17px,2.2vw,20px);color:var(--ink2);max-width:720px}
+.verdict{display:inline-flex;gap:10px;align-items:center;margin-top:22px;padding:10px 16px;border-radius:999px;background:var(--ok2);color:var(--ok);font-weight:600}
+.verdict b{font-size:20px}
+nav.toc{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+nav.toc .wrap{display:flex;gap:6px;overflow-x:auto;padding-top:10px;padding-bottom:10px;scrollbar-width:none}
+nav.toc a{flex:none;font-size:13px;color:var(--ink2);text-decoration:none;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg2)}
+nav.toc a:hover{color:var(--cobalt);border-color:var(--cobalt)}
+section{padding:56px 0;border-bottom:1px solid var(--line)}
+h2{font-size:clamp(24px,3.6vw,34px);letter-spacing:-.01em;margin:6px 0 10px}
+h3{font-size:18px;margin:0 0 6px}
+.num{font:600 12px/1 var(--mono);color:var(--sand);letter-spacing:.1em}
+p.sub{color:var(--ink2);max-width:760px;margin:0 0 26px}
+.card{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:22px}
+.grid{display:grid;gap:16px}
+.g3{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))}
+.fig{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:18px;margin:0 0 18px;overflow:hidden}
+.fig svg{width:100%;height:auto;display:block}
+.fig figcaption{font-size:13px;color:var(--ink3);margin-top:10px}
+.svg-scroll{overflow-x:auto}
+.svg-scroll svg{min-width:720px}
+svg text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--ink)}
+svg .t2{fill:var(--ink2)} svg .t3{fill:var(--ink3)} svg .mono{font-family:var(--mono)}
+svg .box{fill:var(--bg);stroke:var(--line);stroke-width:1.5}
+svg .boxc{fill:var(--cobalt2);stroke:var(--cobalt);stroke-width:1.5}
+svg .boxs{fill:var(--sand2);stroke:var(--sand);stroke-width:1.5}
+svg .boxok{fill:var(--ok2);stroke:var(--ok);stroke-width:1.5}
+svg .boxw{fill:var(--warn2);stroke:var(--warn);stroke-width:1.5}
+svg .boxb{fill:var(--bad2);stroke:var(--bad);stroke-width:1.5}
+svg .ln{stroke:var(--ink3);stroke-width:1.5;fill:none}
+svg .lnc{stroke:var(--cobalt);stroke-width:2;fill:none}
+svg .lns{stroke:var(--sand);stroke-width:2;fill:none}
+svg .dash{stroke-dasharray:5 5}
+svg .flow{stroke-dasharray:6 8;animation:flow 1.2s linear infinite}
+svg .dot{fill:var(--cobalt)} svg .dots{fill:var(--sand)} svg .dotok{fill:var(--ok)}
+svg .life{stroke:var(--line);stroke-width:1.5;stroke-dasharray:3 4}
+@keyframes flow{to{stroke-dashoffset:-28}}
+@keyframes ping{0%{r:8;opacity:.7}100%{r:60;opacity:0}}
+svg .ping{fill:none;stroke:var(--cobalt);stroke-width:2;animation:ping 2.4s ease-out infinite}
+svg .ping.d2{animation-delay:.8s} svg .ping.d3{animation-delay:1.6s}
+table{width:100%;border-collapse:collapse;font-size:14px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--bg2);box-shadow:var(--shadow)}
+.tbl table{min-width:680px}
+th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);background:var(--bg);font-weight:600}
+tr:last-child td{border-bottom:0}
+td code,p code,li code{font-family:var(--mono);font-size:.88em;background:var(--bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.y{background:var(--ok2);color:var(--ok)} .p{background:var(--warn2);color:var(--warn)} .n{background:var(--bad2);color:var(--bad)}
+.bars{display:grid;gap:12px}
+.bar{display:grid;grid-template-columns:170px 1fr 110px;gap:12px;align-items:center;font-size:14px}
+.bar .track{height:14px;border-radius:999px;background:var(--bg);border:1px solid var(--line);overflow:hidden;position:relative}
+.bar .fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cobalt),color-mix(in srgb,var(--cobalt) 60%,var(--sand)));transform-origin:left;animation:grow 1.4s cubic-bezier(.2,.8,.2,1) both}
+.bar .fill.s{background:linear-gradient(90deg,var(--sand),var(--warn))}
+.bar .fill.g{background:var(--ink3)}
+.bar .v{font-family:var(--mono);color:var(--ink2);text-align:right}
+@keyframes grow{from{transform:scaleX(0)}}
+@media (max-width:640px){.bar{grid-template-columns:1fr 100px}.bar .track{grid-column:1/-1;order:3}}
+.callout{border-left:4px solid var(--cobalt);background:var(--cobalt2);padding:14px 18px;border-radius:0 var(--r) var(--r) 0;margin:18px 0;color:var(--ink)}
+.callout.s{border-color:var(--sand);background:var(--sand2)}
+.callout.w{border-color:var(--warn);background:var(--warn2)}
+.ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:var(--cobalt2);color:var(--cobalt);font-weight:700;margin-bottom:12px;font-family:var(--mono)}
+.ic.s{background:var(--sand2);color:var(--sand)} .ic.w{background:var(--warn2);color:var(--warn)} .ic.b{background:var(--bad2);color:var(--bad)}
+ul.clean{padding-left:18px;margin:8px 0} ul.clean li{margin:4px 0;color:var(--ink2)}
+.steps{counter-reset:s;display:grid;gap:12px}
+.step{display:grid;grid-template-columns:40px 1fr;gap:14px;align-items:start}
+.step::before{counter-increment:s;content:counter(s);width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--bg);font-weight:700}
+footer{padding:40px 0 70px;color:var(--ink3);font-size:13px}
+.themebtn{position:absolute;top:20px;right:16px;border:1px solid var(--line);background:var(--bg2);color:var(--ink2);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--ink2);margin-top:10px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}svg animateMotion{display:none}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap" style="position:relative">
+    <button class="themebtn" id="tb" type="button">Mavzu: avto</button>
+    <div class="eyebrow">Vutric · tadqiqot · 2026-11-18</div>
+    <h1>AirDrop tajribasini <em>Windows, Linux va Android</em>'da qilish mumkinmi?</h1>
+    <p class="lead">AirDrop qanday ishlashi qatlamma-qatlam ochilgan. Har bir qatlamning boshqa platformalardagi o'rinbosari, real tezliklar, platforma cheklovlari, mavjud yechimlar va Vutric qaysi yo'ldan borishi ham ko'rsatilgan.</p>
+    <div class="verdict"><b>✓</b> Ha, mumkin. Lekin bitta texnologiya bilan emas: har platformada qatlamlar boshqacha yig'iladi.</div>
+  </div>
+</header>
+
+<nav class="toc"><div class="wrap">
+  <a href="#s1">1 · AirDrop anatomiyasi</a>
+  <a href="#s2">2 · AirDrop protokoli</a>
+  <a href="#s3">3 · Uzatish kanallari</a>
+  <a href="#s4">4 · Tezliklar</a>
+  <a href="#s5">5 · Platforma matritsasi</a>
+  <a href="#s6">6 · Quick Share qanday ishlaydi</a>
+  <a href="#s7">7 · Mavjud yechimlar</a>
+  <a href="#s8">8 · Qiyin joylar</a>
+  <a href="#s9">9 · Vutric arxitekturasi</a>
+  <a href="#s10">10 · Keyingi qadamlar</a>
+</div></nav>
+
+<main>
+
+<!-- 1 -->
+<section id="s1"><div class="wrap">
+  <div class="num">01</div>
+  <h2>AirDrop nega bunchalik yaxshi ishlaydi</h2>
+  <p class="sub">AirDrop bitta funksiya emas, uchta qatlam ustma-ust ishlaydi. Foydalanuvchi faqat eng yuqorisini ko'radi, tezlik va oflayn ishlash pastki ikkitasidan keladi.</p>
+
+  <figure class="fig"><div class="svg-scroll">
+  <svg viewBox="0 0 960 400" role="img" aria-label="AirDrop uch qatlami">
+    <rect x="20" y="20" width="600" height="104" rx="14" class="boxs"/>
+    <text x="44" y="56" font-size="13" class="t3 mono">3-QATLAM · TAJRIBA</text>
+    <text x="44" y="84" font-size="20" font-weight="700">Share menyu, animatsiya, avtomatik qabul</text>
+    <text x="44" y="108" font-size="14" class="t2">Tizimga chuqur kiritilgan: har qanday ilovadan bitta tegish bilan ochiladi</text>
+
+    <rect x="20" y="144" width="600" height="104" rx="14" class="boxc"/>
+    <text x="44" y="180" font-size="13" class="t3 mono">2-QATLAM · UZATISH</text>
+    <text x="44" y="208" font-size="20" font-weight="700">AWDL: to'g'ridan-to'g'ri Wi-Fi (router kerak emas)</text>
+    <text x="44" y="232" font-size="14" class="t2">Ustida IPv6 link-local → mDNS → TLS → HTTP POST</text>
+
+    <rect x="20" y="268" width="600" height="104" rx="14" class="box"/>
+    <text x="44" y="304" font-size="13" class="t3 mono">1-QATLAM · TOPISH</text>
+    <text x="44" y="332" font-size="20" font-weight="700">BLE e'loni (Bluetooth Low Energy)</text>
+    <text x="44" y="356" font-size="14" class="t2">Kontakt hashlari bilan kichik paket: kim yaqinda ekanini juda kam quvvat bilan bildiradi</text>
+
+    <g transform="translate(790,200)">
+      <circle r="8" class="ping"/><circle r="8" class="ping d2"/><circle r="8" class="ping d3"/>
+      <rect x="-26" y="-46" width="52" height="92" rx="10" fill="var(--ink)"/>
+      <rect x="-21" y="-38" width="42" height="72" rx="4" fill="var(--cobalt)"/>
+    </g>
+    <text x="790" y="290" text-anchor="middle" font-size="13" class="t2">qurilma doimiy e'lon qiladi</text>
+    <text x="790" y="310" text-anchor="middle" font-size="13" class="t3">(soniyasiga bir necha marta)</text>
+
+    <path d="M640 72 H700" class="ln dash"/><text x="706" y="76" font-size="13" class="t2">foydalanuvchi ko'radi</text>
+    <path d="M640 196 H700" class="ln dash"/><text x="706" y="200" font-size="13" class="t2">tezlik shu yerdan</text>
+    <path d="M640 320 H700" class="ln dash"/>
+  </svg></div>
+  <figcaption>1-chizma. AirDrop qatlamlari. Boshqa platformada har bir qatlam uchun alohida o'rinbosar kerak.</figcaption></figure>
+
+  <div class="grid g3">
+    <div class="card"><div class="ic">1</div><h3>Topish: BLE</h3><p style="color:var(--ink2);margin:0">Batareyani deyarli yemaydi. Wi-Fi o'chiq bo'lsa ham qurilma "men shu yerdaman" deydi. Paketda telefon raqami va email'ning qisqartirilgan SHA-256 hashlari bor: "faqat kontaktlar" rejimi shunday ishlaydi.</p></div>
+    <div class="card"><div class="ic">2</div><h3>Uzatish: AWDL</h3><p style="color:var(--ink2);margin:0">Apple Wireless Direct Link. Wi-Fi chipi bir vaqtda ham router'ga, ham qo'shni qurilmaga ulanadi: kanallar orasida juda tez almashadi. Natijada internet ham, umumiy tarmoq ham kerak emas.</p></div>
+    <div class="card"><div class="ic s">3</div><h3>Tajriba</h3><p style="color:var(--ink2);margin:0">Har ilovaning Share menyusida bor, qabul qiluvchida tizim oynasi chiqadi, fayl to'g'ri ilovada ochiladi. Bu qism texnika emas, OS bilan birlashish masalasi.</p></div>
+  </div>
+</div></section>
+
+<!-- 2 -->
+<section id="s2"><div class="wrap">
+  <div class="num">02</div>
+  <h2>AirDrop protokoli: qadamma-qadam</h2>
+  <p class="sub">TU Darmstadt (SEEMOO laboratoriyasi) AirDrop'ni teskari muhandislik qilib, ochiq <code>OpenDrop</code> va <code>OWL</code> (AWDL'ning Linux'dagi ochiq versiyasi) loyihalarini chiqargan. Quyidagi ketma-ketlik shu tadqiqotlarga asoslangan.</p>
+
+  <figure class="fig"><div class="svg-scroll">
+  <svg viewBox="0 0 960 560" role="img" aria-label="AirDrop ketma-ketlik diagrammasi">
+    <rect x="60" y="16" width="200" height="44" rx="10" class="boxc"/><text x="160" y="44" text-anchor="middle" font-size="15" font-weight="700">Yuboruvchi (iPhone)</text>
+    <rect x="700" y="16" width="200" height="44" rx="10" class="boxs"/><text x="800" y="44" text-anchor="middle" font-size="15" font-weight="700">Qabul qiluvchi (Mac)</text>
+    <path d="M160 60 V540" class="life"/><path d="M800 60 V540" class="life"/>
+
+    <rect x="300" y="78" width="360" height="26" rx="6" class="box"/><text x="480" y="96" text-anchor="middle" font-size="12" class="t3 mono">A · TOPISH (BLE)</text>
+    <path d="M160 130 H792" class="lnc"/><polygon points="792,125 802,130 792,135" fill="var(--cobalt)"/>
+    <text x="480" y="122" text-anchor="middle" font-size="14">BLE e'lon: "AirDrop izlayapman" + kontakt hashlari</text>
+    <circle r="5" class="dot"><animateMotion dur="2.6s" repeatCount="indefinite" path="M160 130 H800"/></circle>
+    <path d="M800 168 H170" class="ln"/><polygon points="170,163 160,168 170,173" fill="var(--ink3)"/>
+    <text x="480" y="160" text-anchor="middle" font-size="14" class="t2">Mac AWDL'ni yoqadi (hash mos kelsa)</text>
+
+    <rect x="300" y="190" width="360" height="26" rx="6" class="box"/><text x="480" y="208" text-anchor="middle" font-size="12" class="t3 mono">B · KANAL (AWDL + mDNS)</text>
+    <path d="M160 246 H792" class="lnc"/><polygon points="792,241 802,246 792,251" fill="var(--cobalt)"/>
+    <text x="480" y="238" text-anchor="middle" font-size="14">mDNS so'rov: <tspan class="mono">_airdrop._tcp.local</tspan></text>
+    <path d="M800 284 H170" class="ln"/><polygon points="170,279 160,284 170,289" fill="var(--ink3)"/>
+    <text x="480" y="276" text-anchor="middle" font-size="14" class="t2">javob: IPv6 link-local manzil + port</text>
+
+    <rect x="300" y="306" width="360" height="26" rx="6" class="box"/><text x="480" y="324" text-anchor="middle" font-size="12" class="t3 mono">C · KELISHUV (TLS ustida HTTP)</text>
+    <path d="M160 362 H792" class="lnc"/><polygon points="792,357 802,362 792,367" fill="var(--cobalt)"/>
+    <text x="480" y="354" text-anchor="middle" font-size="14"><tspan class="mono">POST /Discover</tspan> — kim ekaningni ayt (sertifikat)</text>
+    <path d="M160 404 H792" class="lnc"/><polygon points="792,399 802,404 792,409" fill="var(--cobalt)"/>
+    <text x="480" y="396" text-anchor="middle" font-size="14"><tspan class="mono">POST /Ask</tspan> — fayl nomi, turi, hajmi, ko'rinish rasmi</text>
+    <path d="M800 446 H170" class="lns"/><polygon points="170,441 160,446 170,451" fill="var(--sand)"/>
+    <text x="480" y="438" text-anchor="middle" font-size="14">foydalanuvchi "Qabul qilish"ni bosadi → 200 OK</text>
+
+    <rect x="300" y="466" width="360" height="26" rx="6" class="boxok"/><text x="480" y="484" text-anchor="middle" font-size="12" class="mono" fill="var(--ok)">D · UZATISH</text>
+    <path d="M160 520 H792" stroke="var(--ok)" stroke-width="5" fill="none"/><polygon points="792,513 804,520 792,527" fill="var(--ok)"/>
+    <text x="480" y="512" text-anchor="middle" font-size="14"><tspan class="mono">POST /Upload</tspan> — siqilgan arxiv oqimi (CPIO + gzip)</text>
+    <circle r="6" class="dotok"><animateMotion dur="1.4s" repeatCount="indefinite" path="M160 520 H800"/></circle>
+    <circle r="6" class="dotok"><animateMotion dur="1.4s" begin=".45s" repeatCount="indefinite" path="M160 520 H800"/></circle>
+    <circle r="6" class="dotok"><animateMotion dur="1.4s" begin=".9s" repeatCount="indefinite" path="M160 520 H800"/></circle>
+  </svg></div>
+  <figcaption>2-chizma. AirDrop ketma-ketligi. Muhim xulosa: AWDL'dan yuqoridagi hammasi oddiy standart texnologiya (mDNS, TLS, HTTP). Apple'ga xos narsa faqat BLE formati va AWDL.</figcaption></figure>
+
+  <div class="callout">Demak, <b>"AirDrop'ning sehri" asosan AWDL'da</b>. Qolgan qatlamlarni (mDNS + TLS + HTTP yoki QUIC) istalgan platformada qursa bo'ladi. LocalSend aynan shunday qiladi, faqat AWDL o'rniga umumiy Wi-Fi tarmog'idan foydalanadi.</div>
+</div></section>
+
+<!-- 3 -->
+<section id="s3"><div class="wrap">
+  <div class="num">03</div>
+  <h2>Uzatish kanallari: AWDL o'rniga nima bor</h2>
+  <p class="sub">Ikki qurilma orasida baytlarni olib o'tishning olti yo'li bor. Har birining o'z tezligi, sharti va platforma qo'llovi bor.</p>
+
+  <figure class="fig"><div class="svg-scroll">
+  <svg viewBox="0 0 960 500" role="img" aria-label="Uzatish kanallari topologiyasi">
+    <g>
+      <rect x="20" y="20" width="290" height="220" rx="14" class="box"/>
+      <text x="40" y="48" font-size="15" font-weight="700">A · Umumiy Wi-Fi (LAN)</text>
+      <rect x="140" y="70" width="50" height="30" rx="6" class="boxs"/><text x="165" y="90" text-anchor="middle" font-size="11">router</text>
+      <rect x="50" y="160" width="40" height="60" rx="8" class="boxc"/><text x="70" y="235" text-anchor="middle" font-size="11" class="t2">telefon</text>
+      <rect x="225" y="170" width="64" height="44" rx="6" class="boxc"/><text x="257" y="235" text-anchor="middle" font-size="11" class="t2">PC</text>
+      <path d="M70 160 L160 100" class="lnc flow"/><path d="M170 100 L257 170" class="lnc flow"/>
+      <text x="165" y="140" text-anchor="middle" font-size="11" class="t3">router orqali</text>
+    </g>
+    <g>
+      <rect x="335" y="20" width="290" height="220" rx="14" class="box"/>
+      <text x="355" y="48" font-size="15" font-weight="700">B · Wi-Fi Direct / AWDL</text>
+      <rect x="365" y="120" width="40" height="60" rx="8" class="boxc"/>
+      <rect x="540" y="128" width="64" height="44" rx="6" class="boxc"/>
+      <path d="M405 150 H540" class="lnc flow"/>
+      <text x="472" y="140" text-anchor="middle" font-size="11" class="t3">to'g'ridan-to'g'ri</text>
+      <text x="355" y="220" font-size="12" class="t2">router yo'q, internet yo'q</text>
+    </g>
+    <g>
+      <rect x="650" y="20" width="290" height="220" rx="14" class="box"/>
+      <text x="670" y="48" font-size="15" font-weight="700">C · Hotspot</text>
+      <rect x="680" y="120" width="40" height="60" rx="8" class="boxs"/>
+      <text x="700" y="198" text-anchor="middle" font-size="11" class="t2">AP</text>
+      <rect x="855" y="128" width="64" height="44" rx="6" class="boxc"/>
+      <path d="M720 150 H855" class="lnc flow"/>
+      <text x="787" y="140" text-anchor="middle" font-size="11" class="t3">PC hotspot'ga ulanadi</text>
+      <text x="670" y="220" font-size="12" class="t2">PC'ning internet ulanishi uziladi</text>
+    </g>
+    <g>
+      <rect x="20" y="260" width="290" height="220" rx="14" class="box"/>
+      <text x="40" y="288" font-size="15" font-weight="700">D · Bluetooth</text>
+      <rect x="50" y="360" width="40" height="60" rx="8" class="boxc"/>
+      <rect x="225" y="368" width="64" height="44" rx="6" class="boxc"/>
+      <path d="M90 390 H225" class="ln dash"/>
+      <text x="157" y="380" text-anchor="middle" font-size="11" class="t3">juda sekin</text>
+      <text x="40" y="460" font-size="12" class="t2">faqat topish va kelishuv uchun yaxshi</text>
+    </g>
+    <g>
+      <rect x="335" y="260" width="290" height="220" rx="14" class="box"/>
+      <text x="355" y="288" font-size="15" font-weight="700">E · Internet orqali to'g'ridan-to'g'ri</text>
+      <text x="355" y="308" font-size="12" class="t3">NAT teshish (iroh / WebRTC)</text>
+      <rect x="365" y="370" width="40" height="60" rx="8" class="boxc"/>
+      <rect x="540" y="378" width="64" height="44" rx="6" class="boxc"/>
+      <path d="M385 370 Q472 320 572 378" class="ln dash"/>
+      <text x="472" y="338" text-anchor="middle" font-size="11" class="t3">avval relay orqali tanishadi</text>
+      <path d="M405 405 H540" class="lnc flow"/>
+      <text x="472" y="445" text-anchor="middle" font-size="11" class="t3">keyin to'g'ridan-to'g'ri UDP</text>
+    </g>
+    <g>
+      <rect x="650" y="260" width="290" height="220" rx="14" class="box"/>
+      <text x="670" y="288" font-size="15" font-weight="700">F · Relay server</text>
+      <rect x="770" y="310" width="50" height="34" rx="6" class="boxw"/><text x="795" y="332" text-anchor="middle" font-size="11">relay</text>
+      <rect x="680" y="380" width="40" height="60" rx="8" class="boxc"/>
+      <rect x="855" y="388" width="64" height="44" rx="6" class="boxc"/>
+      <path d="M700 380 L785 344" class="lnc flow"/><path d="M805 344 L887 388" class="lnc flow"/>
+      <text x="670" y="465" font-size="12" class="t2">har doim ishlaydi, lekin internet tezligida</text>
+    </g>
+  </svg></div>
+  <figcaption>3-chizma. Olti uzatish kanali. Yaxshi ilova bularning bir nechtasini biladi va eng tezini avtomatik tanlaydi.</figcaption></figure>
+
+  <div class="tbl"><table>
+    <thead><tr><th>Kanal</th><th>Shart</th><th>Internet kerakmi</th><th>Kuchli tomoni</th><th>Zaif tomoni</th></tr></thead>
+    <tbody>
+      <tr><td><b>A · LAN</b></td><td>Ikkalasi bitta Wi-Fi'da</td><td><span class="pill y">yo'q</span></td><td>Hamma platformada ishlaydi, tez, oddiy</td><td>Mehmonxona va ofis Wi-Fi'lari qurilmalarni bir-biridan ajratadi (client isolation)</td></tr>
+      <tr><td><b>B · Wi-Fi Direct</b></td><td>Ikkala tomonda P2P qo'llovi</td><td><span class="pill y">yo'q</span></td><td>Haqiqiy AirDrop o'rinbosari</td><td>Windows drayverga bog'liq, Linux chipga bog'liq, Apple'da yo'q</td></tr>
+      <tr><td><b>C · Hotspot</b></td><td>Bir qurilma kirish nuqtasi bo'ladi</td><td><span class="pill y">yo'q</span></td><td>Deyarli har joyda ishlaydi</td><td>Ulanuvchining internet ulanishi vaqtincha uziladi, iOS'da dasturiy yoqib bo'lmaydi</td></tr>
+      <tr><td><b>D · Bluetooth</b></td><td>Yonma-yon</td><td><span class="pill y">yo'q</span></td><td>Kam quvvat, topish uchun ideal</td><td>Fayl uchun juda sekin</td></tr>
+      <tr><td><b>E · NAT teshish</b></td><td>Ikkalasida internet</td><td><span class="pill n">ha</span></td><td>Har xil tarmoqlarda ham to'g'ridan-to'g'ri</td><td>Ba'zi NAT'lar (simmetrik, CGNAT) teshilmaydi</td></tr>
+      <tr><td><b>F · Relay</b></td><td>Ikkalasida internet</td><td><span class="pill n">ha</span></td><td>100% ishlaydi</td><td>Internet tezligi bilan cheklangan, server xarajati bor</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<!-- 4 -->
+<section id="s4"><div class="wrap">
+  <div class="num">04</div>
+  <h2>Tezliklar: qaysi kanal qancha beradi</h2>
+  <p class="sub">Bu yerdagi raqamlar o'lchov emas, muhandislik baholari: oddiy uy sharoitida, 5 GHz Wi-Fi, bitta katta fayl uchun taxminiy foydali tezlik. Vutric'da real o'lchov hali qilinmagan (10-bo'lim).</p>
+
+  <div class="card">
+    <div class="bars">
+      <div class="bar"><span>AWDL (AirDrop)</span><div class="track"><div class="fill" style="width:80%"></div></div><span class="v">30–100 MB/s</span></div>
+      <div class="bar"><span>Wi-Fi Direct</span><div class="track"><div class="fill" style="width:60%"></div></div><span class="v">20–60 MB/s</span></div>
+      <div class="bar"><span>LAN, 5 GHz</span><div class="track"><div class="fill" style="width:65%"></div></div><span class="v">30–80 MB/s</span></div>
+      <div class="bar"><span>Hotspot, 5 GHz</span><div class="track"><div class="fill" style="width:50%"></div></div><span class="v">20–50 MB/s</span></div>
+      <div class="bar"><span>LAN, 2.4 GHz</span><div class="track"><div class="fill s" style="width:14%"></div></div><span class="v">3–10 MB/s</span></div>
+      <div class="bar"><span>Relay (internet)</span><div class="track"><div class="fill s" style="width:8%"></div></div><span class="v">1–10 MB/s</span></div>
+      <div class="bar"><span>Bluetooth Classic</span><div class="track"><div class="fill g" style="width:1.2%"></div></div><span class="v">0.1–0.3 MB/s</span></div>
+    </div>
+    <div class="legend"><span style="color:var(--cobalt)">■ ko'k: to'g'ridan-to'g'ri, yuqori tezlik</span><span style="color:var(--sand)">■ qum rang: cheklangan</span><span style="color:var(--ink3)">■ kulrang: faqat signal uchun</span></div>
+  </div>
+
+  <h3 style="margin-top:30px">1 GB video qancha vaqtda o'tadi</h3>
+  <div class="tbl" style="margin-top:10px"><table>
+    <thead><tr><th>Kanal</th><th>Taxminiy tezlik</th><th>1 GB uchun vaqt</th><th>His</th></tr></thead>
+    <tbody>
+      <tr><td>AWDL / LAN 5 GHz</td><td>~60 MB/s</td><td><b>~17 soniya</b></td><td><span class="pill y">AirDrop darajasi</span></td></tr>
+      <tr><td>Wi-Fi Direct / Hotspot</td><td>~35 MB/s</td><td><b>~30 soniya</b></td><td><span class="pill y">yaxshi</span></td></tr>
+      <tr><td>LAN 2.4 GHz</td><td>~6 MB/s</td><td><b>~3 daqiqa</b></td><td><span class="pill p">sabr kerak</span></td></tr>
+      <tr><td>Relay</td><td>~4 MB/s</td><td><b>~4–5 daqiqa</b></td><td><span class="pill p">zaxira yo'li</span></td></tr>
+      <tr><td>Bluetooth</td><td>~0.2 MB/s</td><td><b>~1.5 soat</b></td><td><span class="pill n">yaroqsiz</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout s"><b>Xulosa:</b> AirDrop tezligiga yetish uchun eng arzon va ishonchli yo'l <b>5 GHz'dagi to'g'ridan-to'g'ri LAN yoki hotspot</b>. Wi-Fi Direct qo'shimcha imkoniyat, majburiy emas.</div>
+</div></section>
+
+<!-- 5 -->
+<section id="s5"><div class="wrap">
+  <div class="num">05</div>
+  <h2>Platforma matritsasi: kim nimani ruxsat beradi</h2>
+  <p class="sub">Muammo texnologiyada emas, OS ilovaga nimani ochib berishida. Quyida oddiy ilova (root/admin huquqisiz) qila oladigan narsalar.</p>
+
+  <div class="tbl"><table>
+    <thead><tr><th>Imkoniyat</th><th>Android</th><th>Windows</th><th>Linux</th><th>macOS</th><th>iOS</th></tr></thead>
+    <tbody>
+      <tr><td><b>BLE e'lon qilish</b></td><td><span class="pill y">ha</span></td><td><span class="pill y">ha</span> <small>WinRT</small></td><td><span class="pill p">BlueZ, adapterga qarab</span></td><td><span class="pill y">ha</span></td><td><span class="pill p">faqat ilova ochiqligida</span></td></tr>
+      <tr><td><b>BLE skanerlash</b></td><td><span class="pill y">ha</span> <small>ruxsat bilan</small></td><td><span class="pill y">ha</span></td><td><span class="pill y">ha</span></td><td><span class="pill y">ha</span></td><td><span class="pill p">fonda cheklangan</span></td></tr>
+      <tr><td><b>Wi-Fi Direct</b></td><td><span class="pill y">ha</span> <small>WifiP2pManager</small></td><td><span class="pill p">API bor, drayver beqaror</span></td><td><span class="pill p">wpa_supplicant, chipga qarab</span></td><td><span class="pill n">yo'q</span> <small>(AWDL yopiq)</small></td><td><span class="pill n">yo'q</span></td></tr>
+      <tr><td><b>Hotspot yaratish</b></td><td><span class="pill y">ha</span> <small>LocalOnlyHotspot</small></td><td><span class="pill y">ha</span> <small>Mobile hotspot API</small></td><td><span class="pill y">ha</span> <small>NetworkManager</small></td><td><span class="pill p">qo'lda</span></td><td><span class="pill n">yo'q</span></td></tr>
+      <tr><td><b>Hotspot'ga ulanish</b></td><td><span class="pill y">ha</span> <small>tasdiq bilan</small></td><td><span class="pill y">ha</span></td><td><span class="pill y">ha</span></td><td><span class="pill y">ha</span></td><td><span class="pill y">ha</span> <small>NEHotspot, tasdiq bilan</small></td></tr>
+      <tr><td><b>mDNS (LAN'da topish)</b></td><td><span class="pill y">ha</span> <small>NSD</small></td><td><span class="pill y">ha</span></td><td><span class="pill y">ha</span> <small>Avahi</small></td><td><span class="pill y">ha</span> <small>Bonjour</small></td><td><span class="pill y">ha</span> <small>"Local Network" ruxsati</small></td></tr>
+      <tr><td><b>Share menyuga kirish</b></td><td><span class="pill y">ha</span> <small>Share target</small></td><td><span class="pill y">ha</span> <small>Share contract / Explorer menyu</small></td><td><span class="pill p">fayl menejerga qarab</span></td><td><span class="pill y">ha</span> <small>Share extension</small></td><td><span class="pill y">ha</span> <small>Share extension</small></td></tr>
+      <tr><td><b>Fonda qabul qilish</b></td><td><span class="pill p">Foreground service kerak</span></td><td><span class="pill y">ha</span> <small>tray ilova</small></td><td><span class="pill y">ha</span> <small>daemon</small></td><td><span class="pill y">ha</span></td><td><span class="pill n">deyarli yo'q</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="legend"><span><span class="pill y">ha</span> ishonchli</span><span><span class="pill p">qisman</span> shartli yoki beqaror</span><span><span class="pill n">yo'q</span> ilovaga yopiq</span></div>
+
+  <div class="callout w" style="margin-top:20px"><b>Eng og'ir platforma — iOS.</b> Fonda topish ham, Wi-Fi Direct ham, hotspot yaratish ham yo'q. iPhone qabul qiluvchi bo'lsa, ilova ochiq turishi kerak. Android, Windows va Linux esa deyarli to'liq ochiq.</div>
+</div></section>
+
+<!-- 6 -->
+<section id="s6"><div class="wrap">
+  <div class="num">06</div>
+  <h2>Quick Share qanday ishlaydi (eng yaqin analog)</h2>
+  <p class="sub">Google'ning Quick Share'i Nearby Connections kutubxonasiga qurilgan. Uning asosiy g'oyasi: <b>sekin kanalda tanishib, tez kanalga o'tish</b> (bandwidth upgrade).</p>
+
+  <figure class="fig"><div class="svg-scroll">
+  <svg viewBox="0 0 960 250" role="img" aria-label="Quick Share kanal yangilash">
+    <g>
+      <rect x="20" y="60" width="200" height="110" rx="14" class="box"/>
+      <text x="120" y="92" text-anchor="middle" font-size="12" class="t3 mono">1 · TOPISH</text>
+      <text x="120" y="120" text-anchor="middle" font-size="16" font-weight="700">BLE / mDNS</text>
+      <text x="120" y="146" text-anchor="middle" font-size="12" class="t2">yaqin qurilmalar ro'yxati</text>
+    </g>
+    <path d="M220 115 H262" class="ln"/><polygon points="262,110 272,115 262,120" fill="var(--ink3)"/>
+    <g>
+      <rect x="272" y="60" width="200" height="110" rx="14" class="box"/>
+      <text x="372" y="92" text-anchor="middle" font-size="12" class="t3 mono">2 · TANISHUV</text>
+      <text x="372" y="120" text-anchor="middle" font-size="16" font-weight="700">Bluetooth / LAN</text>
+      <text x="372" y="146" text-anchor="middle" font-size="12" class="t2">kalit almashish + PIN</text>
+    </g>
+    <path d="M472 115 H514" class="ln"/><polygon points="514,110 524,115 514,120" fill="var(--ink3)"/>
+    <g>
+      <rect x="524" y="60" width="200" height="110" rx="14" class="boxs"/>
+      <text x="624" y="92" text-anchor="middle" font-size="12" class="t3 mono">3 · YANGILASH</text>
+      <text x="624" y="120" text-anchor="middle" font-size="16" font-weight="700">tez kanal tanlash</text>
+      <text x="624" y="146" text-anchor="middle" font-size="12" class="t2">Wi-Fi Direct / hotspot / LAN</text>
+    </g>
+    <path d="M724 115 H766" class="lnc"/><polygon points="766,110 776,115 766,120" fill="var(--cobalt)"/>
+    <g>
+      <rect x="776" y="60" width="164" height="110" rx="14" class="boxok"/>
+      <text x="858" y="92" text-anchor="middle" font-size="12" class="mono" fill="var(--ok)">4 · UZATISH</text>
+      <text x="858" y="120" text-anchor="middle" font-size="16" font-weight="700">to'liq tezlik</text>
+      <text x="858" y="146" text-anchor="middle" font-size="12" class="t2">shifrlangan oqim</text>
+    </g>
+    <path d="M120 200 H858" class="ln dash"/>
+    <circle r="6" class="dots"><animateMotion dur="4s" repeatCount="indefinite" path="M120 200 H858"/></circle>
+    <text x="120" y="228" font-size="12" class="t3">sekin, kam quvvat</text>
+    <text x="858" y="228" text-anchor="end" font-size="12" class="t3">tez, ko'proq quvvat</text>
+  </svg></div>
+  <figcaption>4-chizma. Quick Share'dagi kanal yangilash. Vutric uchun ham shu naqsh to'g'ri keladi: tanishuvni QR yoki mDNS orqali qilib, keyin eng tez yo'lga o'tish.</figcaption></figure>
+</div></section>
+
+<!-- 7 -->
+<section id="s7"><div class="wrap">
+  <div class="num">07</div>
+  <h2>Mavjud yechimlar</h2>
+  <p class="sub">Bozorda allaqachon bor narsalar. Ularning hech biri "hamma platformada, oflayn, chiroyli" degan uchala shartni birga bajarmaydi: Vutric uchun bo'shliq shu yerda.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Yechim</th><th>Platformalar</th><th>Kanallar</th><th>Oflayn</th><th>Kamchiligi</th></tr></thead>
+    <tbody>
+      <tr><td><b>Quick Share</b> (Google)</td><td>Android, Windows, ChromeOS</td><td>BLE + Wi-Fi Direct / hotspot / LAN</td><td><span class="pill y">ha</span></td><td>Linux va macOS yo'q, Windows'da ba'zan sekin, yopiq kod</td></tr>
+      <tr><td><b>LocalSend</b> (open-source)</td><td>Hammasi, iOS ham</td><td>LAN: multicast + HTTPS</td><td><span class="pill p">faqat bitta LAN</span></td><td>BLE, Wi-Fi Direct va internet orqali yo'l yo'q</td></tr>
+      <tr><td><b>KDE Connect / GSConnect</b></td><td>Linux, Android, Windows, macOS</td><td>LAN</td><td><span class="pill p">bitta LAN</span></td><td>Asosan "telefonni boshqarish"; fayl uzatish ikkinchi darajali</td></tr>
+      <tr><td><b>Warpinator</b></td><td>Linux, Android (+ norasmiy Windows)</td><td>LAN, gRPC</td><td><span class="pill p">bitta LAN</span></td><td>Kichik ekotizim</td></tr>
+      <tr><td><b>PairDrop / Snapdrop</b></td><td>Brauzer</td><td>WebRTC + signal server</td><td><span class="pill n">yo'q</span></td><td>Brauzer cheklovlari, katta faylda beqaror</td></tr>
+      <tr><td><b>Pixel 10 ↔ AirDrop</b></td><td>Pixel 10 ↔ iPhone / Mac</td><td>AirDrop protokoli</td><td><span class="pill y">ha</span></td><td>Bilishimcha, 2025 yil noyabrda e'lon qilingan; faqat Pixel 10 va AirDrop'ning "Hamma" rejimi</td></tr>
+      <tr><td><b>OpenDrop + OWL</b></td><td>Linux, macOS</td><td>AWDL (ochiq qayta yozilgan)</td><td><span class="pill y">ha</span></td><td>Tadqiqot loyihasi: maxsus Wi-Fi karta (monitor rejimi) kerak, oddiy foydalanuvchi uchun emas</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<!-- 8 -->
+<section id="s8"><div class="wrap">
+  <div class="num">08</div>
+  <h2>Qiyin joylar va ularning yechimi</h2>
+  <div class="grid g2">
+    <div class="card"><div class="ic b">!</div><h3>Oflayn to'g'ridan-to'g'ri ulanish</h3>
+      <p style="color:var(--ink2);margin:0 0 8px">Wi-Fi Direct Android'da yaxshi, Windows'da drayverga bog'liq, Linux'da chipga bog'liq, Apple'da yo'q.</p>
+      <ul class="clean"><li><b>Yechim:</b> asosiy yo'l LAN, ikkinchisi hotspot (telefon yaratadi, PC ulanadi). Wi-Fi Direct faqat Android ↔ Android/Windows uchun qo'shimcha.</li></ul></div>
+    <div class="card"><div class="ic w">?</div><h3>Fonda topish</h3>
+      <p style="color:var(--ink2);margin:0 0 8px">Android fonda BLE skanerlashni cheklaydi, iOS deyarli to'liq to'sadi, Windows/Linux'da BLE e'loni adapterga bog'liq.</p>
+      <ul class="clean"><li><b>Yechim:</b> QR kod (100% ishlaydi) + mDNS (bitta LAN'da) asosiy. BLE bo'lsa yaxshi, lekin u bo'lmasa ham ishlash kerak.</li></ul></div>
+    <div class="card"><div class="ic w">⇄</div><h3>Tarmoq izolyatsiyasi</h3>
+      <p style="color:var(--ink2);margin:0 0 8px">Ofis, mehmonxona va universitet Wi-Fi'lari qurilmalarni bir-biridan ajratadi: bitta tarmoqda bo'lsa ham bir-birini ko'rmaydi.</p>
+      <ul class="clean"><li><b>Yechim:</b> ilova buni o'zi aniqlab, hotspot yoki relay'ga o'tishi kerak. Foydalanuvchiga tushunarli matn bilan ko'rsatilsin.</li></ul></div>
+    <div class="card"><div class="ic s">✦</div><h3>Tizim bilan birlashish</h3>
+      <p style="color:var(--ink2);margin:0 0 8px">AirDrop "Share" tugmasining ichida yashaydi. Biz ham shunday bo'lishimiz kerak.</p>
+      <ul class="clean">
+        <li>Android: <code>ACTION_SEND</code> Share target</li>
+        <li>Windows: Share contract + Explorer kontekst menyusi</li>
+        <li>Linux: <code>.desktop</code> fayl + Nautilus/Dolphin skripti</li>
+      </ul></div>
+    <div class="card"><div class="ic">⚿</div><h3>Xavfsizlik</h3>
+      <p style="color:var(--ink2);margin:0 0 8px">AirDrop "Hamma" rejimida begona rasm yuborish muammosi bo'lgan. Ochiq LAN'da har kim yuborishi mumkin.</p>
+      <ul class="clean"><li><b>Yechim:</b> QR orqali juftlash (kalit almashinadi), har uzatishda end-to-end shifrlash, birinchi marta tasdiq so'rash.</li></ul></div>
+    <div class="card"><div class="ic">⚡</div><h3>Yengillik</h3>
+      <p style="color:var(--ink2);margin:0 0 8px">Electron kabi og'ir freymvorklar "yengil" taassurotni buzadi: 200+ MB RAM, sekin ochilish.</p>
+      <ul class="clean"><li><b>Yechim:</b> Rust yadro + native/wgpu UI, kichik binar, tez ochilish. Vutric'da shu tanlangan.</li></ul></div>
+  </div>
+</div></section>
+
+<!-- 9 -->
+<section id="s9"><div class="wrap">
+  <div class="num">09</div>
+  <h2>Vutric arxitekturasi</h2>
+  <p class="sub">Vutric shu muammolarning hammasini bitta tizimda yechishga mo'ljallangan. Asosi: <b>Rust yadro + iroh (QUIC) + wgpu animatsiya</b>. Qarorlar ADR-0005 (har qanday qurilmadan har qanday qurilmaga, oflayn) va ADR-0006 (har qanday tarmoq, yo'lni foydalanuvchi tanlaydi, har qanday fayl) da yozilgan.</p>
+
+  <figure class="fig"><div class="svg-scroll">
+  <svg viewBox="0 0 960 380" role="img" aria-label="Vutric qatlamlari">
+    <rect x="20" y="20" width="920" height="70" rx="14" class="boxs"/>
+    <text x="44" y="50" font-size="12" class="t3 mono">TAJRIBA</text>
+    <text x="44" y="74" font-size="16" font-weight="700">Galereya bosh ekran · bitta ulanish ekrani · "otish" animatsiyasi (wgpu) · Share target</text>
+
+    <rect x="20" y="106" width="450" height="120" rx="14" class="box"/>
+    <text x="44" y="136" font-size="12" class="t3 mono">TOPISH</text>
+    <text x="44" y="162" font-size="15" font-weight="700">QR kod</text><text x="150" y="162" font-size="13" class="t2">— har doim ishlaydi</text>
+    <text x="44" y="186" font-size="15" font-weight="700">mDNS (LAN)</text><text x="150" y="186" font-size="13" class="t2">— bitta tarmoqda avtomatik</text>
+    <text x="44" y="210" font-size="15" font-weight="700">BLE</text><text x="150" y="210" font-size="13" class="t2">— keyinroq, qo'shimcha</text>
+
+    <rect x="490" y="106" width="450" height="120" rx="14" class="boxc"/>
+    <text x="514" y="136" font-size="12" class="t3 mono">UZATISH · iroh / QUIC</text>
+    <text x="514" y="162" font-size="15" font-weight="700">LAN to'g'ridan-to'g'ri</text><text x="700" y="162" font-size="13" class="t2">— eng tez</text>
+    <text x="514" y="186" font-size="15" font-weight="700">Hotspot</text><text x="700" y="186" font-size="13" class="t2">— router yo'q bo'lsa</text>
+    <text x="514" y="210" font-size="15" font-weight="700">NAT teshish → relay</text><text x="700" y="210" font-size="13" class="t2">— uzoqdan</text>
+
+    <rect x="20" y="242" width="920" height="120" rx="14" class="box"/>
+    <text x="44" y="272" font-size="12" class="t3 mono">RUST YADRO (umumiy: Android · Windows · Linux · macOS)</text>
+    <g font-size="13">
+      <rect x="44" y="290" width="200" height="50" rx="10" class="boxok"/><text x="144" y="320" text-anchor="middle">E2E shifrlash (TLS 1.3)</text>
+      <rect x="264" y="290" width="200" height="50" rx="10" class="boxok"/><text x="364" y="320" text-anchor="middle">bo'laklab uzatish + davom</text>
+      <rect x="484" y="290" width="200" height="50" rx="10" class="boxok"/><text x="584" y="320" text-anchor="middle">BLAKE3 tekshiruv</text>
+      <rect x="704" y="290" width="212" height="50" rx="10" class="boxok"/><text x="810" y="320" text-anchor="middle">yo'l tanlovchi</text>
+    </g>
+  </svg></div>
+  <figcaption>5-chizma. Vutric qatlamlari. AirDrop'dagi uch qatlam bilan bir xil, lekin har bir qatlamda bir nechta zaxira yo'l bor.</figcaption></figure>
+
+  <h3 style="margin-top:26px">Yo'l tanlash: qaror daraxti</h3>
+  <figure class="fig"><div class="svg-scroll">
+  <svg viewBox="0 0 960 430" role="img" aria-label="Yo'l tanlash qaror daraxti">
+    <rect x="380" y="16" width="200" height="44" rx="22" class="boxc"/><text x="480" y="44" text-anchor="middle" font-size="15" font-weight="700">Fayl yuborish</text>
+    <path d="M480 60 V88" class="ln"/>
+    <rect x="330" y="88" width="300" height="52" rx="10" class="box"/><text x="480" y="112" text-anchor="middle" font-size="14" font-weight="600">Bitta LAN'da va bir-birini ko'radimi?</text><text x="480" y="130" text-anchor="middle" font-size="12" class="t3">mDNS yoki QR'dagi manzil javob beradimi</text>
+    <path d="M630 114 H760 V170" class="lnc"/><text x="690" y="106" font-size="12" fill="var(--ok)" font-weight="700">HA</text>
+    <rect x="680" y="170" width="160" height="56" rx="10" class="boxok"/><text x="760" y="194" text-anchor="middle" font-size="14" font-weight="700">LAN</text><text x="760" y="212" text-anchor="middle" font-size="12" class="t2">30–80 MB/s</text>
+    <path d="M480 140 V180" class="ln"/><text x="490" y="166" font-size="12" fill="var(--bad)" font-weight="700">YO'Q</text>
+    <rect x="330" y="180" width="300" height="52" rx="10" class="box"/><text x="480" y="204" text-anchor="middle" font-size="14" font-weight="600">Yonma-yonmi? (QR skanerlandi)</text><text x="480" y="222" text-anchor="middle" font-size="12" class="t3">hotspot yaratish mumkinmi</text>
+    <path d="M330 206 H180 V262" class="lnc"/><text x="250" y="198" font-size="12" fill="var(--ok)" font-weight="700">HA</text>
+    <rect x="100" y="262" width="160" height="56" rx="10" class="boxok"/><text x="180" y="286" text-anchor="middle" font-size="14" font-weight="700">Hotspot</text><text x="180" y="304" text-anchor="middle" font-size="12" class="t2">20–50 MB/s</text>
+    <path d="M480 232 V272" class="ln"/><text x="490" y="258" font-size="12" fill="var(--bad)" font-weight="700">YO'Q</text>
+    <rect x="330" y="272" width="300" height="52" rx="10" class="box"/><text x="480" y="296" text-anchor="middle" font-size="14" font-weight="600">NAT teshib bo'ladimi?</text><text x="480" y="314" text-anchor="middle" font-size="12" class="t3">iroh avtomatik sinaydi</text>
+    <path d="M630 298 H760 V350" class="lnc"/><text x="690" y="290" font-size="12" fill="var(--ok)" font-weight="700">HA</text>
+    <rect x="680" y="350" width="160" height="56" rx="10" class="boxc"/><text x="760" y="374" text-anchor="middle" font-size="14" font-weight="700">To'g'ridan-to'g'ri</text><text x="760" y="392" text-anchor="middle" font-size="12" class="t2">internet tezligi</text>
+    <path d="M480 324 V350" class="ln"/><text x="490" y="342" font-size="12" fill="var(--bad)" font-weight="700">YO'Q</text>
+    <rect x="400" y="350" width="160" height="56" rx="10" class="boxw"/><text x="480" y="374" text-anchor="middle" font-size="14" font-weight="700">Relay</text><text x="480" y="392" text-anchor="middle" font-size="12" class="t2">har doim ishlaydi</text>
+  </svg></div>
+  <figcaption>6-chizma. Yo'l tanlovchi avval eng tez yo'lni sinaydi. ADR-0006 bo'yicha foydalanuvchi yo'lni qo'lda ham tanlay oladi.</figcaption></figure>
+
+  <h3 style="margin-top:26px">Bitta "otish" boshidan oxirigacha</h3>
+  <figure class="fig"><div class="svg-scroll">
+  <svg viewBox="0 0 960 400" role="img" aria-label="Vutric uzatish ketma-ketligi">
+    <rect x="60" y="16" width="200" height="44" rx="10" class="boxc"/><text x="160" y="44" text-anchor="middle" font-size="15" font-weight="700">Telefon (Android)</text>
+    <rect x="700" y="16" width="200" height="44" rx="10" class="boxs"/><text x="800" y="44" text-anchor="middle" font-size="15" font-weight="700">PC (Windows/Linux)</text>
+    <path d="M160 60 V380" class="life"/><path d="M800 60 V380" class="life"/>
+
+    <path d="M800 100 H170" class="ln"/><polygon points="170,95 160,100 170,105" fill="var(--ink3)"/>
+    <text x="480" y="92" text-anchor="middle" font-size="14">PC ekranda QR ko'rsatadi: node ID + manzillar + kalit</text>
+    <path d="M160 146 H792" class="lnc"/><polygon points="792,141 802,146 792,151" fill="var(--cobalt)"/>
+    <text x="480" y="138" text-anchor="middle" font-size="14">telefon skanerlaydi → QUIC ulanish (TLS 1.3, kalit tekshiriladi)</text>
+    <path d="M160 192 H792" class="lnc"/><polygon points="792,187 802,192 792,197" fill="var(--cobalt)"/>
+    <text x="480" y="184" text-anchor="middle" font-size="14">taklif: fayllar ro'yxati, hajmi, ko'rinish rasmlari</text>
+    <path d="M800 238 H170" class="lns"/><polygon points="170,233 160,238 170,243" fill="var(--sand)"/>
+    <text x="480" y="230" text-anchor="middle" font-size="14">qabul (ishonchli qurilma bo'lsa avtomatik)</text>
+    <path d="M160 292 H792" stroke="var(--ok)" stroke-width="5" fill="none"/><polygon points="792,285 804,292 792,299" fill="var(--ok)"/>
+    <text x="480" y="282" text-anchor="middle" font-size="14">bo'laklab oqim, parallel stream'lar, BLAKE3 hash</text>
+    <circle r="6" class="dotok"><animateMotion dur="1.3s" repeatCount="indefinite" path="M160 292 H800"/></circle>
+    <circle r="6" class="dotok"><animateMotion dur="1.3s" begin=".43s" repeatCount="indefinite" path="M160 292 H800"/></circle>
+    <circle r="6" class="dotok"><animateMotion dur="1.3s" begin=".86s" repeatCount="indefinite" path="M160 292 H800"/></circle>
+    <path d="M800 340 H170" class="ln"/><polygon points="170,335 160,340 170,345" fill="var(--ink3)"/>
+    <text x="480" y="332" text-anchor="middle" font-size="14">tasdiq: hash mos → PC'da fayl "tushadi" animatsiyasi</text>
+  </svg></div>
+  <figcaption>7-chizma. Uzilsa, uzatish tushgan bo'lakdan davom etadi: faylni boshidan qayta yubormaydi.</figcaption></figure>
+
+  <div class="tbl"><table>
+    <thead><tr><th>AirDrop qatlami</th><th>Apple'da</th><th>Vutric'da</th><th>Holat</th></tr></thead>
+    <tbody>
+      <tr><td>Topish</td><td>BLE + kontakt hashlari</td><td>QR + mDNS, keyinroq BLE</td><td><span class="pill y">QR, mDNS: spike 0.2</span></td></tr>
+      <tr><td>Kanal</td><td>AWDL</td><td>LAN → hotspot → NAT teshish → relay</td><td><span class="pill p">LAN bor, hotspot rejada</span></td></tr>
+      <tr><td>Protokol</td><td>TLS + HTTP (/Ask, /Upload)</td><td>QUIC (iroh) + o'z taklif/qabul xabarlari</td><td><span class="pill y">docs/protocol.md</span></td></tr>
+      <tr><td>Tajriba</td><td>Share menyu + animatsiya</td><td>Galereya bosh ekran + wgpu "otish" + Share target</td><td><span class="pill p">dizayn jarayonda</span></td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<!-- 10 -->
+<section id="s10"><div class="wrap">
+  <div class="num">10</div>
+  <h2>Keyingi qadamlar</h2>
+  <p class="sub">"AirDrop darajasi" degan da'voni isbotlash uchun avval o'lchash kerak, keyin optimallashtirish.</p>
+  <div class="steps">
+    <div class="step"><div class="card"><h3>Real Wi-Fi tezlik o'lchovi</h3><p style="color:var(--ink2);margin:0">Spike 0.2 APK bilan: 1 GB fayl, 5 GHz va 2.4 GHz, LAN va hotspot. Natija MB/s, CPU va batareya bilan jadvalga yoziladi. Maqsad: 5 GHz LAN'da ≥ 30 MB/s.</p></div></div>
+    <div class="step"><div class="card"><h3>Hotspot yo'li</h3><p style="color:var(--ink2);margin:0">Android <code>LocalOnlyHotspot</code> → QR'ga SSID/parol → PC avtomatik ulanadi. Router yo'q joyda ham ishlaydi.</p></div></div>
+    <div class="step"><div class="card"><h3>Izolyatsiyani aniqlash</h3><p style="color:var(--ink2);margin:0">Bitta tarmoqda bo'lsa ham ko'rinmasa, foydalanuvchiga sababini aytib, hotspot yoki relay'ni taklif qilish.</p></div></div>
+    <div class="step"><div class="card"><h3>Tizim bilan birlashish</h3><p style="color:var(--ink2);margin:0">Android Share target, Windows Explorer menyusi, Linux fayl menejer skripti: Vutric har ilovadan bitta tegishda ochilsin.</p></div></div>
+    <div class="step"><div class="card"><h3>BLE va Wi-Fi Direct</h3><p style="color:var(--ink2);margin:0">Yuqoridagilar tayyor bo'lgandan keyin: BLE orqali avtomatik topish, Android ↔ Android/Windows uchun Wi-Fi Direct.</p></div></div>
+  </div>
+</div></section>
+
+</main>
+
+<footer><div class="wrap">
+  Manbalar: TU Darmstadt SEEMOO tadqiqotlari (OpenDrop, OWL, AirDrop protokoli tahlili), Android Nearby Connections hujjatlari, Windows.Devices.WiFiDirect va Bluetooth LE API hujjatlari, Vutric repo: <code>docs/protocol.md</code>, ADR-0005, ADR-0006.<br>
+  Tezlik raqamlari muhandislik baholari, o'lchov emas. Vutric uchun real o'lchov 10-bo'limdagi 1-qadamda qilinadi.
+</div></footer>
+
+<script>
+(function(){
+  var b=document.getElementById('tb'),r=document.documentElement,m=['avto','yorug\'','qorong\'i'],i=0;
+  function apply(){if(i===0)r.removeAttribute('data-theme');else r.setAttribute('data-theme',i===1?'light':'dark');b.textContent='Mavzu: '+m[i];}
+  try{var s=localStorage.getItem('ad-theme');if(s){i=+s||0;apply();}}catch(e){}
+  b.addEventListener('click',function(){i=(i+1)%3;apply();try{localStorage.setItem('ad-theme',i)}catch(e){}});
+})();
+</script>
+</body>
+</html>

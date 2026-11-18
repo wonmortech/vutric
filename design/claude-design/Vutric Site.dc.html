@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Vutric — flick it onto your desktop</title>
+<style>
+@font-face{font-family:"Geist";src:url("fonts/geist.woff2") format("woff2-variations");font-weight:100 900;font-display:swap}
+@font-face{font-family:"Geist Mono";src:url("fonts/geist-mono.woff2") format("woff2-variations");font-weight:100 900;font-display:swap}
+html,body{margin:0}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+a{text-decoration:none}
+@keyframes lg-draw{to{stroke-dashoffset:0}}
+@keyframes lg-spin{0%{transform:rotateY(-90deg) scale(.9);opacity:0}16%{opacity:1}38%{transform:rotateY(0) scale(1)}74%{transform:rotateY(0) scale(1)}100%{transform:rotateY(16deg) scale(1)}}
+@keyframes lg-fill{to{opacity:1}}
+@keyframes lg-word{0%,22%{clip-path:inset(0 100% 0 0);opacity:0}30%{opacity:1}52%,100%{clip-path:inset(0 0 0 0);opacity:1}}
+@keyframes lg-sheen{0%,36%{transform:translateX(-140%)}58%{transform:translateX(360%)}100%{transform:translateX(360%)}}
+@keyframes lg-run{0%{opacity:0}4%{opacity:1}94%{opacity:1}100%{opacity:0}}
+@keyframes vs-move{0%,10%{left:3px}45%,60%{left:calc(100% - 23px)}95%,100%{left:3px}}
+@keyframes vs-back{0%,10%{left:3px}40%{left:calc(100% - 14px)}48%,60%{left:calc(100% - 23px)}95%,100%{left:3px}}
+@keyframes vs-float{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-14px) rotate(1deg)}}
+@keyframes vs-rise{0%{opacity:0;transform:translateY(7px)}40%{opacity:1}100%{opacity:0;transform:translateY(-7px)}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;scroll-behavior:auto!important}.lg-draw{stroke-dashoffset:0!important}.lg-g2{opacity:1!important}.lg-mark{transform:none!important;opacity:1!important}.lg-word{clip-path:none!important;opacity:1!important}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" style="--font:Geist,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased;min-height:100vh;transition:background .4s,color .4s">
+
+<nav style="position:sticky;top:0;z-index:50;background:var(--nav);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);border-bottom:1px solid var(--line)">
+  <div style="max-width:1200px;margin:0 auto;padding:0 24px;height:62px;display:flex;align-items:center;gap:26px">
+    <a href="#top" style="display:flex;align-items:center;gap:10px;color:var(--ink)"><img src="logo.svg" alt="" style="width:28px;height:28px;border-radius:7px"><span style="font-size:18px;font-weight:700;letter-spacing:-0.04em">vutric</span></a>
+    <div style="display:none;gap:22px;font-size:14px" ref="{{ navLinks }}">
+      <a href="#features" style="color:var(--muted)">Highlights</a><a href="#effect" style="color:var(--muted)">Effect</a><a href="#themes" style="color:var(--muted)">Themes</a><a href="#screens" style="color:var(--muted)">Screens</a>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+      <div style="display:flex;gap:5px;padding:4px;border-radius:999px;background:var(--chip)">
+        <sc-for list="{{ swatches }}" as="s" hint-placeholder-count="5"><span onClick="{{ s.pick }}" title="{{ s.name }}" style="width:22px;height:22px;border-radius:50%;cursor:pointer;background:{{ s.dot }};box-shadow:{{ s.ring }}"></span></sc-for>
+      </div>
+      <a href="#screens" style="height:36px;padding:0 18px;border-radius:999px;background:var(--btn);color:var(--btn-ink);display:flex;align-items:center;font-size:14px;font-weight:600">Get the app</a>
+    </div>
+  </div>
+</nav>
+
+<section id="top" data-screen-label="Logo" style="padding:76px 24px 16px;display:flex;justify-content:center">
+  <div style="perspective:1200px;width:min(560px,86vw);animation:lg-run 7s ease-in-out infinite">
+    <div class="lg-mark" style="transform-style:preserve-3d;animation:lg-spin 7s cubic-bezier(.3,.8,.3,1) infinite;display:flex;flex-direction:column;align-items:center;gap:22px">
+      <div style="position:relative;width:120px;height:124px">
+        <svg viewBox="2 0 28 32" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible"><g fill="none" stroke="#2969FF" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"><path class="lg-draw" d="M9.3704 3H22.6265C23.8941 3 25.0353 3.7685 25.5119 4.94317L27.25 9.22751H4.75L6.48432 4.94496C6.93972 3.82046 8.00401 3.06766 9.20572 3.00434L9.3704 3Z" style="stroke-dasharray:68;stroke-dashoffset:68;animation:lg-draw 1.1s 0.1s ease-out infinite"></path><path class="lg-draw" d="M4.75 12.3411H10.6056C11.6407 12.3411 12.6081 12.8555 13.187 13.7136L16 17.8836L18.8115 13.7141C19.3904 12.8557 20.3579 12.3411 21.3932 12.3411H27.25L16 29.0206Z" style="stroke-dasharray:62;stroke-dashoffset:62;animation:lg-draw 1.1s 0.35s ease-out infinite"></path></g><g class="lg-g2" style="opacity:0;animation:lg-fill 1s 1.5s ease-out forwards" fill="#2969FF"><path d="M9.3704 3H22.6265C23.8941 3 25.0353 3.7685 25.5119 4.94317L27.25 9.22751H4.75L6.48432 4.94496C6.93972 3.82046 8.00401 3.06766 9.20572 3.00434L9.3704 3Z"></path><path d="M4.75 12.3411H10.6056C11.6407 12.3411 12.6081 12.8555 13.187 13.7136L16 17.8836L18.8115 13.7141C19.3904 12.8557 20.3579 12.3411 21.3932 12.3411H27.25L16 29.0206Z"></path></g></svg>
+        <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none"><div style="position:absolute;top:-20%;left:0;width:36%;height:140%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.75),transparent);filter:blur(3px);animation:lg-sheen 7s ease-in-out infinite;mix-blend-mode:screen"></div></div>
+      </div>
+      <div style="overflow:hidden"><div class="lg-word" style="font-size:82px;font-weight:700;letter-spacing:-0.055em;line-height:1;animation:lg-word 7s ease-out infinite;color:var(--ink)">vutric</div></div>
+    </div>
+  </div>
+</section>
+
+<section data-screen-label="Hero" style="padding:20px 24px 44px;display:flex;flex-direction:column;align-items:center;gap:26px;text-align:center">
+  <div style="font-size:14px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center"><span style="width:7px;height:7px;border-radius:50%;background:#30D158;box-shadow:0 0 0 3px rgba(48,209,88,.2)"></span>v0.1 · iOS · Android · Windows · Ubuntu · macOS</div>
+  <h1 style="margin:0;font-size:clamp(44px,7vw,100px);line-height:1;font-weight:700;letter-spacing:-0.05em;text-wrap:balance">Flick it.<br>It lands on<br><span style="color:var(--muted)">your desktop.</span></h1>
+  <p style="margin:0;font-size:clamp(18px,1.6vw,22px);line-height:1.5;color:var(--muted);max-width:44ch;text-wrap:pretty">Pick a photo on your <b style="color:var(--ink);font-weight:600">phone</b>, flick it off the edge, and it flies across to your <b style="color:var(--ink);font-weight:600">computer</b> — right where you are looking. No cables, no cloud, one Wi‑Fi.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:6px">
+    <a href="#screens" style="height:52px;padding:0 26px;border-radius:999px;background:var(--btn);color:var(--btn-ink);display:flex;align-items:center;font-size:17px;font-weight:600">See the screens</a>
+    <a href="#effect" style="height:52px;padding:0 26px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line-2);color:var(--ink);display:flex;align-items:center;font-size:17px;font-weight:500">Watch the effect</a>
+  </div>
+</section>
+
+<section data-screen-label="Scene" style="padding:12px 24px 128px">
+  <div style="position:relative;max-width:1320px;margin:0 auto;aspect-ratio:1680/860;border-radius:28px;overflow:hidden;background:var(--scene);box-shadow:inset 0 0 0 1px var(--line)">
+    <div style="position:absolute;left:0;right:0;top:0;height:44%;background:radial-gradient(44% 90% at 54% 0%,color-mix(in srgb,var(--accent) 42%,transparent),transparent 72%)"></div>
+    <div style="position:absolute;left:4%;top:50%;transform:translateY(-50%);width:50%;max-width:720px;aspect-ratio:16/10;border-radius:16px;background:radial-gradient(42% 60% at 86% 46%,rgba(255,255,255,.95),rgba(180,205,240,.5) 26%,transparent 62%),repeating-conic-gradient(from 180deg at 104% 46%,#0b1014 0deg,#36454f 6deg,#5e6f7c 9deg,#1a232a 13deg,#0b1014 18deg),#0b1014;box-shadow:0 40px 90px -30px rgba(0,0,0,.7),0 0 0 7px #15151a,0 0 0 8px #333">
+      <div style="position:absolute;top:0;right:0;bottom:0;width:32%;background:radial-gradient(60% 50% at 100% 46%,color-mix(in srgb,var(--accent) 55%,transparent),transparent 72%)"></div>
+      <div style="position:absolute;right:-3%;top:28%;width:62px;height:84px;border-radius:9px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78,#c46d5a 58%,#121838);box-shadow:0 0 0 3px #fff,0 20px 40px -10px rgba(0,0,0,.8);transform:rotate(-6deg)"></div>
+      <div style="position:absolute;left:50%;bottom:7px;transform:translateX(-50%);height:16px;padding:0 5px;border-radius:7px;background:rgba(255,255,255,.14);backdrop-filter:blur(10px);display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:4px;background:#6fc3ff"></span><span style="width:12px;height:12px;border-radius:4px;background:#8ee88e"></span><span style="width:12px;height:12px;border-radius:4px;background:#ffd36b"></span><span style="width:12px;height:12px;border-radius:4px;background:#2F6BFF"></span></div>
+    </div>
+    <div style="position:absolute;right:5.5%;top:50%;transform:translateY(-50%);width:19%;max-width:280px;aspect-ratio:9/19.5;border-radius:34px;background:#0a0a0a;box-shadow:0 30px 70px -20px rgba(0,0,0,.8),0 0 0 7px #1b1b1f,0 0 0 8px #3a3a3f;overflow:hidden">
+      <div style="position:absolute;inset:7px;border-radius:28px;overflow:hidden;background:#111">
+        <div style="position:absolute;inset:-18px;display:grid;grid-template-columns:repeat(3,1fr);gap:3px;filter:blur(9px) brightness(.62) saturate(1.2)"><span style="aspect-ratio:1;background:linear-gradient(180deg,#9fd0ec,#134e78)"></span><span style="aspect-ratio:1;background:linear-gradient(160deg,#4f7a3e,#1e3d2a)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#f6e4c2,#a8784d)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#f0b77d,#161a30)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#2b3a78,#121838)"></span><span style="aspect-ratio:1;background:linear-gradient(160deg,#4f7a3e,#1e3d2a)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#9fd0ec,#134e78)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#f6e4c2,#a8784d)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#f0b77d,#161a30)"></span></div>
+        <div style="position:absolute;top:13px;right:9px;height:24px;padding:0 10px;border-radius:999px;background:rgba(255,255,255,.14);backdrop-filter:blur(14px);display:flex;align-items:center;gap:6px;font-size:10px;font-weight:600;color:#fff"><span style="width:6px;height:6px;border-radius:50%;background:#30D158"></span>Studio PC</div>
+        <div style="position:absolute;left:9%;top:42%;width:42%;aspect-ratio:3/4;border-radius:10px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78,#c46d5a 58%,#121838);box-shadow:0 0 0 2px #fff,0 16px 30px -10px rgba(0,0,0,.8);animation:vs-float 4s ease-in-out infinite"></div>
+        <div style="position:absolute;left:10%;bottom:20px;font-size:10px;color:rgba(255,255,255,.7);display:flex;align-items:center;gap:5px"><span style="width:0;height:0;border-top:5px solid rgba(255,255,255,.7);border-left:4px solid transparent;border-right:4px solid transparent"></span>Flick ↑ to send</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features" data-screen-label="Highlights" style="padding:40px 24px 120px">
+  <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:14px">
+    <h2 style="margin:0 0 30px;font-size:clamp(34px,4.4vw,56px);font-weight:700;letter-spacing:-0.045em">The highlights.</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px">
+      <div style="grid-column:1 / -1;border-radius:26px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line);padding:36px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:center">
+        <div style="display:flex;flex-direction:column;gap:12px"><div style="font-size:26px;font-weight:600;letter-spacing:-0.03em">Pair in a glance.</div><p style="margin:0;font-size:17px;line-height:1.5;color:var(--muted)">Scan the QR on your computer, or let it find the desktop on your network. Thirty seconds, then it gets out of the way.</p></div>
+        <div style="position:relative;aspect-ratio:16/11;border-radius:18px;overflow:hidden;background:#07080c">
+          <div style="position:absolute;inset:0;display:grid;place-items:center">
+            <div style="position:relative;width:46%;aspect-ratio:1;border-radius:14px;background:#fff;padding:12px"><img src="qr-big.svg" alt="" style="width:100%;height:100%"><div style="position:absolute;left:12%;right:12%;height:2px;background:var(--accent);box-shadow:0 0 14px 3px color-mix(in srgb,var(--accent) 80%,transparent);top:16%;animation:vs-scan 2.6s ease-in-out infinite"></div></div>
+          </div>
+          <div style="position:absolute;left:14px;top:14px;width:36px;height:36px;border-top:3px solid var(--accent);border-left:3px solid var(--accent);border-radius:10px 0 0 0"></div>
+          <div style="position:absolute;right:14px;bottom:14px;width:36px;height:36px;border-bottom:3px solid var(--accent);border-right:3px solid var(--accent);border-radius:0 0 10px 0"></div>
+        </div>
+      </div>
+      <div style="border-radius:26px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line);padding:32px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-size:21px;font-weight:600;letter-spacing:-0.02em">Lands where you look.</div>
+        <p style="margin:0;font-size:16px;line-height:1.5;color:var(--muted)">The card flies out of a glowing portal at the screen edge and settles with a soft spring.</p>
+        <div style="margin-top:auto;position:relative;height:130px;border-radius:14px;background:#07080c;overflow:hidden"><div style="position:absolute;right:0;top:0;bottom:0;width:40%;background:radial-gradient(60% 60% at 100% 50%,color-mix(in srgb,var(--accent) 60%,transparent),transparent 72%)"></div><div style="position:absolute;left:26%;top:50%;width:64px;height:84px;border-radius:9px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78,#121838);box-shadow:0 0 0 3px #fff,0 16px 30px -10px #000;transform:translateY(-50%) rotate(-5deg);animation:vs-float 3.6s ease-in-out infinite"></div></div>
+      </div>
+      <div style="border-radius:26px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line);padding:32px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-size:21px;font-weight:600;letter-spacing:-0.02em">Your clipboard too.</div>
+        <p style="margin:0;font-size:16px;line-height:1.5;color:var(--muted)">Photos, videos, any file, and whatever you copied — it all comes across.</p>
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:var(--card-2)"><span style="width:34px;height:34px;border-radius:8px;background:linear-gradient(180deg,#9fd0ec,#134e78)"></span><div style="flex:1;font-size:14px;font-weight:500">IMG_2041.jpg</div><span style="width:22px;height:22px;border-radius:50%;background:#30D158;display:grid;place-items:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:var(--card-2)"><span style="width:34px;height:34px;border-radius:8px;background:var(--chip);display:grid;place-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg></span><div style="flex:1;font-size:14px;font-weight:500">Clipboard · «vutric.io»</div><span style="font-family:'Geist Mono';font-size:12px;color:var(--muted)">12 ms</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="effect" data-screen-label="Effect" style="padding:120px 24px;background:var(--bg-2)">
+  <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:46px">
+    <h2 style="margin:0;font-size:clamp(34px,4.4vw,56px);font-weight:700;letter-spacing:-0.045em;line-height:1.05;max-width:22ch">The effect. <span style="color:var(--muted)">A portal opens and the photo flies out.</span></h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px">
+      <sc-for list="{{ phases }}" as="p" hint-placeholder-count="4">
+        <div style="border-radius:22px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line);padding:24px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between"><div style="font-size:19px;font-weight:600">{{ p.name }}</div><div style="font-family:'Geist Mono';font-size:12px;color:var(--muted)">{{ p.t }}</div></div>
+          <div style="position:relative;aspect-ratio:4/3;border-radius:14px;overflow:hidden;background:radial-gradient(80% 90% at 85% 50%,#0c1d55,#040713)">
+            <div style="position:absolute;right:-8%;top:14%;width:26%;height:72%;border-radius:50%;border:2px solid var(--accent-2);box-shadow:0 0 14px var(--accent),inset 0 0 10px color-mix(in srgb,var(--accent) 60%,transparent);opacity:{{ p.ring }}"></div>
+            <div style="position:absolute;width:30%;height:26%;top:37%;left:{{ p.cardL }};border-radius:5px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(160deg,#f4c48a,#c06a4a 55%,#2b2f5a);box-shadow:0 4px 10px rgba(0,0,0,.5);transform:rotate({{ p.cardR }})"></div>
+          </div>
+          <p style="margin:0;font-size:14px;line-height:1.5;color:var(--muted)">{{ p.desc }}</p>
+        </div>
+      </sc-for>
+    </div>
+    <p style="margin:0;font-size:15px;color:var(--muted);max-width:76ch;line-height:1.6">Signal blue → ice over a night lens. Harder flicks land deeper; the angle bends the path. Reduced motion falls back to <b style="color:var(--ink);font-weight:600">Oddiy</b> — a quiet slide‑in.</p>
+  </div>
+</section>
+
+<section id="themes" data-screen-label="Themes" style="padding:120px 24px">
+  <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:40px">
+    <div style="display:flex;flex-direction:column;gap:12px"><h2 style="margin:0;font-size:clamp(34px,4.4vw,56px);font-weight:700;letter-spacing:-0.045em;line-height:1.05">Five looks. <span style="color:var(--muted)">Pick the one that fits your desk.</span></h2><p style="margin:0;font-size:18px;color:var(--muted)">Tap a card — the whole page becomes that theme. Current: <b style="color:var(--ink);font-weight:600">{{ themeName }}</b>.</p></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px">
+      <sc-for list="{{ themeCards }}" as="t" hint-placeholder-count="5">
+        <div onClick="{{ t.pick }}" style="cursor:pointer;border-radius:22px;overflow:hidden;background:{{ t.card }};box-shadow:{{ t.shadow }};display:flex;flex-direction:column">
+          <div style="aspect-ratio:5/4;background:{{ t.bg }};position:relative;padding:18px;display:flex;flex-direction:column;justify-content:space-between">
+            <div style="position:absolute;right:16px;top:0;bottom:0;width:36%;background:radial-gradient(60% 50% at 100% 42%,{{ t.glow }},transparent 72%)"></div>
+            <div style="display:flex;align-items:center;gap:8px;position:relative"><span style="width:20px;height:20px;border-radius:6px;background:{{ t.accent }}"></span><span style="font-size:15px;font-weight:700;letter-spacing:-0.03em;color:{{ t.ink }}">vutric</span></div>
+            <div style="position:relative;display:flex;flex-direction:column;gap:8px">
+              <span style="height:30px;width:70%;border-radius:999px;background:{{ t.accent }};display:flex;align-items:center;padding:0 12px;font-size:12px;font-weight:600;color:{{ t.accentInk }}">Yuborish</span>
+              <span style="height:26px;width:52%;border-radius:999px;background:{{ t.chip }}"></span>
+            </div>
+          </div>
+          <div style="padding:16px 18px;display:flex;flex-direction:column;gap:3px;background:{{ t.card }}"><div style="display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600;color:{{ t.cardInk }}">{{ t.name }}<sc-if value="{{ t.on }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;color:{{ t.accent }}">● active</span></sc-if></div><div style="font-size:13px;color:{{ t.cardMuted }}">{{ t.desc }}</div></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section id="screens" data-screen-label="Screens" style="padding:120px 24px;background:var(--bg-2)">
+  <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:40px">
+    <h2 style="margin:0;font-size:clamp(34px,4.4vw,56px);font-weight:700;letter-spacing:-0.045em;line-height:1.05">Every screen, two themes.</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:26px">
+      <sc-for list="{{ screens }}" as="s" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="position:relative;aspect-ratio:9/19.5;border-radius:30px;background:{{ s.bg }};box-shadow:inset 0 0 0 1px var(--line),0 24px 48px -28px rgba(0,0,0,.6);overflow:hidden;padding:18px 16px;display:flex;flex-direction:column;gap:12px;color:{{ s.ink }}">
+            <div style="height:20px;display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:600"><span>9:41</span><span style="width:20px;height:9px;border-radius:2px;border:1.2px solid currentColor"></span></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center">{{ s.body }}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500"><span style="font-family:'Geist Mono';font-size:11px;color:var(--muted);padding:3px 8px;border:1px solid var(--line-2);border-radius:999px">{{ s.id }}</span>{{ s.name }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <a href="Vutric App v4.dc.html" style="align-self:flex-start;height:52px;padding:0 26px;border-radius:999px;background:var(--btn);color:var(--btn-ink);display:flex;align-items:center;font-size:17px;font-weight:600">Open the full app →</a>
+  </div>
+</section>
+
+<section data-screen-label="CTA" style="padding:140px 24px;display:flex;flex-direction:column;align-items:center;gap:30px;text-align:center">
+  <img src="logo.svg" alt="" style="width:76px;height:76px;border-radius:19px;box-shadow:0 20px 50px -18px color-mix(in srgb,var(--accent) 80%,transparent)">
+  <h2 style="margin:0;font-size:clamp(34px,5vw,64px);font-weight:700;letter-spacing:-0.05em;line-height:1">Your photo is one flick away.</h2>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center"><a href="#screens" style="height:54px;padding:0 28px;border-radius:999px;background:var(--btn);color:var(--btn-ink);display:flex;align-items:center;font-size:18px;font-weight:600">Download for phone</a><a href="#screens" style="height:54px;padding:0 28px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line-2);color:var(--ink);display:flex;align-items:center;font-size:18px;font-weight:500">Download for desktop</a></div>
+  <div style="font-size:14px;color:var(--muted)">Free · iOS 26 · Android 12+ · Windows 11 · Ubuntu · macOS 26</div>
+</section>
+
+<footer style="border-top:1px solid var(--line);padding:40px 24px"><div style="max-width:1200px;margin:0 auto;display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center"><div style="display:flex;align-items:center;gap:10px"><img src="logo.svg" alt="" style="width:24px;height:24px;border-radius:6px"><span style="font-size:15px;font-weight:600">vutric</span><span style="font-size:13px;color:var(--muted)">design system v0.1</span></div><div style="font-size:13px;color:var(--muted)">Local‑first · one Wi‑Fi · no account</div></div></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:860}}">
+class Component extends DCLogic {
+  state = { theme: 'night', zone: 'Oʻng chekka', dur: 11, tA: true, tB: false };
+  rootRef = React.createRef();
+  navLinks = React.createRef();
+  THEMES = [
+    { id:'night', name:'Night', desc:'OLED black, cool blue light', dot:'#000000',
+      v:{ '--bg':'#000000','--bg-2':'#0A0A0C','--card':'#141416','--card-2':'#1C1C1F','--chip':'rgba(255,255,255,.08)','--ink':'#F5F5F7','--muted':'#86868B','--line':'rgba(255,255,255,.1)','--line-2':'rgba(255,255,255,.2)','--accent':'#2969FF','--accent-2':'#9CC0FF','--accent-ink':'#FFFFFF','--btn':'#F5F5F7','--btn-ink':'#000000','--nav':'rgba(0,0,0,.72)','--scene':'radial-gradient(60% 70% at 72% 20%,rgba(47,107,255,.2),transparent 70%),linear-gradient(180deg,#05060a,#0b0d16)' } },
+    { id:'daylight', name:'Daylight', desc:'Clean white, calm and bright', dot:'#FFFFFF',
+      v:{ '--bg':'#FBFBFD','--bg-2':'#F2F2F7','--card':'#FFFFFF','--card-2':'#F0F0F4','--chip':'rgba(60,60,67,.08)','--ink':'#111113','--muted':'#6E6E73','--line':'rgba(0,0,0,.08)','--line-2':'rgba(0,0,0,.16)','--accent':'#2969FF','--accent-2':'#2969FF','--accent-ink':'#FFFFFF','--btn':'#111113','--btn-ink':'#FFFFFF','--nav':'rgba(251,251,253,.78)','--scene':'radial-gradient(60% 70% at 72% 20%,rgba(47,107,255,.14),transparent 70%),linear-gradient(180deg,#eef0f6,#dfe3ee)' } },
+    { id:'graphite', name:'Graphite', desc:'Warm dark grey, soft contrast', dot:'#2B2B2E',
+      v:{ '--bg':'#1A1A1C','--bg-2':'#202023','--card':'#28282B','--card-2':'#323236','--chip':'rgba(255,255,255,.08)','--ink':'#ECECEE','--muted':'#9A9AA0','--line':'rgba(255,255,255,.1)','--line-2':'rgba(255,255,255,.18)','--accent':'#6E9BFF','--accent-2':'#AFC6FF','--accent-ink':'#0A0F20','--btn':'#ECECEE','--btn-ink':'#1A1A1C','--nav':'rgba(26,26,28,.75)','--scene':'radial-gradient(60% 70% at 72% 20%,rgba(110,155,255,.18),transparent 70%),linear-gradient(180deg,#141416,#23232a)' } },
+    { id:'ocean', name:'Ocean', desc:'Deep teal night, aqua accent', dot:'#0B2A33',
+      v:{ '--bg':'#041519','--bg-2':'#061D22','--card':'#0C262D','--card-2':'#113038','--chip':'rgba(120,230,230,.1)','--ink':'#E6F6F6','--muted':'#7FA7AD','--line':'rgba(140,230,230,.12)','--line-2':'rgba(140,230,230,.24)','--accent':'#2BD4C4','--accent-2':'#9CF4EC','--accent-ink':'#032022','--btn':'#E6F6F6','--btn-ink':'#041519','--nav':'rgba(4,21,25,.74)','--scene':'radial-gradient(60% 70% at 72% 20%,rgba(43,212,196,.2),transparent 70%),linear-gradient(180deg,#041216,#07262b)' } },
+    { id:'sand', name:'Sand', desc:'Warm paper, ink and amber', dot:'#E8DCC4',
+      v:{ '--bg':'#F5EFE2','--bg-2':'#EDE4D2','--card':'#FBF7EE','--card-2':'#EEE6D5','--chip':'rgba(60,45,20,.08)','--ink':'#241C10','--muted':'#7A6B52','--line':'rgba(36,28,16,.1)','--line-2':'rgba(36,28,16,.2)','--accent':'#C8631C','--accent-2':'#E89A52','--accent-ink':'#FFFFFF','--btn':'#241C10','--btn-ink':'#F5EFE2','--nav':'rgba(245,239,226,.8)','--scene':'radial-gradient(60% 70% at 72% 20%,rgba(200,99,28,.18),transparent 70%),linear-gradient(180deg,#e7dcc6,#d8c9ab)' } }
+  ];
+  componentDidMount() { this.apply(); if (this.navLinks.current && window.innerWidth > 760) this.navLinks.current.style.display = 'flex'; }
+  componentDidUpdate() { this.apply(); }
+  apply() { const el = this.rootRef.current; if (!el) return; const t = this.THEMES.find(x => x.id === this.state.theme); Object.keys(t.v).forEach(k => el.style.setProperty(k, t.v[k])); }
+  pick(id) { this.setState({ theme: id }); }
+
+  renderVals() {
+    const cur = this.state.theme;
+    const sb = (id) => { const t = this.THEMES.find(x => x.id === id); const dark = ['night','graphite','ocean'].includes(id); return { ink: t.v['--ink'], bg: t.v['--bg'], accent: t.v['--accent'], dark }; };
+    const phaseData = [
+      { name:'Open', t:'0–24%', ring:'1', cardL:'30%', cardR:'0deg', desc:'A luminous ring grows at the send zone edge with a back‑ease overshoot.' },
+      { name:'Fly', t:'10–62%', ring:'.8', cardL:'46%', cardR:'8deg', desc:'The card follows a Bézier shaped by your throw; four contour echoes trail it.' },
+      { name:'Land', t:'62–100%', ring:'.3', cardL:'30%', cardR:'-2deg', desc:'An underdamped spring settles scale and tilt; a soft drop shadow appears.' },
+      { name:'Dock', t:'+0.45s', ring:'0', cardL:'72%', cardR:'-12deg', desc:'It flies to the corner, shrinks to 22% and hands off to the notification.' }
+    ];
+    const screenBody = {
+      onboard: React.createElement('div', { style:{display:'flex',flexDirection:'column',gap:'10px',alignItems:'center'} },
+        React.createElement('img', { src:'logo.svg', style:{width:'46px',height:'46px',borderRadius:'12px'} }),
+        React.createElement('div', { style:{fontSize:'15px',fontWeight:600,letterSpacing:'-0.02em'} }, 'Rasmlarni kompyuterga oting'),
+        React.createElement('div', { style:{fontSize:'11px',color:'var(--muted)'} }, 'Uchta ruxsat kerak'),
+        React.createElement('div', { style:{marginTop:'8px',height:'36px',width:'100%',borderRadius:'999px',background:'var(--accent)',color:'var(--accent-ink)',display:'grid',placeItems:'center',fontSize:'12px',fontWeight:600} }, 'Ruxsat berish')),
+      scan: React.createElement('div', { style:{display:'flex',flexDirection:'column',gap:'10px',alignItems:'center'} },
+        React.createElement('div', { style:{fontSize:'14px',fontWeight:600} }, 'QR kodni skanerlang'),
+        React.createElement('div', { style:{position:'relative',width:'62%',aspectRatio:'1',borderRadius:'12px',background:'#fff',padding:'8px'} },
+          React.createElement('img', { src:'qr-big.svg', style:{width:'100%',height:'100%'} }))),
+      fling: React.createElement('div', { style:{display:'flex',flexDirection:'column',gap:'8px',alignItems:'center',width:'100%'} },
+        React.createElement('div', { style:{width:'60%',aspectRatio:'3/4',borderRadius:'12px',background:'radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78,#121838)',boxShadow:'0 0 0 3px currentColor,0 16px 30px -12px #000',animation:'vs-float 3.6s ease-in-out infinite'} }),
+        React.createElement('div', { style:{fontSize:'11px',color:'var(--muted)'} }, '↑ Yuborish uchun suring')),
+      done: React.createElement('div', { style:{display:'flex',flexDirection:'column',gap:'10px',alignItems:'center'} },
+        React.createElement('div', { style:{width:'52px',height:'52px',borderRadius:'50%',background:'#30D158',display:'grid',placeItems:'center'} },
+          React.createElement('div', { style:{width:'18px',height:'9px',borderLeft:'3px solid #fff',borderBottom:'3px solid #fff',transform:'rotate(-45deg) translateY(-2px)'} })),
+        React.createElement('div', { style:{fontSize:'14px',fontWeight:600} }, 'Yetib bordi · 38 ms'))
+    };
+    const screens = [
+      { id:'A1', name:'Onboarding', theme:'daylight', body: screenBody.onboard },
+      { id:'A2', name:'Pair by QR', theme:'night', body: screenBody.scan },
+      { id:'A5', name:'Fling', theme:'ocean', body: screenBody.fling },
+      { id:'A6', name:'Arrived', theme:'sand', body: screenBody.done }
+    ];
+    return {
+      rootRef: this.rootRef, navLinks: this.navLinks,
+      themeName: this.THEMES.find(x => x.id === cur).name,
+      swatches: this.THEMES.map(t => ({ name: t.name, dot: t.dot, ring: t.id === cur ? '0 0 0 2px var(--accent),0 0 0 3px var(--bg)' : 'inset 0 0 0 1px rgba(128,128,128,.4)', pick: () => this.pick(t.id) })),
+      themeCards: this.THEMES.map(t => ({ name: t.name, desc: t.desc, on: t.id === cur, pick: () => this.pick(t.id),
+        bg: t.v['--scene'], card: t.v['--card'], cardInk: t.v['--ink'], cardMuted: t.v['--muted'], ink: t.v['--ink'], accent: t.v['--accent'], accentInk: t.v['--accent-ink'], chip: t.v['--chip'], glow: 'color-mix(in srgb,'+t.v['--accent']+' 55%,transparent)',
+        shadow: t.id === cur ? '0 0 0 2px '+t.v['--accent'] : 'inset 0 0 0 1px var(--line)' })),
+      phases: phaseData,
+      screens: screens.map(s => { const info = sb(s.theme); return { id: s.id, name: s.name, bg: info.bg, ink: info.ink, body: s.body }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -16,8 +16,10 @@
 //! Every network wait is bounded ([`HANDSHAKE_TIMEOUT`], [`probe::ROUND_TRIP_TIMEOUT`]), so a silent peer can
 //! stall a caller for seconds, never forever.
 
+pub mod disk;
 pub mod preview;
 pub mod probe;
+pub mod settings;
 pub mod transfer;
 
 use std::net::{IpAddr, SocketAddr};

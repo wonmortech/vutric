@@ -287,13 +287,13 @@ async fn receive(peer: &Peer, a: &Args) -> Result<()> {
             via(&s),
             s.check_code()?
         );
-        if let Err(e) = serve_files(&mut s, &dir).await {
+        if let Err(e) = serve_files(&mut s, &dir, a.dir.is_some()).await {
             println!("{}: {e:#}", s.remote_name);
         }
     }
 }
 
-async fn serve_files(s: &mut Session, dir: &Path) -> Result<()> {
+async fn serve_files(s: &mut Session, dir: &Path, explicit: bool) -> Result<()> {
     let clock = Instant::now();
     loop {
         let msg = s.recv().await?;
@@ -305,7 +305,15 @@ async fn serve_files(s: &mut Session, dir: &Path) -> Result<()> {
                 offer.total_bytes as f64 / 1e6,
                 offer.names(3).join(", ")
             );
-            let sum = transfer::receive(s, offer, dir, transfer::log_progress("receiving")).await?;
+            let settings = vutric_net::settings::load(
+                &vutric_net::settings::desktop_dir()?.join(vutric_net::settings::FILE),
+            );
+            let mut to =
+                transfer::SaveTo::for_peer(s, &settings, dir.to_path_buf(), transfer::today_utc());
+            if explicit {
+                to.rules.folder = None; // --dir wins over the settings file
+            }
+            let sum = transfer::receive(s, offer, &to, transfer::log_progress("receiving")).await?;
             println!(
                 "saved {} file(s), {:.1} MB in {:.1} s ({:.1} MB/s, {}){}",
                 sum.files,

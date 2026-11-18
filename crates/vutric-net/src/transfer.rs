@@ -7,6 +7,9 @@
 //! `id [16] | index u32 LE | offset u64 LE`, then the file's bytes from `offset`, then BLAKE3 of the whole file
 //! (32 bytes). The receiver writes `<name>.vutric-part`, hashes the held prefix and the new bytes, and renames the
 //! file into place only when the hash matches. An interrupted transfer resumes where its part file ends.
+//!
+//! Where a file lands is the user's choice ([`SaveTo`], ADR-0007 part 4): save folder, a folder per kind,
+//! a subfolder per device or day, the sender's tree kept or flattened, and what to do on a name conflict.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -17,7 +20,8 @@ use std::time::{Duration, Instant};
 use anyhow::{Context as _, Result, anyhow, bail, ensure};
 use iroh::endpoint::{Connection, RecvStream};
 use tokio::io::{AsyncReadExt as _, AsyncSeekExt as _, AsyncWriteExt as _};
-use vutric_core::message::{MAX_OFFER_ENTRIES, OfferEntry};
+use vutric_core::message::{FailReason, MAX_OFFER_ENTRIES, OfferEntry};
+use vutric_core::storage::{Arrival, Conflict, SaveRules};
 use vutric_core::{FlingId, Message, filename};
 
 use crate::Session;
@@ -28,14 +32,14 @@ const CHUNK: usize = 1 << 20;
 pub const PARALLEL: usize = 4;
 const HEADER: usize = 16 + 4 + 8;
 const PART: &str = ".vutric-part";
+/// Deepest folder tree sent from here (the receiver applies the same limit).
+const MAX_DEPTH: usize = 32;
 /// A transfer that moves no byte for this long is given up.
 const IDLE: Duration = Duration::from_secs(60);
 /// How long the sender waits for the user on the other side to accept.
 const ASK: Duration = Duration::from_secs(300);
 /// Encoded size budget of one offer's entries, well under the control-frame cap.
 const BATCH_BYTES: usize = 96 * 1024;
-/// Deepest folder tree accepted from a peer.
-const MAX_DEPTH: usize = 32;
 /// How often progress is reported.
 const TICK: Duration = Duration::from_millis(150);
 
@@ -50,6 +54,91 @@ impl std::fmt::Display for Declined {
 }
 
 impl std::error::Error for Declined {}
+
+/// The other side has no room for the files (its free-space guard said no).
+#[derive(Debug)]
+pub struct NoRoom;
+
+impl std::fmt::Display for NoRoom {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("the other device has no room for these files")
+    }
+}
+
+impl std::error::Error for NoRoom {}
+
+/// Where and how received files are saved: the user's rules for this sender, plus what the rules need.
+#[derive(Debug, Clone)]
+pub struct SaveTo {
+    pub rules: SaveRules,
+    /// Used when the rules name no folder.
+    pub default_folder: PathBuf,
+    /// The sender's display name, for a per-device subfolder.
+    pub device: String,
+    /// Today, `YYYY-MM-DD` in the user's calendar, for a per-day subfolder.
+    pub date: String,
+    /// Refuse when less than this would stay free.
+    pub min_free_bytes: u64,
+}
+
+impl SaveTo {
+    /// Default rules into `dir`, the sender's tree kept, no free-space guard: what a plain "save here" means.
+    #[must_use]
+    pub fn folder(dir: impl Into<PathBuf>) -> Self {
+        Self {
+            rules: SaveRules::default(),
+            default_folder: dir.into(),
+            device: String::new(),
+            date: today_utc(),
+            min_free_bytes: 0,
+        }
+    }
+
+    fn target(&self, e: &OfferEntry) -> PathBuf {
+        self.rules.target(
+            &self.default_folder,
+            Arrival {
+                path: &e.path,
+                mime: &e.mime,
+                device: if self.device.is_empty() {
+                    "Vutric"
+                } else {
+                    &self.device
+                },
+                date: &self.date,
+            },
+        )
+    }
+}
+
+impl SaveTo {
+    /// The user's rules for whoever is on the other end of `s`: global settings with that device's overrides.
+    #[must_use]
+    pub fn for_peer(
+        s: &Session,
+        settings: &vutric_core::storage::Settings,
+        default_folder: PathBuf,
+        date: String,
+    ) -> Self {
+        let (rules, _) = settings.rules_for(&s.remote_id().to_string());
+        Self {
+            rules,
+            default_folder,
+            device: s.remote_name.clone(),
+            date,
+            min_free_bytes: settings.min_free_bytes,
+        }
+    }
+}
+
+/// Today in UTC, `YYYY-MM-DD`.
+#[must_use]
+pub fn today_utc() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    vutric_core::storage::date_of_unix(secs)
+}
 
 /// One file on this device, ready to offer.
 #[derive(Debug, Clone)]
@@ -325,7 +414,10 @@ pub async fn send(s: &mut Session, files: Vec<Outgoing>, on: OnProgress) -> Resu
                     }
                     break have;
                 }
-                Message::FlingFailed { id: r, .. } if r == id => {
+                Message::FlingFailed { id: r, reason } if r == id => {
+                    if reason == FailReason::DiskFull {
+                        return Err(NoRoom.into());
+                    }
                     bail!("the other device cancelled")
                 }
                 _ => {}
@@ -516,24 +608,6 @@ pub async fn decline(s: &mut Session, offer: &IncomingOffer) -> Result<()> {
     .await
 }
 
-/// A file's place under the save folder: every component sanitized, `..` and empty parts dropped.
-fn target_of(dir: &Path, path: &str) -> PathBuf {
-    let parts: Vec<String> = path
-        .split(['/', '\\'])
-        .filter(|p| !p.is_empty() && *p != "." && *p != "..")
-        .take(MAX_DEPTH)
-        .map(filename::sanitize)
-        .collect();
-    let mut out = dir.to_path_buf();
-    if parts.is_empty() {
-        out.push(filename::sanitize("file"));
-    }
-    for p in parts {
-        out.push(p);
-    }
-    out
-}
-
 fn part_of(target: &Path) -> PathBuf {
     let mut s = target.as_os_str().to_owned();
     s.push(PART);
@@ -548,17 +622,24 @@ struct Planned {
     held: u64,
 }
 
-/// Accepts the transfer and saves it under `dir` (folders kept). Later batches of the same transfer are
-/// accepted without asking again.
+/// Accepts the transfer and saves it by the rules in `to`. Later batches of the same transfer are accepted
+/// without asking again. When the disk would drop under the free-space guard, the sender is told
+/// ([`FailReason::DiskFull`]) and this returns [`NoRoom`].
 #[allow(clippy::too_many_lines)] // one protocol exchange, read top to bottom
 pub async fn receive(
     s: &mut Session,
     offer: IncomingOffer,
-    dir: &Path,
+    to: &SaveTo,
     on: OnProgress,
 ) -> Result<Summary> {
-    std::fs::create_dir_all(dir).with_context(|| format!("create {}", dir.display()))?;
+    let base = to
+        .rules
+        .folder
+        .clone()
+        .unwrap_or_else(|| to.default_folder.clone());
+    std::fs::create_dir_all(&base).with_context(|| format!("create {}", base.display()))?;
     let id = offer.id;
+    let conflict = to.rules.conflict;
     let meter = Meter::new(offer.total_bytes, offer.total_files);
     let ticker = meter.ticker(Arc::clone(&on));
     let renames = Arc::new(tokio::sync::Mutex::new(()));
@@ -572,7 +653,7 @@ pub async fn receive(
             .iter()
             .enumerate()
             .map(|(k, e)| {
-                let mut target = target_of(dir, &e.path);
+                let mut target = to.target(e);
                 // Two entries that sanitize to one name must not share a part file.
                 if !used.insert(target.clone()) {
                     let name = target
@@ -592,6 +673,18 @@ pub async fn receive(
                 }
             })
             .collect();
+        let needed: u64 = plan.iter().map(|p| p.entry.size - p.held).sum();
+        let free = plan
+            .first()
+            .and_then(|p| crate::disk::free_bytes(&p.target));
+        if free.is_some_and(|free| free < needed.saturating_add(to.min_free_bytes)) {
+            s.send(&Message::FlingFailed {
+                id,
+                reason: FailReason::DiskFull,
+            })
+            .await?;
+            return Err(NoRoom.into());
+        }
         s.send(&Message::OfferReply {
             id,
             accept: true,
@@ -623,7 +716,7 @@ pub async fn receive(
                     tasks.spawn(async move {
                         let p = &plan[k];
                         let r = match receive_one(st, p, &meter).await {
-                            Ok(()) => place(&p.part, &p.target, &renames).await,
+                            Ok(()) => place(&p.part, &p.target, conflict, &renames).await,
                             Err(e) => Err(e),
                         };
                         let counter = if r.is_ok() { &meter.files_done } else { &meter.failed };
@@ -748,9 +841,28 @@ async fn receive_one(mut st: RecvStream, p: &Planned, meter: &Meter) -> Result<(
     Ok(())
 }
 
-/// Renames a verified part file to its final name, `name (2).ext` if that is taken.
-async fn place(part: &Path, target: &Path, renames: &tokio::sync::Mutex<()>) -> Result<PathBuf> {
+/// Moves a verified part file to its final name, by the user's conflict rule: `name (2).ext`, replace the old
+/// file, or keep the old file and drop the new one.
+async fn place(
+    part: &Path,
+    target: &Path,
+    conflict: Conflict,
+    renames: &tokio::sync::Mutex<()>,
+) -> Result<PathBuf> {
     let _one = renames.lock().await;
+    match conflict {
+        Conflict::Replace => {
+            tokio::fs::rename(part, target)
+                .await
+                .with_context(|| format!("save {}", target.display()))?;
+            return Ok(target.to_path_buf());
+        }
+        Conflict::Skip if tokio::fs::try_exists(target).await.unwrap_or(false) => {
+            let _ = tokio::fs::remove_file(part).await;
+            return Ok(target.to_path_buf());
+        }
+        Conflict::Skip | Conflict::KeepBoth => {}
+    }
     let dir = target.parent().context("no parent")?;
     let name = target
         .file_name()
@@ -812,18 +924,24 @@ mod tests {
 
     #[test]
     fn targets_stay_inside_the_save_folder() {
+        let to = SaveTo::folder("save");
+        let e = |path: &str| OfferEntry {
+            path: path.into(),
+            size: 1,
+            mime: String::new(),
+        };
         let dir = Path::new("save");
         assert_eq!(
-            target_of(dir, "../../etc/passwd"),
+            to.target(&e("../../etc/passwd")),
             dir.join("etc").join("passwd")
         );
         assert_eq!(
-            target_of(dir, "Trip/day 1/a.jpg"),
+            to.target(&e("Trip/day 1/a.jpg")),
             dir.join("Trip").join("day 1").join("a.jpg")
         );
-        assert!(target_of(dir, "C:\\Windows\\x.dll").starts_with(dir));
-        assert!(target_of(dir, "/").starts_with(dir));
-        assert_ne!(target_of(dir, "/"), dir);
+        assert!(to.target(&e("C:\\Windows\\x.dll")).starts_with(dir));
+        assert!(to.target(&e("/")).starts_with(dir));
+        assert_ne!(to.target(&e("/")), dir);
     }
 
     #[test]

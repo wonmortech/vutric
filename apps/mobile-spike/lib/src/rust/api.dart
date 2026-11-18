@@ -7,7 +7,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `as_initiator`, `bump`, `cancellable`, `drop_session`, `epoch`, `finished`, `forget_on_error`, `keep`, `ms`, `now_epoch`, `open`, `peer_slot`, `peer`, `pending_slot`, `progress_of`, `receiver_clock`, `report`, `reporter`, `retire`, `route_name`, `runtime`, `sent_of`, `session_slot`, `session`, `take_offer`
+// These functions are ignored because they are not marked as `pub`: `as_initiator`, `bump`, `cancellable`, `drop_session`, `epoch`, `finished`, `forget_on_error`, `keep`, `load_settings`, `ms`, `now_epoch`, `open`, `peer_slot`, `peer`, `pending_slot`, `progress_of`, `receiver_clock`, `report`, `reporter`, `retire`, `route_name`, `runtime`, `sent_of`, `session_slot`, `session`, `settings_path`, `take_offer`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Sent`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
@@ -93,6 +93,18 @@ Future<double> fling({
   exitX: exitX,
 );
 
+/// Where this phone keeps its settings file (the app's support folder). Call once at start.
+Future<void> setSettingsDir({required String dir}) =>
+    RustLib.instance.api.crateApiSetSettingsDir(dir: dir);
+
+/// The settings as JSON (every field present, defaults filled in), for the Settings screen.
+Future<String> getSettings() => RustLib.instance.api.crateApiGetSettings();
+
+/// Saves settings edited on the Settings screen. Invalid JSON is rejected whole, never half-applied; values out of
+/// range are clamped.
+Future<void> putSettings({required String json}) =>
+    RustLib.instance.api.crateApiPutSettings(json: json);
+
 /// Waits for the next photo or file offer on the open session (either side may have opened it). Latency probes
 /// are answered here and never shown; a fling whose preview is not a sane JPEG is refused (`FlingFailed`), so its
 /// thrower learns at once. Cancelled by [`disconnect`].
@@ -119,8 +131,10 @@ Stream<TransferProgress> sendFiles({
 /// Accepts the offer [`next_incoming`] returned and saves it under `dir` (folders kept). Each file appears
 /// only once its hash matched; an interrupted transfer resumes where it stopped when sent again. Progress goes
 /// to `sink`; its last event has `done` and `saved`. Cancelled by [`disconnect`].
-Stream<TransferProgress> receiveFiles({required String dir}) =>
-    RustLib.instance.api.crateApiReceiveFiles(dir: dir);
+Stream<TransferProgress> receiveFiles({
+  required String dir,
+  required String date,
+}) => RustLib.instance.api.crateApiReceiveFiles(dir: dir, date: date);
 
 /// Says no to the offer [`next_incoming`] returned.
 Future<void> declineFiles() => RustLib.instance.api.crateApiDeclineFiles();
@@ -221,14 +235,19 @@ class FilesOffer {
   /// The first few paths, to show.
   final List<String> names;
 
+  /// The user's settings say yes without asking (accept rule and this device's override).
+  final bool autoAccept;
+
   const FilesOffer({
     required this.files,
     required this.bytes,
     required this.names,
+    required this.autoAccept,
   });
 
   @override
-  int get hashCode => files.hashCode ^ bytes.hashCode ^ names.hashCode;
+  int get hashCode =>
+      files.hashCode ^ bytes.hashCode ^ names.hashCode ^ autoAccept.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -237,7 +256,8 @@ class FilesOffer {
           runtimeType == other.runtimeType &&
           files == other.files &&
           bytes == other.bytes &&
-          names == other.names;
+          names == other.names &&
+          autoAccept == other.autoAccept;
 }
 
 /// What arrived on the open session: a photo thrown at this phone, or files offered to it.

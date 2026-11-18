@@ -18,6 +18,11 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 }
+// Release lint of third-party plugins crashes on JDK 17 (image_picker_android: lint calls Java 21's
+// List.removeLast). It checks plugin code, not ours; `flutter analyze` covers the Dart side.
+subprojects {
+    tasks.matching { it.name.startsWith("lintVital") }.configureEach { enabled = false }
+}
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)

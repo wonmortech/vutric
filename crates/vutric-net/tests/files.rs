@@ -91,7 +91,9 @@ async fn folder_tree_and_many_files_arrive_verified() {
         let offer = offer_of(&mut rx).await;
         assert_eq!(offer.total_files, 304);
         let on: OnProgress = Arc::new(move |p| seen2.store(p.bytes_done, Ordering::Relaxed));
-        let got = transfer::receive(&mut rx, offer, &dst2, on).await.unwrap();
+        let got = transfer::receive(&mut rx, offer, &transfer::SaveTo::folder(&dst2), on)
+            .await
+            .unwrap();
         (got, rx)
     });
     let sent = transfer::send(&mut tx, files, quiet()).await.unwrap();
@@ -150,7 +152,7 @@ async fn resumes_a_part_file_and_rejects_a_damaged_one() {
     let dst2 = dst.clone();
     let recv = tokio::spawn(async move {
         let offer = offer_of(&mut rx).await;
-        let got = transfer::receive(&mut rx, offer, &dst2, quiet())
+        let got = transfer::receive(&mut rx, offer, &transfer::SaveTo::folder(&dst2), quiet())
             .await
             .unwrap();
         (got, rx)

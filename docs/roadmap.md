@@ -48,12 +48,39 @@ Cross-check of the Phase 2 Linux daemon against the iOS client; nothing new on t
 | When | Work |
 |---|---|
 | Spike 0.2 (done) | R0 same network + internet; any files, many at once, resume, hash check (ADR-0006) |
+| Spike 0.2 (done, not yet on a real phone) | Phone opens on its own gallery + files, multi-select, one send button; receiving settings screen ([ADR-0008](decisions/0008-gallery-first-phone-app.md)) |
 | Phase 1 | R1 stronger LAN finding + failure screens · R2 our own relay + route badge · storage settings on desktop and Android (save folder, split by type, subfolders, gallery, conflicts, auto-accept, free-space guard, history) · R3 hotspot (Android host) · R4 BLE finding · R5 USB (Android) |
 | Phase 3 | storage settings on iPhone (Files folder bookmark, PhotoKit) · R3/R4 on iPhone · R5 USB (iPhone, after App Review check) · R6 Wi-Fi Aware within one platform |
 | After Phase 3 | R7 Wi-Fi Direct · R8 encrypted cloud handoff (opt-in) · R9 animated QR |
 | Watched | R10 iPhone ⇄ Android Wi-Fi Aware, re-checked every quarter |
 
+## OS modules and UI layers (across phases, [ADR-0009](decisions/0009-native-modules-kotlin-swift.md))
+
+| When | Work |
+|---|---|
+| Spike 0.3 (before Phase 1 UI) | desktop UI spike: Flutter desktop vs Tauri vs Slint, LocalSend as reference; overlay card without focus; RAM / cold open / fps table → owner confirms the desktop toolkit |
+| Phase 1 | Rust daemon (tray, toast, IPC, autostart) + overlay cards · Flutter desktop windows · FRB + UniFFI in one `libvutric.so` · Kotlin: `TransferJob`, `ShareEntry`, `VutricTile`, `LinkManager` (hotspot), `Nearby` (mDNS), `SafStore` · Explorer menu, MSIX/winget |
+| Phase 2 | Flutter Linux · Nautilus/Dolphin scripts, StatusNotifier · Kotlin: BLE (`Nearby`), Wi-Fi P2P (`LinkManager`) |
+| Phase 3–4 | Swift: Share Extension (no Flutter), Live Activity + widget, App Intents, Bonjour/CoreBluetooth discovery, `NEHotspotConfiguration`, PhotoKit + HEIC→JPEG, Files bookmark · App Group + Keychain group · TestFlight |
+| Phase 5 | macOS `NSPanel` overlay · Flutter macOS · Swift share extension |
+| Opt-in, Phase 1+ | Kotlin `Companion` (notification mirroring), `Clipboard` |
+
+## Other apps' protocols (across phases, [ADR-0010](decisions/0010-interop-every-app.md))
+
+| When | Work |
+|---|---|
+| Phase 1 | LocalSend v2.1 adapter (desktop + Android) · browser send/receive page · Quick Share LAN adapter on Windows (eksperimental) · sandboxed adapter processes + fuzzers + real-app tests |
+| Phase 2 | Quick Share on Linux · KDE Connect (desktop + Android) · Warpinator · croc · magic-wormhole · LocalSend on Linux |
+| Phase 3 | LocalSend on iPhone (foreground) |
+| Phase 5 | LocalSend and Quick Share (QR, NearDrop style) on macOS |
+| Not possible | AirDrop, Apple Continuity, Samsung/Huawei/Mi Share, Xender/SHAREit/Zapya protocols, Phone Link: closed (ADR-0010 part 2) |
+
+## Everything in one list
+
+[backlog.md](backlog.md) lists every proposal, feature, adapter and owed measurement from the ADRs and the research
+documents, each with its source and phase, so nothing is forgotten.
+
 ## Later (any phase, owner decides)
 
 More effects (Kometa, Pufak, Oddiy + new ones), clipboard, multi-monitor targeting,
-LocalSend protocol compatibility, Play Store / App Store / Microsoft Store listings.
+Play Store / App Store / Microsoft Store listings.

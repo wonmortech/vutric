@@ -3,6 +3,7 @@
 // Files app shows under "On My iPhone").
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -69,20 +70,33 @@ String _ext(String path) {
   return dot < 0 ? '' : path.substring(dot + 1).toLowerCase();
 }
 
-/// Puts received photos and videos into the gallery; returns how many went there.
+/// Today in the phone's calendar, `YYYY-MM-DD`, for a per-day save folder.
+String localDate() {
+  final d = DateTime.now();
+  return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+}
+
+/// Puts received photos and videos into the gallery when the settings say so (album, keep a copy or not);
+/// returns how many went there.
 Future<int> saveMediaToGallery(List<String> saved) async {
   final media = saved.where((p) => _media.contains(_ext(p))).toList();
   if (media.isEmpty) return 0;
+  final save = (jsonDecode(await vutric.getSettings()) as Map<String, dynamic>)['save'] as Map<String, dynamic>;
+  if (save['gallery'] != true) return 0;
+  final album = (save['album'] as String?)?.trim();
+  final keepCopy = save['keep_copy'] != false;
   if (!await Gal.hasPermission() && !await Gal.requestPermission()) return 0;
   var n = 0;
   for (final p in media) {
     try {
+      final name = album == null || album.isEmpty ? 'Vutric' : album;
       if (_video.contains(_ext(p))) {
-        await Gal.putVideo(p, album: 'Vutric');
+        await Gal.putVideo(p, album: name);
       } else {
-        await Gal.putImage(p, album: 'Vutric');
+        await Gal.putImage(p, album: name);
       }
       n++;
+      if (!keepCopy) await File(p).delete();
     } catch (_) {
       // Not a format the gallery takes (or no space): it stays in Vutric's folder.
     }

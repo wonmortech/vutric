@@ -103,27 +103,31 @@ class _CatchPageState extends State<CatchPage> with SingleTickerProviderStateMix
   /// Asks the user, then saves the files with a progress sheet. False when the session is gone.
   Future<bool> _offered(vutric.FilesOffer offer) async {
     HapticFeedback.mediumImpact();
-    final yes = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text('${_peer?.peerName ?? 'Qurilma'} fayl yubormoqda'),
-        content: Text(offerText(offer)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Rad etish')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Qabul qilish')),
-        ],
-      ),
-    );
+    // Settings may say yes already (trusted device, or under the size limit): then no question.
+    final yes =
+        offer.autoAccept ||
+        await showDialog<bool>(
+              context: context,
+              barrierDismissible: false,
+              builder: (ctx) => AlertDialog(
+                title: Text('${_peer?.peerName ?? 'Qurilma'} fayl yubormoqda'),
+                content: Text(offerText(offer)),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Rad etish')),
+                  FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Qabul qilish')),
+                ],
+              ),
+            ) ==
+            true;
     if (!mounted) return false;
     try {
-      if (yes != true) {
+      if (!yes) {
         await vutric.declineFiles();
         return true;
       }
       final dir = await receiveDir();
       if (!mounted) return false;
-      final r = await runTransfer(context, title: 'Qabul qilinmoqda', stream: vutric.receiveFiles(dir: dir));
+      final r = await runTransfer(context, title: 'Qabul qilinmoqda', stream: vutric.receiveFiles(dir: dir, date: localDate()));
       if (!mounted) return false;
       if (r == null) return (await vutric.currentRoute()).isNotEmpty;
       final inGallery = await saveMediaToGallery(r.saved);

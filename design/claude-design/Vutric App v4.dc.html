@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+@font-face{font-family:"Geist";src:url("fonts/geist.woff2") format("woff2-variations");font-weight:100 900;font-display:swap}
+@font-face{font-family:"Geist Mono";src:url("fonts/geist-mono.woff2") format("woff2-variations");font-weight:100 900;font-display:swap}
+html,body{margin:0;background:#050505}
+*{box-sizing:border-box}
+a{color:#2969FF;text-decoration:none}a:hover{color:#5B8CFF}
+@keyframes vt-rise{0%{opacity:0;transform:translateY(8px)}40%{opacity:1}100%{opacity:0;transform:translateY(-8px)}}
+@keyframes vt-spin{to{transform:rotate(360deg)}}
+@keyframes vt-scan{0%,100%{top:14%}50%{top:84%}}
+@keyframes vt-breathe{0%,100%{transform:scale(.92);opacity:.45}50%{transform:scale(1.06);opacity:1}}
+@keyframes vt-glow{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes vt-bar{0%{left:-40%}100%{left:100%}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" style="--bg:#F2F2F7;--bg-alt:rgba(118,118,128,.12);--raised:#FFFFFF;--ink:#000000;--muted:rgba(60,60,67,.6);--line:rgba(60,60,67,.12);--line-strong:rgba(60,60,67,.22);--action:#007AFF;--action-ink:#FFFFFF;--accent:#007AFF;--accent-hi:#3395FF;--accent-2:#9CD0FF;--accent-ink:#FFFFFF;--hero:#1C1C1E;--hero-ink:#FFFFFF;--hero-muted:rgba(235,235,245,.6);--canvas:#E5E5EA;--ok:#34C759;--err:#FF3B30;--glass:rgba(255,255,255,.62);--glass-shadow:inset 0 .5px 0 rgba(255,255,255,.95),inset 0 0 0 .5px rgba(255,255,255,.6),0 0 0 .5px rgba(0,0,0,.06),0 8px 24px -8px rgba(0,0,0,.16);--font:-apple-system,BlinkMacSystemFont,'SF Pro Text',Geist,system-ui,sans-serif;--mono:'SF Mono',ui-monospace,Menlo,'Geist Mono',monospace;--r-pill:999px;--r-card:22px;--r-panel:26px;width:2720px;background:var(--canvas);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased">
+
+<section data-screen-label="Portal" style="background:#000;color:#F5F5F7;padding:140px 0 160px;display:flex;flex-direction:column;align-items:center;gap:110px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',Geist,system-ui,sans-serif">
+  <div style="display:flex;align-items:center;gap:12px"><img src="logo.svg" alt="Vutric" style="width:44px;height:44px;border-radius:10px"><span style="font-size:24px;font-weight:600;letter-spacing:-0.04em">Vutric</span><span style="font-size:13px;color:#86868B;padding:3px 9px;border:1px solid #333336;border-radius:999px">v1.0</span></div>
+  <div style="position:relative;width:1820px;height:900px">
+    <div style="position:absolute;left:80px;top:20px;width:1240px;height:800px;border-radius:30px 30px 6px 6px;background:#0b0b0c;box-shadow:0 0 0 1.5px #3a3a3e,inset 0 0 0 1px #1d1d1f;padding:16px 16px 34px">
+      <div style="position:relative;width:100%;height:100%;border-radius:14px 14px 2px 2px;overflow:hidden;background:radial-gradient(38% 55% at 90% 46%,rgba(255,255,255,.95),rgba(205,222,236,.55) 26%,transparent 62%),radial-gradient(70% 90% at 0% 50%,rgba(0,0,0,.75),transparent 70%),radial-gradient(120% 80% at 104% 46%,transparent 30%,rgba(5,8,10,.55) 75%),repeating-conic-gradient(from 180deg at 104% 46%,#0c1116 0deg,#223039 7deg,#38505e 11deg,#141c22 15deg,#0c1116 22deg),#0b1014">
+        <div style="position:absolute;top:0;left:0;right:0;height:26px;background:rgba(0,0,0,.28);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:12.5px;font-weight:500;z-index:3"><div style="display:flex;gap:18px"><span style="font-weight:700">Finder</span><span>Fayl</span><span>Tahrir</span><span>Koʻrinish</span><span>Oʻtish</span><span>Oyna</span></div><div style="display:flex;gap:14px;align-items:center"><img src="logo.svg" alt="" style="width:15px;height:15px;border-radius:4px"><span style="width:15px;height:10px;border-radius:2px;border:1.2px solid #fff"></span><span style="white-space:nowrap">Chor 18-noy 10:34</span></div></div>
+        <div style="position:absolute;top:34px;right:12px;width:320px;border-radius:18px;background:rgba(40,40,44,.55);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:inset 0 .5px 0 rgba(255,255,255,.35),inset 0 0 0 .5px rgba(255,255,255,.15),0 20px 40px -16px rgba(0,0,0,.6);padding:12px;display:grid;grid-template-columns:36px 1fr 44px;gap:10px;align-items:center;z-index:4;opacity:0" ref="{{ macToastRef }}"><img src="logo.svg" alt="" style="width:36px;height:36px;border-radius:9px"><div style="display:flex;flex-direction:column;gap:1px;min-width:0"><div style="font-size:13px;font-weight:600">Vutric</div><div style="font-size:12.5px;color:rgba(255,255,255,.78)">iPhone’dan rasm keldi · 38 ms</div></div><span style="width:44px;height:44px;border-radius:8px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%)"></span></div>
+        <div ref="{{ macSlitRef }}" style="position:absolute;top:0;right:0;bottom:0;width:340px;opacity:0;z-index:2;pointer-events:none;background:radial-gradient(60% 45% at 100% 46%,color-mix(in srgb,var(--accent) 55%,transparent),transparent 70%)"><div style="position:absolute;right:0;top:22%;height:48%;width:4px;border-radius:4px;background:linear-gradient(180deg,transparent,var(--accent) 20%,var(--accent-2) 50%,var(--accent) 80%,transparent);box-shadow:0 0 30px 6px color-mix(in srgb,var(--accent) 80%,transparent)"></div></div>
+        <div ref="{{ macCardRef }}" style="position:absolute;top:160px;left:760px;width:300px;height:400px;border-radius:14px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%);box-shadow:0 0 0 5px #fff,0 50px 90px -30px rgba(0,0,0,.9);z-index:3;opacity:0;will-change:transform"></div>
+        <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);height:56px;padding:0 8px;border-radius:18px;background:rgba(255,255,255,.14);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:inset 0 .5px 0 rgba(255,255,255,.4),inset 0 0 0 .5px rgba(255,255,255,.18);display:flex;align-items:center;gap:8px;z-index:3"><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#6fc3ff,#1a7cf0);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#fff,#d9d9de);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#8ee88e,#2fb84a);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#ffd36b,#ff9f0a);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#ff8a80,#ff3b30);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#5ac8fa,#007aff);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#f2f2f7,#aeaeb2);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#bf9fff,#7d5cff);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#ffe066,#ffcc00);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#64d2ff,#30b0c7);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#ff9f6b,#ff6b2b);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#d1d1d6,#8e8e93);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5)"></span><span style="width:1px;height:36px;background:rgba(255,255,255,.3)"></span><img src="logo.svg" alt="" style="width:40px;height:40px;border-radius:10px"></div>
+      </div>
+      <div style="position:absolute;top:16px;left:50%;margin-left:-90px;width:180px;height:30px;border-radius:0 0 12px 12px;background:#0b0b0c;z-index:5"></div>
+    </div>
+    <div style="position:absolute;left:0;top:820px;width:1400px;height:24px;border-radius:2px 2px 26px 26px / 2px 2px 20px 20px;background:linear-gradient(180deg,#5a5a5f 0%,#2c2c2f 45%,#151517 100%);box-shadow:0 30px 60px -10px rgba(0,0,0,.9)"><div style="position:absolute;top:0;left:50%;margin-left:-90px;width:180px;height:9px;border-radius:0 0 10px 10px;background:linear-gradient(180deg,#1c1c1e,#3c3c40)"></div></div>
+    <div style="position:absolute;left:1440px;top:140px;width:340px;height:704px;border-radius:60px;padding:5px;background:linear-gradient(145deg,#5a5a60,#1e1e21 40%,#3a3a3f 70%,#18181a);box-shadow:0 40px 80px -20px rgba(0,0,0,.9)">
+      <span style="position:absolute;left:-3px;top:118px;width:4px;height:30px;border-radius:2px;background:#3a3a3f"></span><span style="position:absolute;left:-3px;top:170px;width:4px;height:58px;border-radius:2px;background:#3a3a3f"></span><span style="position:absolute;left:-3px;top:240px;width:4px;height:58px;border-radius:2px;background:#3a3a3f"></span><span style="position:absolute;right:-3px;top:196px;width:4px;height:90px;border-radius:2px;background:#3a3a3f"></span><span style="position:absolute;right:-3px;top:400px;width:4px;height:52px;border-radius:2px;background:#2a2a2e"></span>
+      <div style="width:100%;height:100%;border-radius:55px;background:#000;padding:10px">
+        <div style="position:relative;width:100%;height:100%;border-radius:46px;overflow:hidden;background:#0a0a0a">
+          <div style="position:absolute;inset:-30px;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;filter:blur(16px) brightness(.62) saturate(1.2)"><span style="aspect-ratio:1;background:radial-gradient(60% 50% at 30% 30%,#9fc77a,transparent 70%),linear-gradient(160deg,#4f7a3e,#1e3d2a)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#9fd0ec 0%,#d9eef7 45%,#2a7aa8 46%,#134e78 100%)"></span><span style="aspect-ratio:1;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%)"></span><span style="aspect-ratio:1;background:repeating-linear-gradient(90deg,transparent 0 9px,rgba(255,214,140,.35) 9px 11px) 0 55%/100% 45% no-repeat,linear-gradient(180deg,#11183a 0%,#253a7a 55%,#0b1026 56%)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#f6e4c2 0%,#e9c99a 50%,#c99b6a 51%,#a8784d 100%)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#f0b77d 0%,#d58d6d 50%,#2a2f4f 51%,#161a30 100%)"></span><span style="aspect-ratio:1;background:radial-gradient(60% 50% at 30% 30%,#9fc77a,transparent 70%),linear-gradient(160deg,#4f7a3e,#1e3d2a)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#9fd0ec 0%,#d9eef7 45%,#2a7aa8 46%,#134e78 100%)"></span><span style="aspect-ratio:1;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%)"></span><span style="aspect-ratio:1;background:repeating-linear-gradient(90deg,transparent 0 9px,rgba(255,214,140,.35) 9px 11px) 0 55%/100% 45% no-repeat,linear-gradient(180deg,#11183a 0%,#253a7a 55%,#0b1026 56%)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#f6e4c2 0%,#e9c99a 50%,#c99b6a 51%,#a8784d 100%)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#f0b77d 0%,#d58d6d 50%,#2a2f4f 51%,#161a30 100%)"></span><span style="aspect-ratio:1;background:radial-gradient(60% 50% at 30% 30%,#9fc77a,transparent 70%),linear-gradient(160deg,#4f7a3e,#1e3d2a)"></span><span style="aspect-ratio:1;background:linear-gradient(180deg,#9fd0ec 0%,#d9eef7 45%,#2a7aa8 46%,#134e78 100%)"></span><span style="aspect-ratio:1;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%)"></span></div>
+          <div style="position:absolute;top:11px;left:50%;margin-left:-50px;width:100px;height:30px;border-radius:16px;background:#000;z-index:5"></div>
+          <div style="position:absolute;top:0;left:0;right:0;height:50px;display:flex;align-items:center;justify-content:space-between;padding:4px 26px 0 32px;font-size:14px;font-weight:600;z-index:4"><span>10:34</span><div style="display:flex;gap:5px;align-items:center"><svg width="16" height="10" viewBox="0 0 19 12" fill="#fff"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="22" height="11" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="#fff" opacity=".45"></rect><rect x="2" y="2" width="16" height="9" rx="2.5" fill="#fff"></rect></svg></div></div>
+          <div style="position:absolute;top:58px;right:12px;height:32px;padding:0 12px;border-radius:999px;background:rgba(255,255,255,.14);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:inset 0 .5px 0 rgba(255,255,255,.35),inset 0 0 0 .5px rgba(255,255,255,.15);display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;z-index:4;white-space:nowrap"><span style="width:7px;height:7px;border-radius:50%;background:#30D158;box-shadow:0 0 0 2.5px rgba(48,209,88,.25)"></span>MacBook Pro</div>
+          <div style="position:absolute;top:104px;left:0;right:0;text-align:center;font-size:11.5px;color:rgba(255,255,255,.7);z-index:4;display:flex;align-items:center;justify-content:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>Chap chetga oting — Mac’ga tushadi</div>
+          <div style="position:absolute;top:130px;right:10px;width:96px;display:flex;flex-direction:column;gap:6px;z-index:3"><span style="height:92px;border-radius:8px;background:linear-gradient(180deg,#9fd0ec 0%,#d9eef7 45%,#2a7aa8 46%,#134e78 100%);box-shadow:0 0 0 .5px rgba(255,255,255,.15)"></span><span style="height:92px;border-radius:8px;background:radial-gradient(60% 50% at 30% 30%,#9fc77a,transparent 70%),linear-gradient(160deg,#4f7a3e,#1e3d2a);box-shadow:0 0 0 .5px rgba(255,255,255,.15)"></span><span style="height:92px;border-radius:8px;background:linear-gradient(180deg,#f0b77d 0%,#d58d6d 50%,#2a2f4f 51%,#161a30 100%);box-shadow:0 0 0 .5px rgba(255,255,255,.15)"></span><span style="height:92px;border-radius:8px;background:linear-gradient(180deg,#f6e4c2 0%,#e9c99a 50%,#c99b6a 51%,#a8784d 100%);box-shadow:0 0 0 .5px rgba(255,255,255,.15)"></span><span style="height:92px;border-radius:8px;background:repeating-linear-gradient(90deg,transparent 0 9px,rgba(255,214,140,.35) 9px 11px) 0 55%/100% 45% no-repeat,linear-gradient(180deg,#11183a 0%,#253a7a 55%,#0b1026 56%);box-shadow:0 0 0 .5px rgba(255,255,255,.15)"></span></div>
+          <div ref="{{ phoneSlitRef }}" style="position:absolute;top:0;left:0;bottom:0;width:180px;opacity:0;z-index:2;pointer-events:none;background:radial-gradient(70% 40% at 0% 50%,color-mix(in srgb,var(--accent) 60%,transparent),transparent 70%)"><div style="position:absolute;left:0;top:28%;height:44%;width:3px;border-radius:3px;background:linear-gradient(180deg,transparent,var(--accent) 20%,var(--accent-2) 50%,var(--accent) 80%,transparent);box-shadow:0 0 22px 5px color-mix(in srgb,var(--accent) 80%,transparent)"></div></div>
+          <div ref="{{ phoneCardRef }}" style="position:absolute;top:236px;left:44px;width:150px;height:200px;border-radius:12px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%);box-shadow:0 0 0 3px #fff,0 30px 50px -16px rgba(0,0,0,.9);z-index:6;will-change:transform"></div>
+          <div style="position:absolute;left:12px;right:12px;bottom:22px;height:54px;border-radius:999px;background:rgba(255,255,255,.12);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:inset 0 .5px 0 rgba(255,255,255,.35),inset 0 0 0 .5px rgba(255,255,255,.15);display:grid;grid-template-columns:repeat(3,1fr);padding:4px;font-size:11px;font-weight:600;z-index:4"><span style="border-radius:999px;background:rgba(255,255,255,.16);display:grid;place-items:center">Rasmlar</span><span style="display:grid;place-items:center;color:rgba(255,255,255,.7)">Fayllar</span><span style="display:grid;place-items:center;color:rgba(255,255,255,.7)">Bufer</span></div>
+          <div style="position:absolute;bottom:7px;left:50%;margin-left:-55px;width:110px;height:4px;border-radius:2px;background:#fff;opacity:.6;z-index:5"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:36px;text-align:center;max-width:1600px">
+    <div style="font-size:104px;line-height:1.02;font-weight:700;letter-spacing:-0.045em">Portal.<br>Oting. U Mac’ingizga tushadi.</div>
+    <div style="font-size:24px;line-height:1.5;color:#86868B;max-width:46ch;text-wrap:pretty">iPhone yoki Android’dagi <b style="color:#F5F5F7;font-weight:600">Vutric ilovasida</b> rasm, video yoki faylni tanlang va <b style="color:#F5F5F7;font-weight:600">chap chetga oting</b>. U uchib oʻtib, <b style="color:#F5F5F7;font-weight:600">kompyuter ekraniga tushadi</b> — Mac, Windows yoki Linux. <b style="color:#F5F5F7;font-weight:600">Kabel yoʻq, internet yoʻq</b>, faqat bitta Wi-Fi.</div>
+    <div style="display:flex;gap:14px;align-items:center;margin-top:8px"><div style="height:56px;padding:0 28px;border-radius:999px;background:#F5F5F7;color:#000;display:flex;align-items:center;font-size:18px;font-weight:600">App Store’dan yuklab olish</div><div style="height:56px;padding:0 28px;border-radius:999px;box-shadow:inset 0 0 0 1px #424245;display:flex;align-items:center;font-size:18px;font-weight:500">Mac uchun yuklab olish</div></div>
+    <div style="font-size:15px;color:#6E6E73">Bepul · iOS 26, macOS 26, Android 12+, Windows 11, Linux</div>
+  </div>
+</section>
+<section data-screen-label="Hero" style="position:relative;overflow:hidden;padding:120px 120px 120px;display:grid;grid-template-columns:minmax(0,1fr) 393px minmax(0,1fr);gap:96px;align-items:center;background:radial-gradient(50% 60% at 50% 0%,rgba(255,91,46,.20),transparent 70%),#000;color:#F5F4F1">
+  <div style="display:flex;flex-direction:column;gap:32px;max-width:640px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <img src="logo.svg" alt="Vutric" style="width:56px;height:56px;border-radius:13px;box-shadow:0 0 0 1px rgba(255,255,255,.1),0 12px 40px -10px rgba(255,91,46,.5)">
+      <div style="font-size:30px;font-weight:600;letter-spacing:-0.05em">vutric</div>
+      <div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:13px;color:#8F8D88;padding:4px 10px;border:1px solid rgba(255,255,255,.14);border-radius:999px;white-space:nowrap">iOS 26 · macOS 26 · Android · Windows</div>
+    </div>
+    <div style="font-size:72px;line-height:1;font-weight:600;letter-spacing:-0.05em;text-wrap:balance">Oʻzingiz<br>sinab koʻring.</div>
+    <div style="font-size:21px;line-height:1.5;color:#B5B3AE;max-width:30ch">Telefondagi rasmni yuqoriga suring — u bir lahzada kompyuter ekraniga uchib tushadi. Internet yoʻq, faqat bitta Wi-Fi.</div>
+    <div style="display:flex;gap:10px;align-items:center;font-size:15px;color:#8F8D88"><span style="width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,.2);display:grid;place-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F5F4F1" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></span>Jonli prototip: kartani yuqoriga oting yoki «Yuborish»ni bosing</div>
+  </div>
+
+  <div data-screen-label="Prototip" style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 60px 120px -30px color-mix(in srgb,var(--accent) 28%,transparent);display:flex;flex-direction:column;user-select:none">
+    <div ref="{{ zoneRef }}" style="position:absolute;top:0;left:0;right:0;height:240px;opacity:0;pointer-events:none;z-index:1;background:radial-gradient(60% 70% at 50% 0%,color-mix(in srgb,var(--accent) 55%,transparent),color-mix(in srgb,var(--accent) 12%,transparent) 55%,transparent 75%)">
+      <div style="position:absolute;top:0;left:12%;right:12%;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,var(--accent) 20%,var(--accent-2) 50%,var(--accent) 80%,transparent);box-shadow:0 0 24px 4px color-mix(in srgb,var(--accent) 80%,transparent)"></div>
+      <div style="position:absolute;top:96px;left:0;right:0;text-align:center;font-size:14px;font-weight:500;color:var(--accent-2)">Qoʻyib yuboring</div>
+    </div>
+    <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+    <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600;position:relative;z-index:3"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+    <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px;position:relative;z-index:2">
+      <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:var(--r-pill);background:rgba(255,255,255,.06);border:1px solid var(--line-strong);backdrop-filter:blur(20px);font-size:14px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#2BD67B;box-shadow:0 0 0 3px rgba(43,214,123,.22)"></span>XSTUDIO<span style="color:var(--muted);font-weight:400;margin-left:-4px">· Windows</span><span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000092</span></div>
+      <div style="flex:1;display:grid;place-items:center;position:relative">
+        <div ref="{{ cardRef }}" onPointerDown="{{ onDown }}" onPointerMove="{{ onMove }}" onPointerUp="{{ onUp }}" onPointerCancel="{{ onUp }}" style="position:relative;z-index:10;width:250px;height:334px;border-radius:var(--r-card);background:{{ cardBg }};box-shadow:0 0 0 5px #1C1C1F,0 40px 70px -24px rgba(0,0,0,.8);cursor:grab;touch-action:none;will-change:transform"></div>
+      </div>
+      <div style="height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+        <sc-if value="{{ isReady }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted)">
+            <div style="position:relative;width:14px;height:22px">
+              <svg style="position:absolute;top:0;left:0;animation:vt-rise 1.6s ease-out infinite" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"></path></svg>
+              <svg style="position:absolute;top:8px;left:0;animation:vt-rise 1.6s .3s ease-out infinite" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"></path></svg>
+            </div>Yuborish uchun yuqoriga suring
+          </div>
+        </sc-if>
+        <sc-if value="{{ isSending }}" hint-placeholder-val="{{ false }}">
+          <div style="display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 16px 0 12px;border-radius:var(--r-pill);background:var(--raised);border:1px solid var(--line-strong);font-size:14px;font-weight:500"><span style="width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.2);border-top-color:var(--accent);animation:vt-spin .7s linear infinite"></span>Yuborilmoqda…</div>
+        </sc-if>
+        <sc-if value="{{ isArrived }}" hint-placeholder-val="{{ false }}">
+          <div style="display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 16px 0 8px;border-radius:var(--r-pill);background:rgba(43,214,123,.16);border:1px solid rgba(43,214,123,.35);font-size:14px;font-weight:500"><span style="width:24px;height:24px;border-radius:50%;background:#2BD67B;display:grid;place-items:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#06210F" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>Yetib bordi · <span style="font-family:var(--mono)">{{ ms }} ms</span></div>
+          <div style="display:flex;gap:6px">
+            <sc-for list="{{ sent }}" as="s" hint-placeholder-count="0"><span style="width:22px;height:22px;border-radius:6px;background:{{ s.bg }};box-shadow:0 0 0 1.5px #0A0A0B,0 0 0 2.5px rgba(43,214,123,.6)"></span></sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isRejected }}" hint-placeholder-val="{{ false }}">
+          <div style="display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 16px 0 8px;border-radius:var(--r-pill);background:rgba(255,69,58,.14);border:1px solid rgba(255,69,58,.4);font-size:14px;font-weight:500"><span style="width:24px;height:24px;border-radius:50%;background:#FF453A;color:#fff;display:grid;place-items:center;font-size:14px;font-weight:700">!</span>Kompyuter rasmni qabul qilmadi</div>
+          <div style="font-size:12px;color:var(--muted)">Sessiya saqlandi — yana otishingiz mumkin</div>
+        </sc-if>
+        <sc-if value="{{ isTimeout }}" hint-placeholder-val="{{ false }}">
+          <div style="display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 8px;border-radius:var(--r-pill);background:rgba(255,69,58,.14);border:1px solid rgba(255,69,58,.4);font-size:14px;font-weight:500"><span style="width:24px;height:24px;border-radius:50%;background:#FF453A;color:#fff;display:grid;place-items:center;font-size:14px;font-weight:700">!</span>Javob yoʻq (5 s)<span onClick="{{ onReset }}" style="height:28px;padding:0 12px;border-radius:var(--r-pill);background:#F5F4F1;color:#0B0B0C;display:inline-flex;align-items:center;font-size:13px;cursor:pointer">Qayta ulanish</span></div>
+        </sc-if>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px">
+        <div onClick="{{ onNext }}" style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500;cursor:pointer">Boshqa rasm</div>
+        <div onClick="{{ onSend }}" style="height:56px;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--accent-hi),var(--accent));color:var(--accent-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 0 0 .5px rgba(255,255,255,.25),0 10px 28px -10px color-mix(in srgb,var(--accent) 75%,transparent);display:flex;align-items:center;justify-content:center;gap:8px;font-size:17px;font-weight:600;cursor:pointer;box-shadow:0 10px 30px -10px color-mix(in srgb,var(--accent) 70%,transparent)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>Yuborish</div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.4;z-index:4"></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:0;max-width:520px;justify-self:end;width:100%">
+    <div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:13px;color:#8F8D88;letter-spacing:.08em;margin-bottom:18px">HARAKAT IZOHI · S3</div>
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:6px 20px;padding:18px 0;border-top:1px solid rgba(255,255,255,.1)"><div style="font-size:16px;font-weight:500">Sudrash</div><div style="font-size:15px;line-height:1.5;color:#B5B3AE">Karta barmoqqa 1:1 yopishadi. Ogʻish <span style="font-family:'SF Mono',ui-monospace,'Geist Mono';color:#F5F4F1">dx × 0.05°</span>, yuqoriga koʻtarilganda <span style="font-family:'SF Mono',ui-monospace,'Geist Mono';color:#F5F4F1">≤ 14%</span> kichrayadi. Tepa chetida toʻq sariq «tirqish» ochiladi.</div></div>
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:6px 20px;padding:18px 0;border-top:1px solid rgba(255,255,255,.1)"><div style="font-size:16px;font-weight:500">Chegara</div><div style="font-size:15px;line-height:1.5;color:#B5B3AE"><span style="font-family:'SF Mono',ui-monospace,'Geist Mono';color:#F5F4F1">−150 px</span> yoki tezlik <span style="font-family:'SF Mono',ui-monospace,'Geist Mono';color:#F5F4F1">0.5 px/ms</span> — sekin, ammo uzoq surish ham otish hisoblanadi.</div></div>
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:6px 20px;padding:18px 0;border-top:1px solid rgba(255,255,255,.1)"><div style="font-size:16px;font-weight:500">Otish</div><div style="font-size:15px;line-height:1.5;color:#B5B3AE"><span style="font-family:'SF Mono',ui-monospace,'Geist Mono';color:#F5F4F1">280 ms · cubic(.3,.7,.4,1)</span>. Karta hamma narsaning <b style="color:#F5F4F1;font-weight:500">ustidan</b> chiqib ketadi. Haptic: light impact.</div></div>
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:6px 20px;padding:18px 0;border-top:1px solid rgba(255,255,255,.1)"><div style="font-size:16px;font-weight:500">Qaytish</div><div style="font-size:15px;line-height:1.5;color:#B5B3AE">Pastdan, <span style="font-family:'SF Mono',ui-monospace,'Geist Mono';color:#F5F4F1">560 ms · easeOutBack (.34,1.56,.64,1)</span>.</div></div>
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:6px 20px;padding:18px 0;border-top:1px solid rgba(255,255,255,.1)"><div style="font-size:16px;font-weight:500">Natija</div><div style="font-size:15px;line-height:1.5;color:#B5B3AE">Pill pastda, barmoq yonida: <span style="font-family:'SF Mono',ui-monospace,'Geist Mono';color:#F5F4F1">220 ms</span> fade + 8 px koʻtarilish.</div></div>
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:6px 20px;padding:18px 0;border-top:1px solid rgba(255,255,255,.1);border-bottom:1px solid rgba(255,255,255,.1)"><div style="font-size:16px;font-weight:500">Kam harakat</div><div style="font-size:15px;line-height:1.5;color:#B5B3AE">Reduce motion yoqilsa — 200 ms oddiy soʻnish. Tweaks’da sinab koʻring.</div></div>
+  </div>
+</section>
+
+<section data-screen-label="Brend" style="padding:120px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;background:#0A0A0B;color:#F5F4F1">
+  <div style="grid-column:span 2;grid-row:span 2;border-radius:32px;background:radial-gradient(60% 60% at 70% 20%,rgba(41,105,255,.32),transparent 70%),#000;border:1px solid rgba(255,255,255,.08);padding:48px;display:flex;flex-direction:column;justify-content:space-between;min-height:620px">
+    <div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:13px;color:#8F8D88;letter-spacing:.08em">BREND · BELGI</div>
+    <div style="display:flex;align-items:center;gap:40px">
+      <img src="logo.svg" alt="Vutric belgisi" style="width:220px;height:220px;border-radius:50px;box-shadow:0 0 0 1px rgba(255,255,255,.1),0 40px 100px -30px rgba(41,105,255,.7)">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="font-size:120px;font-weight:700;letter-spacing:-0.055em;line-height:.9">vutric</div>
+        <div style="font-size:18px;color:#B5B3AE;max-width:30ch;line-height:1.5">Qirrali «V» — tezlik va yoʻnalish. Vutric Blue bilan.</div>
+      </div>
+    </div>
+  </div>
+  <div style="border-radius:32px;background:#F2F1EE;color:#0B0B0C;padding:32px;display:flex;flex-direction:column;justify-content:space-between;min-height:298px">
+    <div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:13px;color:#6E6C67;letter-spacing:.08em">LIGHT · BONE</div>
+    <div style="display:flex;align-items:center;gap:14px"><img src="logo-mark.svg" alt="" style="width:58px;height:60px"><div style="font-size:52px;font-weight:700;letter-spacing:-0.05em">vutric</div></div>
+  </div>
+  <div style="border-radius:32px;background:linear-gradient(160deg,#4C82FF,#0B3FE0);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 20px 50px -20px rgba(41,105,255,.7);padding:32px;display:flex;flex-direction:column;justify-content:space-between;min-height:298px">
+    <div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:13px;letter-spacing:.08em">VUTRIC BLUE · #2969FF</div>
+    <div style="font-size:24px;line-height:1.25;font-weight:500;letter-spacing:-0.02em">Brend rangi. Belgi, Yuborish tugmasi va tirqish nuri uchun.</div>
+  </div>
+  <div style="grid-column:span 2;border-radius:32px;background:#141416;border:1px solid rgba(255,255,255,.08);padding:32px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px">
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="aspect-ratio:1;border-radius:18px;background:#0A0A0B;border:1px solid rgba(255,255,255,.12)"></div><div style="font-size:14px;font-weight:500">Ink</div><div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:12px;color:#8F8D88">#0A0A0B</div></div>
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="aspect-ratio:1;border-radius:18px;background:#1C1C1F"></div><div style="font-size:14px;font-weight:500">Graphite</div><div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:12px;color:#8F8D88">#1C1C1F</div></div>
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="aspect-ratio:1;border-radius:18px;background:#F2F1EE"></div><div style="font-size:14px;font-weight:500">Bone</div><div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:12px;color:#8F8D88">#F2F1EE</div></div>
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="aspect-ratio:1;border-radius:18px;background:#FF5B2E"></div><div style="font-size:14px;font-weight:500">Flare</div><div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:12px;color:#8F8D88">#FF5B2E</div></div>
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="aspect-ratio:1;border-radius:18px;background:#2BD67B"></div><div style="font-size:14px;font-weight:500">Yetdi</div><div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:12px;color:#8F8D88">#2BD67B</div></div>
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="aspect-ratio:1;border-radius:18px;background:#FF453A"></div><div style="font-size:14px;font-weight:500">Xato</div><div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:12px;color:#8F8D88">#FF453A</div></div>
+  </div>
+  <div style="grid-column:span 2;border-radius:32px;background:#141416;border:1px solid rgba(255,255,255,.08);padding:32px;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px"><div style="font-size:48px;font-weight:600;letter-spacing:-0.05em">Oting.</div><div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:12px;color:#8F8D88">Display · 48/600 · −5%</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px"><div style="font-size:28px;font-weight:600;letter-spacing:-0.035em">Rasm tayyor</div><div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:12px;color:#8F8D88">Title · 28/600</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px"><div style="font-size:17px">Yuborish uchun yuqoriga suring</div><div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:12px;color:#8F8D88">Body · 17/400</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:15px;letter-spacing:.1em">000092 · 38 ms</div><div style="font-family:'SF Mono',ui-monospace,'Geist Mono';font-size:12px;color:#8F8D88">Geist Mono · raqamlar</div></div>
+  </div>
+</section>
+
+<section data-screen-label="Mavzular" style="padding:120px 120px 40px;display:flex;flex-direction:column;gap:56px">
+  <div style="display:flex;flex-direction:column;gap:12px"><div style="font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.08em">S6 · MAVZULAR</div><div style="font-size:56px;font-weight:600;letter-spacing:-0.05em;line-height:1">9 ta mavzu — bittasi toʻliq native</div><div style="font-size:18px;color:var(--muted);max-width:64ch;line-height:1.5">Har biri rang, shrift, burchak va material bilan farq qiladi. Chapdagi ekranda yoki kichik telefonga bosib tanlang — butun sahifa oʻsha mavzuga oʻtadi.</div></div>
+  <div style="display:flex;gap:64px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px;flex:none">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S6</span>Sozlamalar → Mavzu</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px"><span style="font-size:17px;font-weight:600">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 16px 34px;gap:12px;overflow:hidden">
+          <div style="height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 4px"><div style="width:44px;height:44px;border-radius:50%;background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></div><div style="font-size:17px;font-weight:600">Mavzu</div><div style="width:44px"></div></div>
+          <div style="font-size:13px;color:var(--muted);padding:6px 16px 0;text-transform:uppercase;letter-spacing:.04em">Koʻrinish</div>
+          <div style="border-radius:var(--r-panel);background:var(--raised);overflow:hidden;display:flex;flex-direction:column">
+            <sc-for list="{{ themes }}" as="t" hint-placeholder-count="9">
+              <div onClick="{{ t.pick }}" style="height:64px;display:flex;align-items:center;gap:14px;padding:0 16px;cursor:pointer;border-bottom:.5px solid var(--line)">
+                <div style="position:relative;width:40px;height:40px;flex:none"><span style="position:absolute;inset:0;border-radius:12px;background:{{ t.a }};box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span><span style="position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:50%;background:{{ t.b }};box-shadow:0 0 0 2.5px var(--raised)"></span></div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0"><div style="font-size:16px;font-weight:500">{{ t.name }}</div><div style="font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.desc }}</div></div>
+                <sc-if value="{{ t.on }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+    <div style="flex:1;display:grid;grid-template-columns:repeat(5,216px);gap:48px 40px;align-content:start;padding-top:40px">
+      <sc-for list="{{ themes }}" as="t" hint-placeholder-count="9">
+        <div onClick="{{ t.pick }}" style="display:flex;flex-direction:column;gap:16px;cursor:pointer">
+          <div style="{{ t.vars }}"><div style="position:absolute;top:0;left:0;transform:scale(.55);transform-origin:0 0;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);font-size:14px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#2BD67B;box-shadow:0 0 0 3px rgba(43,214,123,.22)"></span>XSTUDIO<span style="color:var(--muted);font-weight:400;margin-left:-4px">· Windows</span><span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000092</span></div>
+          <div style="flex:1;display:grid;place-items:center"><div style="width:250px;height:334px;border-radius:var(--r-card);background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%);box-shadow:0 0 0 5px var(--raised),0 36px 60px -24px rgba(0,0,0,.5)"></div></div>
+          <div style="height:44px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:14px;color:var(--muted)"><div style="position:relative;width:14px;height:22px"><svg style="position:absolute;top:0;left:0;animation:vt-rise 1.6s ease-out infinite" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"></path></svg><svg style="position:absolute;top:8px;left:0;animation:vt-rise 1.6s .3s ease-out infinite" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"></path></svg></div>Yuborish uchun yuqoriga suring</div>
+          <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px">
+            <div style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">Boshqa rasm</div>
+            <div style="height:56px;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--accent-hi),var(--accent));color:var(--accent-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 0 0 .5px rgba(255,255,255,.25),0 10px 28px -10px color-mix(in srgb,var(--accent) 75%,transparent);display:flex;align-items:center;justify-content:center;gap:8px;font-size:17px;font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>Yuborish</div>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div></div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:500"><span style="width:12px;height:12px;border-radius:50%;background:{{ t.b }};box-shadow:0 0 0 1px var(--line-strong)"></span>{{ t.name }}<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">{{ t.tag }}</span></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+<section data-screen-label="S1-S2" style="padding:120px 120px 40px;display:flex;flex-direction:column;gap:56px">
+  <div style="display:flex;flex-direction:column;gap:12px"><div style="font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.08em">S1 · S2</div><div style="font-size:56px;font-weight:600;letter-spacing:-0.05em;line-height:1">Bosh ekran va ulanish</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:72px 64px;align-items:flex-start">
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S1·a</span>Bosh ekran · tayyor</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;height:44px">
+            <div style="display:flex;align-items:center;gap:10px"><img src="logo.svg" alt="" style="width:34px;height:34px;border-radius:9px"><span style="font-size:22px;font-weight:600;letter-spacing:-0.05em">vutric</span></div>
+            <div style="display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:var(--r-pill);border:1px solid var(--line-strong);font-size:14px;font-weight:500">iPhone<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg></div>
+          </div>
+          <div style="font-size:34px;line-height:1.02;font-weight:600;letter-spacing:-0.05em;margin:14px 0 6px">Nimani<br>yuboramiz?</div>
+          <div style="flex:1;position:relative;overflow:hidden;border-radius:var(--r-panel);background:radial-gradient(70% 55% at 80% 0%,color-mix(in srgb,var(--accent) 50%,transparent),transparent 70%),var(--hero);color:var(--hero-ink);padding:24px;display:flex;flex-direction:column;justify-content:flex-end">
+            <div style="position:absolute;top:0;left:20%;right:-10%;height:3px;background:linear-gradient(90deg,transparent,var(--accent),var(--accent-2));box-shadow:0 0 20px 3px color-mix(in srgb,var(--accent) 80%,transparent)"></div>
+            <div style="position:absolute;top:56px;right:58px;width:96px;height:128px;border-radius:14px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%);box-shadow:0 0 0 3px #1C1C1F,0 24px 40px -10px rgba(0,0,0,.8);transform:rotate(8deg)"></div>
+            <div style="position:absolute;top:110px;right:72px;width:96px;height:128px;border-radius:14px;border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);transform:rotate(4deg) scale(.96)"></div>
+            <div style="position:absolute;top:164px;right:86px;width:96px;height:128px;border-radius:14px;border:1.5px solid color-mix(in srgb,var(--accent) 20%,transparent);transform:rotate(0deg) scale(.92)"></div>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;position:relative">
+              <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:28px;font-weight:600;letter-spacing:-0.035em">Rasm otish</div><div style="font-size:15px;color:var(--hero-muted)">Kompyuterga yoki telefonga</div></div>
+              <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(180deg,var(--accent-hi),var(--accent));color:var(--accent-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 0 0 .5px rgba(255,255,255,.25),0 10px 28px -10px color-mix(in srgb,var(--accent) 75%,transparent);display:grid;place-items:center;box-shadow:0 10px 30px -8px color-mix(in srgb,var(--accent) 80%,transparent)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></div>
+            </div>
+          </div>
+          <div style="height:92px;border-radius:var(--r-panel);background:var(--raised);border:1px solid var(--line);padding:0 20px;display:flex;align-items:center;gap:16px">
+            <div style="width:52px;height:52px;border-radius:16px;background:var(--bg-alt);display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"></path></svg></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:3px"><div style="font-size:18px;font-weight:600;letter-spacing:-0.02em">Rasm qabul qilish</div><div style="font-size:14px;color:var(--muted)">Boshqa qurilmadan</div></div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5"><path d="M9 5l7 7-7 7"></path></svg>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div style="flex:1;height:62px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);padding:4px;display:grid;grid-template-columns:repeat(3,1fr)">
+              <div style="border-radius:var(--r-pill);background:var(--bg-alt);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--accent);font-size:10px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>Otish</div>
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"></path></svg>Qabul</div>
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>Tarix</div>
+            </div>
+            <div style="width:62px;height:62px;border-radius:50%;background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:grid;place-items:center"><img src="qr-small.svg" alt="QR" style="width:26px;height:26px"></div>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S1·b</span>Tayyorlanmoqda · QR varaq</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px;opacity:.35">
+          <div style="display:flex;align-items:center;gap:10px;height:44px"><img src="logo.svg" alt="" style="width:34px;height:34px;border-radius:9px"><span style="font-size:22px;font-weight:600;letter-spacing:-0.05em">vutric</span></div>
+          <div style="height:300px;border-radius:var(--r-panel);background:#0B0B0C"></div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:560px;border-radius:36px 36px 0 0;background:var(--raised);box-shadow:0 -20px 60px rgba(0,0,0,.18);padding:12px 24px 40px;display:flex;flex-direction:column;align-items:center;gap:18px">
+          <div style="width:40px;height:5px;border-radius:3px;background:var(--line-strong)"></div>
+          <div style="font-size:24px;font-weight:600;letter-spacing:-0.035em;margin-top:6px">Bu qurilmaning QR kodi</div>
+          <div style="font-size:15px;color:var(--muted);text-align:center;margin-top:-10px">Boshqa qurilma shuni skanerlasin</div>
+          <div style="position:relative;width:240px;height:240px;border-radius:var(--r-panel);background:#fff;padding:20px;box-shadow:0 0 0 1px var(--line)"><img src="qr-big.svg" alt="" style="width:100%;height:100%;opacity:.15"><div style="position:absolute;inset:0;display:grid;place-items:center"><span style="width:36px;height:36px;border-radius:50%;border:3px solid rgba(11,11,12,.12);border-top-color:var(--accent);animation:vt-spin .8s linear infinite"></span></div></div>
+          <div style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:var(--r-pill);background:var(--bg-alt);font-size:13px;font-weight:500"><span style="width:12px;height:12px;border-radius:50%;border:2px solid var(--line-strong);border-top-color:var(--ink);animation:vt-spin .8s linear infinite"></span>Tayyorlanmoqda…</div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S1·c</span>Ishga tushmadi</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="display:flex;align-items:center;gap:10px;height:44px"><img src="logo.svg" alt="" style="width:34px;height:34px;border-radius:9px;filter:grayscale(1)"><span style="font-size:22px;font-weight:600;letter-spacing:-0.05em">vutric</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:0 12px">
+            <div style="width:88px;height:88px;border-radius:var(--r-panel);background:rgba(229,55,44,.1);display:grid;place-items:center"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--err)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0M12 19h.01M3 3l18 18"></path></svg></div>
+            <div style="font-size:28px;font-weight:600;letter-spacing:-0.04em;line-height:1.1">Mahalliy tarmoqqa<br>ruxsat yoʻq</div>
+            <div style="font-size:15px;line-height:1.5;color:var(--muted);max-width:30ch">Vutric qurilmalarni topishi uchun ruxsat kerak. Sozlamalar → Vutric → Mahalliy tarmoq.</div>
+            <div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:6px 10px;border-radius:8px;background:var(--bg-alt)">xato: ENETUNREACH · port 47321</div>
+          </div>
+          <div style="height:56px;border-radius:var(--r-pill);background:var(--action);color:var(--action-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 22px -10px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600">Qayta urinish</div>
+          <div style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">Sozlamalarni ochish</div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S2</span>QR skaner</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:#000;color:#F5F4F1;box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;inset:0;background:radial-gradient(60% 40% at 50% 45%,#2a2a2e,#000 80%)"></div>
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600;position:relative"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 20px 34px;gap:22px;position:relative">
+          <div style="align-self:flex-start;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(20px);display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></div>
+          <div style="font-size:28px;font-weight:600;letter-spacing:-0.04em;line-height:1.1;text-align:center">Kompyuterdagi QR kodni<br>skanerlang</div>
+          <div style="position:relative;width:300px;height:300px;margin-top:20px">
+            <div style="position:absolute;inset:38px;border-radius:12px;background:#F2F1EE;padding:14px;transform:rotate(-3deg);opacity:.92"><img src="qr-big.svg" alt="" style="width:100%;height:100%"></div>
+            <div style="position:absolute;top:0;left:0;width:56px;height:56px;border-top:4px solid var(--accent);border-left:4px solid var(--accent);border-top-left-radius:28px"></div>
+            <div style="position:absolute;top:0;right:0;width:56px;height:56px;border-top:4px solid var(--accent);border-right:4px solid var(--accent);border-top-right-radius:28px"></div>
+            <div style="position:absolute;bottom:0;left:0;width:56px;height:56px;border-bottom:4px solid var(--accent);border-left:4px solid var(--accent);border-bottom-left-radius:28px"></div>
+            <div style="position:absolute;bottom:0;right:0;width:56px;height:56px;border-bottom:4px solid var(--accent);border-right:4px solid var(--accent);border-bottom-right-radius:28px"></div>
+            <div style="position:absolute;left:24px;right:24px;height:2px;background:var(--accent);box-shadow:0 0 18px 3px color-mix(in srgb,var(--accent) 80%,transparent);animation:vt-scan 2.6s ease-in-out infinite"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:10px"><div style="font-size:15px;color:#B5B3AE">Kompyuterda ishga tushiring:</div><div style="font-family:var(--mono);font-size:14px;padding:8px 14px;border-radius:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)">vutric --listen</div></div>
+          <div style="margin-top:auto;height:48px;padding:0 20px;border-radius:var(--r-pill);background:rgba(255,255,255,.1);backdrop-filter:blur(20px);display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:500"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>Havolani qoʻlda kiritish</div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:#fff;opacity:.4"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section data-screen-label="S3" style="padding:100px 120px 40px;display:flex;flex-direction:column;gap:56px">
+  <div style="display:flex;flex-direction:column;gap:12px"><div style="font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.08em">S3 · ENG MUHIM EKRAN</div><div style="font-size:56px;font-weight:600;letter-spacing:-0.05em;line-height:1">Rasm otish — 9 holat</div><div style="font-size:18px;color:var(--muted);max-width:60ch;line-height:1.5">Karta hech qachon panel ostiga kirmaydi. Natija va xato — pastda, barmoq yonida. Har ekranda bitta asosiy harakat.</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:72px 64px;align-items:flex-start">
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S3·1</span>Ulanmagan</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="height:44px;display:flex;align-items:center;justify-content:space-between"><div style="width:44px;height:44px;border-radius:50%;background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></div><div style="font-size:17px;font-weight:600">Rasm otish</div><div style="width:44px"></div></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center">
+            <div style="position:relative;width:200px;height:150px">
+              <div style="position:absolute;left:10px;bottom:0;width:62px;height:110px;border-radius:16px;border:2.5px solid var(--ink)"></div>
+              <div style="position:absolute;right:0;top:10px;width:120px;height:82px;border-radius:12px;border:2.5px solid var(--ink)"></div>
+              <div style="position:absolute;right:46px;top:92px;width:28px;height:14px;border-bottom:2.5px solid var(--ink)"></div>
+              <div style="position:absolute;left:74px;top:56px;width:60px;height:0;border-top:2.5px dashed var(--line-strong);transform:rotate(-20deg)"></div>
+            </div>
+            <div style="font-size:30px;font-weight:600;letter-spacing:-0.045em;line-height:1.05">Kompyuterga<br>ulaning</div>
+            <div style="font-size:15px;line-height:1.5;color:var(--muted);max-width:28ch">Ikkala qurilma bitta Wi-Fi tarmogʻida boʻlsin. Internet kerak emas.</div>
+          </div>
+          <div style="height:56px;border-radius:var(--r-pill);background:var(--action);color:var(--action-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 22px -10px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;gap:10px;font-size:17px;font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 12h8"></path></svg>QR kodni skanerlash</div>
+          <div style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;gap:10px;font-size:17px;font-weight:500">Tarmoqdan topish<span style="font-family:var(--mono);font-size:11px;padding:3px 7px;border-radius:var(--r-pill);background:var(--bg-alt);color:var(--muted)">Android</span></div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S3·2</span>Ulanmoqda</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="height:44px;display:flex;align-items:center;justify-content:space-between"><div style="width:44px;height:44px;border-radius:50%;background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></div><div style="font-size:17px;font-weight:600">Rasm otish</div><div style="width:44px"></div></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;text-align:center">
+            <div style="position:relative;width:180px;height:180px;display:grid;place-items:center">
+              <div style="position:absolute;inset:0;border-radius:50%;border:2px solid color-mix(in srgb,var(--accent) 35%,transparent);animation:vt-breathe 2s ease-in-out infinite"></div>
+              <div style="position:absolute;inset:28px;border-radius:50%;border:2px solid color-mix(in srgb,var(--accent) 60%,transparent);animation:vt-breathe 2s .3s ease-in-out infinite"></div>
+              <img src="logo.svg" alt="" style="width:72px;height:72px;border-radius:18px;position:relative">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:28px;font-weight:600;letter-spacing:-0.04em">XSTUDIO’ga ulanmoqda</div><div style="font-family:var(--mono);font-size:13px;color:var(--muted)">192.168.1.24 · kalit almashinuvi</div></div>
+            <div style="position:relative;width:220px;height:4px;border-radius:2px;background:var(--line);overflow:hidden"><div style="position:absolute;top:0;width:40%;height:100%;border-radius:2px;background:var(--accent);animation:vt-bar 1.3s ease-in-out infinite"></div></div>
+          </div>
+          <div style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">Bekor qilish</div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S3·3</span>Ulangan, rasm yoʻq</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);font-size:14px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#2BD67B;box-shadow:0 0 0 3px rgba(43,214,123,.22)"></span>XSTUDIO<span style="color:var(--muted);font-weight:400;margin-left:-4px">· Windows</span><span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000092</span></div>
+          <div style="flex:1;margin:12px 16px;border-radius:var(--r-panel);border:2px dashed var(--line-strong);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center">
+            <div style="width:72px;height:72px;border-radius:var(--r-card);background:var(--raised);box-shadow:0 10px 30px -12px rgba(0,0,0,.25);display:grid;place-items:center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M3 16l5-5 4 4 3-3 6 6"></path><circle cx="16" cy="9" r="1.6"></circle></svg></div>
+            <div style="font-size:26px;font-weight:600;letter-spacing:-0.04em">Rasm tanlang</div>
+            <div style="font-size:15px;color:var(--muted)">Galereyadan yoki kameradan</div>
+          </div>
+          <div style="height:56px;border-radius:var(--r-pill);background:var(--action);color:var(--action-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 22px -10px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600">Galereyani ochish</div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S3·4</span>Rasm tayyor</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);font-size:14px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#2BD67B;box-shadow:0 0 0 3px rgba(43,214,123,.22)"></span>XSTUDIO<span style="color:var(--muted);font-weight:400;margin-left:-4px">· Windows</span><span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000092</span></div>
+          <div style="flex:1;display:grid;place-items:center"><div style="width:250px;height:334px;border-radius:var(--r-card);background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%);box-shadow:0 0 0 5px var(--raised),0 36px 60px -24px rgba(0,0,0,.5)"></div></div>
+          <div style="height:44px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:14px;color:var(--muted)"><div style="position:relative;width:14px;height:22px"><svg style="position:absolute;top:0;left:0;animation:vt-rise 1.6s ease-out infinite" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"></path></svg><svg style="position:absolute;top:8px;left:0;animation:vt-rise 1.6s .3s ease-out infinite" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"></path></svg></div>Yuborish uchun yuqoriga suring</div>
+          <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px">
+            <div style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">Boshqa rasm</div>
+            <div style="height:56px;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--accent-hi),var(--accent));color:var(--accent-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 0 0 .5px rgba(255,255,255,.25),0 10px 28px -10px color-mix(in srgb,var(--accent) 75%,transparent);display:flex;align-items:center;justify-content:center;gap:8px;font-size:17px;font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>Yuborish</div>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S3·5</span>Sudrash paytida</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:0;left:0;right:0;height:260px;background:radial-gradient(60% 70% at 50% 0%,color-mix(in srgb,var(--accent) 45%,transparent),color-mix(in srgb,var(--accent) 10%,transparent) 55%,transparent 75%);animation:vt-glow 1.4s ease-in-out infinite"></div>
+        <div style="position:absolute;top:0;left:12%;right:12%;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,var(--accent) 20%,var(--accent-2) 50%,var(--accent) 80%,transparent);box-shadow:0 0 24px 4px color-mix(in srgb,var(--accent) 80%,transparent);z-index:5"></div>
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600;position:relative"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px;position:relative">
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);font-size:14px;font-weight:500;opacity:.5"><span style="width:8px;height:8px;border-radius:50%;background:#2BD67B"></span>XSTUDIO<span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000092</span></div>
+          <div style="position:absolute;top:66px;left:0;right:0;text-align:center;font-size:14px;font-weight:600;color:var(--accent);z-index:6">Qoʻyib yuboring</div>
+          <div style="flex:1;position:relative">
+            <div style="position:absolute;left:50%;top:150px;width:250px;height:334px;margin-left:-125px;border-radius:var(--r-card);border:1.5px solid color-mix(in srgb,var(--accent) 25%,transparent);transform:translate(12px,0) rotate(-1deg)"></div>
+            <div style="position:absolute;left:50%;top:150px;width:250px;height:334px;margin-left:-125px;border-radius:var(--r-card);border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);transform:translate(24px,-46px) rotate(-3deg) scale(.96)"></div>
+            <div style="position:absolute;left:50%;top:150px;width:250px;height:334px;margin-left:-125px;border-radius:var(--r-card);background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%);box-shadow:0 0 0 5px var(--raised),0 50px 80px -24px rgba(0,0,0,.6);transform:translate(36px,-110px) rotate(-6deg) scale(.9);z-index:10"></div>
+            <div style="position:absolute;left:220px;top:420px;width:54px;height:54px;border-radius:50%;background:rgba(11,11,12,.12);border:2px solid rgba(11,11,12,.25);z-index:11"></div>
+          </div>
+          <div style="height:56px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--muted)">dy −118 px · ogʻish −6° · 90%</div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S3·6</span>Uchib ketdi · kutilmoqda</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:0;left:12%;right:12%;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,var(--accent) 20%,var(--accent-2) 50%,var(--accent) 80%,transparent);box-shadow:0 0 24px 4px color-mix(in srgb,var(--accent) 80%,transparent);z-index:5;opacity:.6"></div>
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="position:absolute;left:150px;top:-150px;width:180px;height:240px;border-radius:18px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%);box-shadow:0 0 0 4px var(--raised),0 30px 60px -20px rgba(0,0,0,.6);transform:rotate(10deg);z-index:10"></div>
+        <div style="position:absolute;left:190px;top:80px;width:3px;height:240px;border-radius:3px;background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 70%,transparent),transparent);transform:rotate(14deg);z-index:9"></div>
+        <div style="position:absolute;left:250px;top:60px;width:2px;height:180px;border-radius:2px;background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 40%,transparent),transparent);transform:rotate(14deg);z-index:9"></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);font-size:14px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#2BD67B;box-shadow:0 0 0 3px rgba(43,214,123,.22)"></span>XSTUDIO<span style="color:var(--muted);font-weight:400;margin-left:-4px">· Windows</span><span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000092</span></div>
+          <div style="flex:1"></div>
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 16px 0 12px;border-radius:var(--r-pill);background:var(--raised);border:1px solid var(--line-strong);font-size:14px;font-weight:500"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--line-strong);border-top-color:var(--accent);animation:vt-spin .7s linear infinite"></span>Yuborilmoqda…</div>
+          <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px;opacity:.4">
+            <div style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">Boshqa rasm</div>
+            <div style="height:56px;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--accent-hi),var(--accent));color:var(--accent-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 0 0 .5px rgba(255,255,255,.25),0 10px 28px -10px color-mix(in srgb,var(--accent) 75%,transparent);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600">Yuborish</div>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S3·7</span>Yetib bordi</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);font-size:14px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#2BD67B;box-shadow:0 0 0 3px rgba(43,214,123,.22)"></span>XSTUDIO<span style="color:var(--muted);font-weight:400;margin-left:-4px">· Windows</span><span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000092</span></div>
+          <div style="flex:1;display:grid;place-items:center"><div style="width:250px;height:334px;border-radius:var(--r-card);background:linear-gradient(180deg,#9fd0ec 0%,#d9eef7 45%,#2a7aa8 46%,#134e78 100%);box-shadow:0 0 0 5px var(--raised),0 36px 60px -24px rgba(0,0,0,.5);transform:translateY(24px) scale(.97)"></div></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+            <div style="display:inline-flex;align-items:center;gap:10px;height:44px;padding:0 18px 0 10px;border-radius:var(--r-pill);background:rgba(20,163,90,.12);border:1px solid rgba(20,163,90,.35);font-size:15px;font-weight:500"><span style="width:26px;height:26px;border-radius:50%;background:var(--ok);display:grid;place-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>Yetib bordi · <span style="font-family:var(--mono)">38 ms</span></div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="width:36px;height:36px;border-radius:10px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%)"></span>
+              <span style="width:36px;height:36px;border-radius:10px;background:radial-gradient(60% 50% at 30% 30%,#9fc77a,transparent 70%),linear-gradient(160deg,#4f7a3e,#1e3d2a)"></span>
+              <span style="width:36px;height:36px;border-radius:10px;background:linear-gradient(180deg,#f6e4c2 0%,#e9c99a 50%,#c99b6a 51%,#a8784d 100%)"></span>
+              <span style="width:36px;height:36px;border-radius:10px;background:linear-gradient(180deg,#f0b77d 0%,#d58d6d 50%,#2a2f4f 51%,#161a30 100%)"></span>
+              <span style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:4px">4 ta · 41 ms oʻrt.</span>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px">
+            <div style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">Boshqa rasm</div>
+            <div style="height:56px;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--accent-hi),var(--accent));color:var(--accent-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 0 0 .5px rgba(255,255,255,.25),0 10px 28px -10px color-mix(in srgb,var(--accent) 75%,transparent);display:flex;align-items:center;justify-content:center;gap:8px;font-size:17px;font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>Yuborish</div>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S3·8</span>Rad etildi</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);font-size:14px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#2BD67B;box-shadow:0 0 0 3px rgba(43,214,123,.22)"></span>XSTUDIO<span style="color:var(--muted);font-weight:400;margin-left:-4px">· Windows</span><span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000092</span></div>
+          <div style="flex:1;display:grid;place-items:center"><div style="width:250px;height:334px;border-radius:var(--r-card);background:radial-gradient(60% 50% at 30% 30%,#9fc77a,transparent 70%),linear-gradient(160deg,#4f7a3e,#1e3d2a);box-shadow:0 0 0 5px var(--raised),0 36px 60px -24px rgba(0,0,0,.5);transform:rotate(-2deg)"></div></div>
+          <div style="border-radius:var(--r-card);background:var(--raised);border:1px solid rgba(229,55,44,.3);padding:16px 18px;display:flex;gap:14px;align-items:flex-start">
+            <span style="flex:none;width:28px;height:28px;border-radius:50%;background:var(--err);color:#fff;display:grid;place-items:center;font-size:15px;font-weight:700">!</span>
+            <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:16px;font-weight:600">Kompyuter rasmni qabul qilmadi</div><div style="font-size:14px;line-height:1.45;color:var(--muted)">XSTUDIO’da «Rad etish» bosildi. Sessiya saqlandi — yana otishingiz mumkin.</div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px">
+            <div style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">Boshqa rasm</div>
+            <div style="height:56px;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--accent-hi),var(--accent));color:var(--accent-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 0 0 .5px rgba(255,255,255,.25),0 10px 28px -10px color-mix(in srgb,var(--accent) 75%,transparent);display:flex;align-items:center;justify-content:center;gap:8px;font-size:17px;font-weight:600">Yana otish</div>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S3·9</span>Javob yoʻq · aloqa uzildi</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 14px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);font-size:14px;font-weight:500;color:var(--muted)"><span style="width:8px;height:8px;border-radius:50%;background:var(--line-strong)"></span>XSTUDIO · uzildi</div>
+          <div style="flex:1;display:grid;place-items:center"><div style="width:250px;height:334px;border-radius:var(--r-card);background:linear-gradient(180deg,#f6e4c2 0%,#e9c99a 50%,#c99b6a 51%,#a8784d 100%);box-shadow:0 0 0 5px var(--raised),0 36px 60px -24px rgba(0,0,0,.5);filter:grayscale(.7);opacity:.6"></div></div>
+          <div style="border-radius:var(--r-card);background:var(--raised);border:1px solid rgba(229,55,44,.3);padding:16px 18px;display:flex;gap:14px;align-items:flex-start">
+            <span style="flex:none;width:28px;height:28px;border-radius:50%;background:var(--err);color:#fff;display:grid;place-items:center;font-size:15px;font-weight:700">!</span>
+            <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:16px;font-weight:600">Javob yoʻq (5 s)</div><div style="font-size:14px;line-height:1.45;color:var(--muted)">Kompyuter uxlab qolgan yoki boshqa Wi-Fi’ga oʻtgan boʻlishi mumkin.</div></div>
+          </div>
+          <div style="height:56px;border-radius:var(--r-pill);background:var(--action);color:var(--action-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 22px -10px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;gap:10px;font-size:17px;font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"></path></svg>Qayta ulanish</div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section data-screen-label="S4" style="padding:100px 120px 40px;display:flex;flex-direction:column;gap:56px">
+  <div style="display:flex;flex-direction:column;gap:12px"><div style="font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.08em">S4</div><div style="font-size:56px;font-weight:600;letter-spacing:-0.05em;line-height:1">Rasm qabul qilish</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:72px 64px;align-items:flex-start">
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S4·1</span>Tanlov</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="height:44px;display:flex;align-items:center;justify-content:space-between"><div style="width:44px;height:44px;border-radius:50%;background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></div><div style="font-size:17px;font-weight:600">Qabul qilish</div><div style="width:44px"></div></div>
+          <div style="font-size:34px;line-height:1.02;font-weight:600;letter-spacing:-0.05em;margin:18px 0 10px">Qanday<br>ulanamiz?</div>
+          <div style="border-radius:var(--r-panel);background:var(--raised);border:1px solid var(--line);padding:22px;display:flex;flex-direction:column;gap:18px">
+            <div style="width:56px;height:56px;border-radius:18px;background:var(--bg-alt);display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 12h8"></path></svg></div>
+            <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:20px;font-weight:600;letter-spacing:-0.02em">Kompyuter QR kodini skanerlash</div><div style="font-size:14px;color:var(--muted);line-height:1.45">Kompyuterdagi Vutric oynasidan</div></div>
+          </div>
+          <div style="border-radius:var(--r-panel);background:var(--raised);border:1px solid var(--line);padding:22px;display:flex;flex-direction:column;gap:18px">
+            <div style="width:56px;height:56px;border-radius:18px;background:var(--bg-alt);display:grid;place-items:center"><img src="qr-small.svg" alt="" style="width:28px;height:28px;border-radius:4px"></div>
+            <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:20px;font-weight:600;letter-spacing:-0.02em">Kutish: QR kodimni skanerlashsin</div><div style="font-size:14px;color:var(--muted);line-height:1.45">Boshqa telefon sizga otadi</div></div>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S4·2</span>Kutish · mening QR kodim</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 20px 34px;gap:20px;text-align:center">
+          <div style="font-size:28px;font-weight:600;letter-spacing:-0.04em;line-height:1.1;margin-top:30px">Shu kodni<br>skanerlashsin</div>
+          <div style="font-size:15px;color:var(--muted);margin-top:-8px">Boshqa qurilmada: Vutric → Rasm otish</div>
+          <div style="flex:1;display:grid;place-items:center">
+            <div style="position:relative;width:292px;height:292px;border-radius:36px;background:#fff;padding:26px;box-shadow:0 0 0 1px var(--line),0 40px 80px -30px color-mix(in srgb,var(--accent) 45%,transparent)">
+              <img src="qr-big.svg" alt="" style="width:100%;height:100%">
+              <img src="logo.svg" alt="" style="position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:13px;box-shadow:0 0 0 6px #fff">
+            </div>
+          </div>
+          <div style="display:inline-flex;align-items:center;gap:10px;font-size:15px;font-weight:500">iPhone<span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000417</span></div>
+          <div style="align-self:stretch;height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">Bekor qilish</div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S4·3</span>Ulangan, kutilmoqda</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:0;left:12%;right:12%;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,var(--accent) 20%,var(--accent-2) 50%,var(--accent) 80%,transparent);box-shadow:0 0 24px 4px color-mix(in srgb,var(--accent) 60%,transparent);animation:vt-glow 3s ease-in-out infinite"></div>
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);font-size:14px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#2BD67B;box-shadow:0 0 0 3px rgba(43,214,123,.22)"></span>Pixel 9<span style="color:var(--muted);font-weight:400;margin-left:-4px">· Android</span><span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000417</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px">
+            <div style="position:relative;width:250px;height:334px;display:grid;place-items:center">
+              <div style="position:absolute;inset:0;border-radius:var(--r-card);border:2px dashed var(--line-strong)"></div>
+              <div style="position:absolute;inset:24px;border-radius:18px;background:var(--raised);animation:vt-breathe 3.2s ease-in-out infinite"></div>
+              <svg style="position:relative" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"></path></svg>
+            </div>
+            <div style="font-size:22px;font-weight:600;letter-spacing:-0.03em">Rasm kutilmoqda…</div>
+          </div>
+          <div style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">Uzish</div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S4·4</span>Rasm keldi</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:0;left:0;right:0;height:200px;background:radial-gradient(50% 60% at 40% 0%,color-mix(in srgb,var(--accent) 35%,transparent),transparent 75%)"></div>
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600;position:relative"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px;position:relative">
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);font-size:14px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#2BD67B;box-shadow:0 0 0 3px rgba(43,214,123,.22)"></span>Pixel 9<span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000417</span></div>
+          <div style="flex:1;position:relative">
+            <div style="position:absolute;left:50%;top:60px;width:250px;height:334px;margin-left:-125px;border-radius:var(--r-card);border:1.5px solid color-mix(in srgb,var(--accent) 18%,transparent);transform:translate(-50px,-150px) rotate(-14deg) scale(.86)"></div>
+            <div style="position:absolute;left:50%;top:60px;width:250px;height:334px;margin-left:-125px;border-radius:var(--r-card);border:1.5px solid color-mix(in srgb,var(--accent) 38%,transparent);transform:translate(-24px,-70px) rotate(-8deg) scale(.93)"></div>
+            <div style="position:absolute;left:50%;top:60px;width:250px;height:334px;margin-left:-125px;border-radius:var(--r-card);background:radial-gradient(60% 50% at 30% 30%,#9fc77a,transparent 70%),linear-gradient(160deg,#4f7a3e,#1e3d2a);box-shadow:0 0 0 5px var(--raised),0 40px 70px -24px rgba(0,0,0,.55);transform:rotate(-2deg)"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="font-size:17px;font-weight:600">3 ta rasm keldi</div><div style="font-family:var(--mono);font-size:12px;color:var(--muted)">ekranda 12 ms · IMG_2041.jpg</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">Ulashish</div>
+            <div style="height:56px;border-radius:var(--r-pill);background:var(--action);color:var(--action-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 22px -10px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600">Saqlash</div>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;width:393px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500"><span style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 9px;border:1px solid var(--line-strong);border-radius:var(--r-pill)">S4·5</span>Aloqa uzildi</div>
+      <div style="position:relative;width:393px;height:852px;border-radius:55px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px #0d0d0f,0 0 0 11.5px #6b6b70,0 0 0 12.5px #2a2a2d,0 50px 90px -40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+        <div style="position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:4"></div>
+        <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-size:16px;font-weight:600"><span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"></rect><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"></rect><rect x="10" y="3" width="3.2" height="9" rx="1"></rect><rect x="15" y="0" width="3.2" height="12" rx="1"></rect></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"></rect><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".45"></path></svg></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 20px 34px;gap:14px">
+          <div style="align-self:center;display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 14px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);font-size:14px;font-weight:500;color:var(--muted)"><span style="width:8px;height:8px;border-radius:50%;background:var(--line-strong)"></span>Pixel 9 · uzildi</div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center">
+            <div style="width:88px;height:88px;border-radius:var(--r-panel);background:rgba(229,55,44,.1);display:grid;place-items:center"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--err)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1M4 4l16 16"></path></svg></div>
+            <div style="font-size:28px;font-weight:600;letter-spacing:-0.04em">Aloqa uzildi</div>
+            <div style="font-size:15px;line-height:1.5;color:var(--muted);max-width:28ch">3 ta rasm saqlandi. Qayta ulanib, qolganini olishingiz mumkin.</div>
+          </div>
+          <div style="height:56px;border-radius:var(--r-pill);background:var(--action);color:var(--action-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 22px -10px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;gap:10px;font-size:17px;font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"></path></svg>Qayta ulanish</div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.35"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section data-screen-label="macOS" style="padding:100px 120px 40px;display:flex;flex-direction:column;gap:56px">
+  <div style="display:flex;flex-direction:column;gap:12px"><div style="font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.08em">macOS 26 · QABUL QILUVCHI</div><div style="font-size:56px;font-weight:600;letter-spacing:-0.05em;line-height:1">Notch ochiladi — rasm tushadi</div><div style="font-size:18px;color:var(--muted);max-width:62ch;line-height:1.5">Notch ostidan Liquid Glass orol chiqadi, rasm otilgan burchak bilan ekranga tushadi, 1.4 s turadi va menyu satridagi Vutric belgisiga qaytadi.</div></div>
+  <div style="width:1520px;padding:18px 18px 0;border-radius:36px 36px 0 0;background:#0d0d0f;box-shadow:0 0 0 1.5px #3a3a3e,0 80px 140px -50px rgba(0,0,0,.7)">
+  <div style="position:relative;width:1484px;height:928px;border-radius:20px 20px 0 0;overflow:hidden;background:radial-gradient(70% 60% at 20% 90%,#3b5b8f,transparent 70%),radial-gradient(60% 60% at 85% 20%,#8f4a6a,transparent 70%),radial-gradient(50% 50% at 55% 60%,#d98a5c,transparent 70%),#1a1d2e;color:#fff">
+    <div style="position:absolute;top:0;left:0;right:0;height:34px;background:rgba(255,255,255,.12);backdrop-filter:blur(30px) saturate(180%);display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:13.5px;font-weight:500;z-index:3">
+      <div style="display:flex;gap:22px;align-items:center"><span style="font-weight:700">Finder</span><span>Fayl</span><span>Tahrir</span><span>Koʻrinish</span><span>Oyna</span></div>
+      <div style="display:flex;gap:16px;align-items:center"><img src="logo.svg" alt="" style="width:18px;height:18px;border-radius:5px;box-shadow:0 0 0 1.5px color-mix(in srgb,var(--accent) 90%,transparent)"><svg width="17" height="12" viewBox="0 0 17 12" fill="#fff"><path d="M8.5 2.3c2.4 0 4.6.9 6.3 2.5l1.2-1.2A10.6 10.6 0 0 0 8.5.6 10.6 10.6 0 0 0 1 3.6l1.2 1.2a8.9 8.9 0 0 1 6.3-2.5Zm0 3.4c1.5 0 2.8.5 3.9 1.5l1.2-1.2a7.2 7.2 0 0 0-10.2 0l1.2 1.2c1.1-1 2.4-1.5 3.9-1.5Zm0 3.4c.6 0 1.1.2 1.5.6L8.5 11.2 7 9.7c.4-.4.9-.6 1.5-.6Z"></path></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="#fff" opacity=".5"></rect><rect x="2" y="2" width="17" height="9" rx="2.5" fill="#fff"></rect></svg><span>Chor 18-noy 9:41</span></div>
+    </div>
+    <div style="position:absolute;top:0;left:50%;margin-left:-250px;width:500px;height:118px;border-radius:0 0 40px 40px;background:#000;z-index:5;box-shadow:0 20px 60px -10px color-mix(in srgb,var(--accent) 55%,transparent),0 0 0 1px color-mix(in srgb,var(--accent) 25%,transparent);display:flex;align-items:flex-end;padding:0 18px 16px;gap:14px">
+      <div style="width:56px;height:56px;border-radius:14px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%)"></div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:3px"><div style="font-size:15px;font-weight:600">iPhone’dan rasm</div><div style="font-family:var(--mono);font-size:12px;color:rgba(235,235,245,.6)">IMG_2041.jpg · 38 ms</div></div>
+      <div style="position:relative;width:120px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);align-self:center;overflow:hidden"><div style="position:absolute;inset:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:2px"></div></div>
+    </div>
+    <div style="position:absolute;top:118px;left:50%;margin-left:-180px;width:360px;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,var(--accent) 20%,var(--accent-2) 50%,var(--accent) 80%,transparent);box-shadow:0 0 36px 6px color-mix(in srgb,var(--accent) 70%,transparent);z-index:4"></div>
+    <div style="position:absolute;left:50%;top:200px;width:380px;height:500px;margin-left:-190px;border-radius:20px;border:1.5px solid color-mix(in srgb,var(--accent) 35%,transparent);transform:translate(-30px,-80px) rotate(-6deg) scale(.88)"></div>
+    <div style="position:absolute;left:50%;top:200px;width:380px;height:500px;margin-left:-190px;border-radius:20px;border:1.5px solid color-mix(in srgb,var(--accent) 60%,transparent);transform:translate(-14px,-36px) rotate(-3deg) scale(.94)"></div>
+    <div style="position:absolute;left:50%;top:200px;width:380px;height:500px;margin-left:-190px;border-radius:20px;background:radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%);box-shadow:0 0 0 6px rgba(255,255,255,.92),0 60px 100px -30px rgba(0,0,0,.9);transform:rotate(-1deg)"></div>
+    <div style="position:absolute;right:14px;top:46px;width:360px;border-radius:var(--r-card);background:rgba(255,255,255,.18);backdrop-filter:blur(40px) saturate(180%);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5),inset 0 0 0 .5px rgba(255,255,255,.2),0 20px 50px -20px rgba(0,0,0,.6);padding:14px;display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;z-index:3">
+      <img src="logo.svg" alt="" style="width:40px;height:40px;border-radius:10px">
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><div style="font-size:14px;font-weight:600">Vutric</div><div style="font-size:13px;color:rgba(255,255,255,.8)">iPhone’dan 3 ta rasm keldi</div></div>
+      <div style="width:44px;height:44px;border-radius:9px;background:radial-gradient(60% 50% at 30% 30%,#9fc77a,transparent 70%),linear-gradient(160deg,#4f7a3e,#1e3d2a)"></div>
+    </div>
+    <div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);height:76px;padding:0 10px;border-radius:26px;background:rgba(255,255,255,.16);backdrop-filter:blur(40px) saturate(180%);box-shadow:inset 0 .5px 0 rgba(255,255,255,.5),inset 0 0 0 .5px rgba(255,255,255,.2),0 20px 50px -20px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px">
+      <span style="width:56px;height:56px;border-radius:14px;background:linear-gradient(180deg,#6fc3ff,#1a7cf0)"></span><span style="width:56px;height:56px;border-radius:14px;background:linear-gradient(180deg,#fff,#e5e5ea)"></span><span style="width:56px;height:56px;border-radius:14px;background:linear-gradient(180deg,#8ee88e,#2fb84a)"></span><span style="width:56px;height:56px;border-radius:14px;background:linear-gradient(180deg,#ffd36b,#ff9f0a)"></span>
+      <span style="width:1px;height:44px;background:rgba(255,255,255,.3)"></span>
+      <div style="position:relative"><img src="logo.svg" alt="Vutric" style="width:56px;height:56px;border-radius:14px"><span style="position:absolute;bottom:-7px;left:50%;margin-left:-2px;width:4px;height:4px;border-radius:50%;background:#fff"></span></div>
+    </div>
+  </div>
+  </div>
+</section>
+
+<section data-screen-label="Komponentlar" style="padding:100px 120px 140px;display:flex;flex-direction:column;gap:48px">
+  <div style="display:flex;flex-direction:column;gap:12px"><div style="font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.08em">S5 · FLUTTER’GA</div><div style="font-size:56px;font-weight:600;letter-spacing:-0.05em;line-height:1">Komponentlar va oʻlchamlar</div></div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;max-width:1700px">
+    <div style="border-radius:var(--r-panel);background:var(--raised);border:1px solid var(--line);padding:32px;display:flex;flex-direction:column;gap:22px">
+      <div style="font-size:20px;font-weight:600;letter-spacing:-0.02em">Qurilma pill’i</div>
+      <div style="display:inline-flex;align-self:flex-start;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:var(--r-pill);background:var(--bg);border:1px solid var(--line);font-size:14px;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#2BD67B;box-shadow:0 0 0 3px rgba(43,214,123,.22)"></span>XSTUDIO<span style="color:var(--muted);font-weight:400;margin-left:-4px">· Windows</span><span style="font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:var(--r-pill);background:var(--bg-alt);letter-spacing:.1em">000092</span></div>
+      <div style="display:inline-flex;align-self:flex-start;align-items:center;gap:10px;height:40px;padding:0 14px;border-radius:var(--r-pill);background:var(--bg);border:1px solid var(--line);font-size:14px;font-weight:500;color:var(--muted)"><span style="width:8px;height:8px;border-radius:50%;background:var(--line-strong)"></span>XSTUDIO · uzildi</div>
+      <div style="font-family:var(--mono);font-size:12px;line-height:1.8;color:var(--muted)">h 40 · pad 14/6 · r full · gap 10<br>nuqta 8 + halo 3 · kod: mono 12, tracking .1em</div>
+    </div>
+    <div style="border-radius:var(--r-panel);background:var(--raised);border:1px solid var(--line);padding:32px;display:flex;flex-direction:column;gap:22px">
+      <div style="font-size:20px;font-weight:600;letter-spacing:-0.02em">Natija pill’i</div>
+      <div style="display:inline-flex;align-self:flex-start;align-items:center;gap:10px;height:40px;padding:0 16px 0 8px;border-radius:var(--r-pill);background:rgba(20,163,90,.12);border:1px solid rgba(20,163,90,.35);font-size:14px;font-weight:500"><span style="width:24px;height:24px;border-radius:50%;background:var(--ok);display:grid;place-items:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>Yetib bordi · <span style="font-family:var(--mono)">38 ms</span></div>
+      <div style="display:inline-flex;align-self:flex-start;align-items:center;gap:10px;height:40px;padding:0 16px 0 12px;border-radius:var(--r-pill);background:var(--bg);border:1px solid var(--line-strong);font-size:14px;font-weight:500"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--line-strong);border-top-color:var(--accent);animation:vt-spin .7s linear infinite"></span>Yuborilmoqda…</div>
+      <div style="display:inline-flex;align-self:flex-start;align-items:center;gap:10px;height:40px;padding:0 16px 0 8px;border-radius:var(--r-pill);background:rgba(229,55,44,.1);border:1px solid rgba(229,55,44,.35);font-size:14px;font-weight:500"><span style="width:24px;height:24px;border-radius:50%;background:var(--err);color:#fff;display:grid;place-items:center;font-weight:700">!</span>Qabul qilinmadi</div>
+      <div style="font-family:var(--mono);font-size:12px;line-height:1.8;color:var(--muted)">h 40 · r full · ikon 24 · fon: rang 12% + chiziq 35%</div>
+    </div>
+    <div style="border-radius:var(--r-panel);background:var(--raised);border:1px solid var(--line);padding:32px;display:flex;flex-direction:column;gap:22px">
+      <div style="font-size:20px;font-weight:600;letter-spacing:-0.02em">Rasm kartasi · tugmalar</div>
+      <div style="display:flex;gap:20px;align-items:flex-end">
+        <div style="width:96px;height:128px;border-radius:var(--r-card);background:linear-gradient(180deg,#9fd0ec 0%,#d9eef7 45%,#2a7aa8 46%,#134e78 100%);box-shadow:0 0 0 5px var(--bg),0 20px 40px -16px rgba(0,0,0,.5)"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:10px">
+          <div style="height:56px;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--accent-hi),var(--accent));color:var(--accent-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 0 0 .5px rgba(255,255,255,.25),0 10px 28px -10px color-mix(in srgb,var(--accent) 75%,transparent);display:grid;place-items:center;font-size:17px;font-weight:600">Yuborish</div>
+          <div style="height:56px;border-radius:var(--r-pill);background:var(--action);color:var(--action-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 22px -10px rgba(0,0,0,.45);display:grid;place-items:center;font-size:17px;font-weight:600">Asosiy</div>
+          <div style="height:56px;border-radius:var(--r-pill);background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:var(--glass-shadow);display:grid;place-items:center;font-size:17px;font-weight:500">Ikkilamchi</div>
+        </div>
+      </div>
+      <div style="font-family:var(--mono);font-size:12px;line-height:1.8;color:var(--muted)">karta 250×334 · r 22 · ramka 5 · soya 0 36 60 −24<br>tugma h 56 · r full · 17/600 · Flare faqat Yuborish</div>
+    </div>
+  </div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ios&quot;,&quot;ios-dark&quot;,&quot;flare&quot;,&quot;paper&quot;,&quot;midnight&quot;,&quot;forest&quot;,&quot;terminal&quot;,&quot;blush&quot;,&quot;signal&quot;],&quot;default&quot;:&quot;ios&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Mavzu&quot;},&quot;outcome&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Yetib bordi&quot;,&quot;Rad etildi&quot;,&quot;Javob yoʻq&quot;],&quot;default&quot;:&quot;Yetib bordi&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototip&quot;},&quot;motion&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Toʻliq&quot;,&quot;Kam (reduced)&quot;],&quot;default&quot;:&quot;Toʻliq&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototip&quot;}}">
+class Component extends DCLogic {
+  state = { phase: 'ready', ms: 38, photo: 0, sent: [], theme: null };
+  SF = "-apple-system,BlinkMacSystemFont,'SF Pro Text',Geist,system-ui,sans-serif";
+  SFM = "'SF Mono',ui-monospace,Menlo,'Geist Mono',monospace";
+  GE = "Geist,-apple-system,system-ui,sans-serif";
+  GM = "'Geist Mono','SF Mono',ui-monospace,monospace";
+  GL = 'inset 0 .5px 0 rgba(255,255,255,.95),inset 0 0 0 .5px rgba(255,255,255,.6),0 0 0 .5px rgba(0,0,0,.06),0 8px 24px -8px rgba(0,0,0,.16)';
+  GD = 'inset 0 .5px 0 rgba(255,255,255,.3),inset 0 0 0 .5px rgba(255,255,255,.14),0 8px 24px -8px rgba(0,0,0,.6)';
+  THEMES = [
+    { id: 'ios', name: 'iOS Native', tag: 'Yorugʻ', desc: 'Liquid Glass, SF Pro, tizim ranglari', v: ['#F2F2F7','rgba(118,118,128,.12)','#FFFFFF','#000000','rgba(60,60,67,.6)','rgba(60,60,67,.12)','rgba(60,60,67,.22)','#007AFF','#FFFFFF','#007AFF','#3395FF','#9CD0FF','#FFFFFF','#1C1C1E','#FFFFFF','rgba(235,235,245,.6)','rgba(255,255,255,.62)',this.GL,'#E5E5EA','#34C759','#FF3B30',this.SF,this.SFM,'999px','22px','26px'] },
+    { id: 'ios-dark', name: 'iOS Native', tag: 'Tun', desc: 'Tizim qorongʻi rejimi, OLED qora', v: ['#000000','rgba(118,118,128,.24)','#1C1C1E','#FFFFFF','rgba(235,235,245,.6)','rgba(84,84,88,.35)','rgba(84,84,88,.6)','#0A84FF','#FFFFFF','#0A84FF','#409CFF','#9CD0FF','#FFFFFF','#1C1C1E','#FFFFFF','rgba(235,235,245,.6)','rgba(255,255,255,.1)',this.GD,'#0B0B0C','#30D158','#FF453A',this.SF,this.SFM,'999px','22px','26px'] },
+    { id: 'flare', name: 'Flare', tag: 'Vutric', desc: 'Qora va toʻq sariq — brend mavzusi', v: ['#0A0A0B','#1A1A1D','#1C1C1F','#F5F4F1','#8F8D88','rgba(255,255,255,.08)','rgba(255,255,255,.16)','#F5F4F1','#0B0B0C','#FF5B2E','#FF7A50','#FFD9A8','#0B0B0C','#000000','#F5F4F1','#B5B3AE','rgba(255,255,255,.07)',this.GD,'#050505','#2BD67B','#FF453A',this.GE,this.GM,'999px','22px','28px'] },
+    { id: 'paper', name: 'Paper', tag: 'Serif', desc: 'Gazeta qogʻozi, serif, oʻtkir burchak', v: ['#F4F0E8','#E9E3D7','#FBF9F4','#1A1814','#6B655A','rgba(26,24,20,.1)','rgba(26,24,20,.28)','#1A1814','#FBF9F4','#C8361C','#D9502F','#F0B9A6','#FBF9F4','#1A1814','#F4F0E8','#B5AE9F','#FBF9F4','0 0 0 1px rgba(26,24,20,.22)','#E6E0D3','#2F7D4A','#C8361C',"'New York','Iowan Old Style',Charter,Georgia,serif",this.SFM,'6px','4px','8px'] },
+    { id: 'midnight', name: 'Midnight', tag: 'Neon', desc: 'Toʻq koʻk, sovuq zangori nur', v: ['#060B1C','#111A33','#0F1730','#E8EEFF','#8C98BF','rgba(140,160,255,.12)','rgba(140,160,255,.26)','#E8EEFF','#060B1C','#3DD6FF','#7AE4FF','#C8F4FF','#04121A','#0B1430','#E8EEFF','#8C98BF','rgba(120,150,255,.1)','inset 0 .5px 0 rgba(160,190,255,.35),inset 0 0 0 .5px rgba(120,150,255,.2),0 10px 30px -10px rgba(61,214,255,.25)','#03060F','#3DFFA2','#FF5470',this.GE,this.GM,'999px','26px','30px'] },
+    { id: 'forest', name: 'Forest', tag: 'Tinch', desc: 'Oʻrmon yashili, yalpiz urgʻu', v: ['#0D1712','#16241C','#15231B','#E7F2EA','#8FA89A','rgba(180,230,200,.1)','rgba(180,230,200,.22)','#E7F2EA','#0D1712','#7CF2B0','#A3F7C9','#E1FFD8','#06200F','#08100C','#E7F2EA','#8FA89A','rgba(180,255,210,.07)','inset 0 .5px 0 rgba(200,255,220,.25),inset 0 0 0 .5px rgba(180,255,210,.12),0 8px 24px -8px rgba(0,0,0,.6)','#070D0A','#7CF2B0','#FF7A6B',this.GE,this.GM,'18px','18px','22px'] },
+    { id: 'terminal', name: 'Terminal', tag: 'Mono', desc: 'Faqat monospace, yashil fosfor', v: ['#050505','#111111','#0C0C0C','#C8FFD4','#5F8F6B','rgba(57,255,136,.14)','rgba(57,255,136,.36)','#39FF88','#000000','#39FF88','#7BFFAD','#D6FFE3','#000000','#000000','#C8FFD4','#5F8F6B','#0A0A0A','0 0 0 1px rgba(57,255,136,.4)','#000000','#39FF88','#FF4D4D',this.GM,this.GM,'2px','2px','4px'] },
+    { id: 'blush', name: 'Blush', tag: 'Yumshoq', desc: 'Pushti, katta yumaloq burchaklar', v: ['#FFF1F3','#FFE1E7','#FFFFFF','#3A0A18','#9A5A6B','rgba(58,10,24,.08)','rgba(58,10,24,.18)','#3A0A18','#FFFFFF','#F43F6B','#FF6A8D','#FFC2D1','#FFFFFF','#3A0A18','#FFF1F3','#E3A9B8','rgba(255,255,255,.7)','inset 0 .5px 0 #fff,0 0 0 .5px rgba(58,10,24,.06),0 10px 30px -12px rgba(244,63,107,.3)','#FBE4E9','#1FA968','#E11D48',this.GE,this.GM,'999px','32px','36px'] },
+    { id: 'signal', name: 'Signal', tag: 'Brutal', desc: 'Sariq, qalin qora chiziq, 0 radius', v: ['#FFE600','#F2D900','#FFFFFF','#000000','#3D3700','rgba(0,0,0,.2)','#000000','#000000','#FFE600','#000000','#222222','#FFFFFF','#FFE600','#000000','#FFE600','#FFF59E','#FFFFFF','0 0 0 2px #000,4px 4px 0 #000','#F5DC00','#0A8F3C','#E00000',this.GE,this.GM,'0px','0px','0px'] }
+  ];
+  rootRef = React.createRef();
+  cardRef = React.createRef();
+  zoneRef = React.createRef();
+  PHOTOS = [
+    'radial-gradient(40% 30% at 68% 58%,#ffe2a8,transparent 70%),linear-gradient(180deg,#2b3a78 0%,#c46d5a 58%,#23284f 59%,#121838 100%)',
+    'linear-gradient(180deg,#9fd0ec 0%,#d9eef7 45%,#2a7aa8 46%,#134e78 100%)',
+    'radial-gradient(60% 50% at 30% 30%,#9fc77a,transparent 70%),linear-gradient(160deg,#4f7a3e,#1e3d2a)',
+    'linear-gradient(180deg,#f0b77d 0%,#d58d6d 50%,#2a2f4f 51%,#161a30 100%)',
+    'linear-gradient(180deg,#f6e4c2 0%,#e9c99a 50%,#c99b6a 51%,#a8784d 100%)'
+  ];
+  LIGHT = { '--bg':'#F2F2F7','--bg-alt':'rgba(118,118,128,.12)','--raised':'#FFFFFF','--ink':'#000000','--muted':'rgba(60,60,67,.6)','--line':'rgba(60,60,67,.12)','--line-strong':'rgba(60,60,67,.22)','--action':'#000000','--action-ink':'#FFFFFF','--canvas':'#E5E5EA','--ok':'#34C759','--err':'#FF3B30','--glass':'rgba(255,255,255,.62)','--glass-shadow':'inset 0 .5px 0 rgba(255,255,255,.95),inset 0 0 0 .5px rgba(255,255,255,.6),0 0 0 .5px rgba(0,0,0,.06),0 8px 24px -8px rgba(0,0,0,.16)' };
+  DARK = { '--bg':'#000000','--bg-alt':'rgba(118,118,128,.24)','--raised':'#1C1C1E','--ink':'#FFFFFF','--muted':'rgba(235,235,245,.6)','--line':'rgba(84,84,88,.35)','--line-strong':'rgba(84,84,88,.6)','--action':'#FFFFFF','--action-ink':'#000000','--canvas':'#0B0B0C','--ok':'#30D158','--err':'#FF453A','--glass':'rgba(255,255,255,.1)','--glass-shadow':'inset 0 .5px 0 rgba(255,255,255,.3),inset 0 0 0 .5px rgba(255,255,255,.14),0 8px 24px -8px rgba(0,0,0,.6)' };
+
+  componentDidMount() { this.applyTheme(); this.startPortal(); }
+  componentDidUpdate(prev) { if (prev && prev.theme !== this.props.theme && this.state.theme) { this.setState({ theme: null }); return; } this.applyTheme(); }
+  getQrs() { if (!this.qrs) this.qrs = { s: this.makeQR(7, '#0B0B0C'), b: this.makeQR(31, '#0B0B0C') }; return this.qrs; }
+  componentWillUnmount() { clearTimeout(this.t1); cancelAnimationFrame(this.raf); }
+  phoneCardRef = React.createRef(); phoneSlitRef = React.createRef(); macCardRef = React.createRef(); macSlitRef = React.createRef(); macToastRef = React.createRef();
+  startPortal() {
+    const seg = (p, a, b) => Math.min(Math.max((p - a) / (b - a), 0), 1);
+    const eo = x => 1 - Math.pow(1 - x, 3);
+    const back = x => 1 + 2.4 * Math.pow(x - 1, 3) + 1.4 * Math.pow(x - 1, 2);
+    const T = 5200;
+    const tick = (ts) => {
+      const reduced = (this.props.motion ?? 'Toʻliq') === 'Kam (reduced)';
+      const p = reduced ? 0.74 : (ts % T) / T;
+      const pc = this.phoneCardRef.current, ps = this.phoneSlitRef.current, mc = this.macCardRef.current, ms = this.macSlitRef.current, mt = this.macToastRef.current;
+      if (pc && mc) {
+        const lift = eo(seg(p, .04, .2)), ex = Math.pow(seg(p, .24, .42), 2);
+        pc.style.transform = `translate(${-330 * ex}px,${-16 * lift + 20 * ex}px) rotate(${-3 * lift - 12 * ex}deg) scale(${.62 + .38 * lift})`;
+        pc.style.opacity = p > .44 ? '0' : String(seg(p, 0, .05));
+        if (ps) ps.style.opacity = String(Math.max(0, seg(p, .18, .34) - seg(p, .44, .56)));
+        const e = seg(p, .42, .68), b = back(e), dk = eo(seg(p, .84, .95));
+        mc.style.transform = `translate(${(1 - b) * 560 + 280 * dk}px,${(1 - b) * -40 - 240 * dk}px) rotate(${14 * (1 - b) - 2 * b}deg) scale(${(.55 + .45 * b) * (1 - .82 * dk)})`;
+        mc.style.opacity = p < .42 ? '0' : String(1 - dk);
+        if (ms) ms.style.opacity = String(Math.max(0, seg(p, .36, .46) - seg(p, .64, .78)));
+        if (mt) { const o = Math.max(0, seg(p, .88, .93) - seg(p, .985, 1)); mt.style.opacity = String(o); mt.style.transform = `translateY(${(1 - o) * -8}px)`; }
+      }
+      if (!reduced) this.raf = requestAnimationFrame(tick); else this.raf = setTimeout(() => requestAnimationFrame(tick), 500);
+    };
+    this.raf = requestAnimationFrame(tick);
+  }
+  themeVars(id) {
+    const t = this.THEMES.find(x => x.id === id) || this.THEMES[0];
+    const [bg, bgAlt, raised, ink, muted, line, lineS, action, actionInk, accent, accentHi, accent2, accentInk, hero, heroInk, heroMuted, glass, glassSh, canvas, ok, err, font, mono, rp, rc, rpa] = t.v;
+    return { '--bg': bg, '--bg-alt': bgAlt, '--raised': raised, '--ink': ink, '--muted': muted, '--line': line, '--line-strong': lineS, '--action': action, '--action-ink': actionInk, '--accent': accent, '--accent-hi': accentHi, '--accent-2': accent2, '--accent-ink': accentInk, '--hero': hero, '--hero-ink': heroInk, '--hero-muted': heroMuted, '--glass': glass, '--glass-shadow': glassSh, '--canvas': canvas, '--ok': ok, '--err': err, '--font': font, '--mono': mono, '--r-pill': rp, '--r-card': rc, '--r-panel': rpa };
+  }
+  currentTheme() { return this.state.theme ?? this.props.theme ?? 'ios'; }
+  applyTheme() {
+    const el = this.rootRef.current; if (!el) return;
+    const v = this.themeVars(this.currentTheme());
+    Object.keys(v).forEach(k => el.style.setProperty(k, v[k]));
+  }
+  makeQR(seed, ink) {
+    const n = 25; let s = seed; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+    const finder = (x, y) => [[0,0],[18,0],[0,18]].some(([fx, fy]) => x >= fx && x < fx + 7 && y >= fy && y < fy + 7);
+    const fOn = (x, y) => { for (const [fx, fy] of [[0,0],[18,0],[0,18]]) { if (x >= fx && x < fx + 7 && y >= fy && y < fy + 7) { const dx = x - fx, dy = y - fy; return dx === 0 || dy === 0 || dx === 6 || dy === 6 || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4); } } return false; };
+    let r = '';
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const on = finder(x, y) ? fOn(x, y) : (x > 9 && x < 15 && y > 9 && y < 15 ? false : rnd() > 0.52);
+      if (on) r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" rx=".25"/>`;
+    }
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 25" fill="${ink}">${r}</svg>`);
+  }
+
+  onDown = (e) => {
+    if (this.state.phase === 'sending') return;
+    const c = this.cardRef.current; if (!c) return;
+    try { c.setPointerCapture(e.pointerId); } catch (_) {}
+    this.drag = { x: e.clientX, y: e.clientY, dx: 0, dy: 0, samples: [{ x: e.clientX, y: e.clientY, t: performance.now() }] };
+    c.style.transition = 'none'; c.style.cursor = 'grabbing';
+    const z = this.zoneRef.current; if (z) z.style.transition = 'none';
+  };
+  onMove = (e) => {
+    const d = this.drag; if (!d) return;
+    const c = this.cardRef.current, z = this.zoneRef.current;
+    d.dx = e.clientX - d.x; d.dy = e.clientY - d.y;
+    d.samples.push({ x: e.clientX, y: e.clientY, t: performance.now() }); if (d.samples.length > 6) d.samples.shift();
+    const up = Math.max(0, -d.dy);
+    c.style.transform = `translate(${d.dx}px,${d.dy}px) rotate(${d.dx * 0.05 - up * 0.02}deg) scale(${1 - Math.min(up / 1100, 0.14)})`;
+    if (z) z.style.opacity = String(Math.min(up / 170, 1));
+  };
+  onUp = () => {
+    const d = this.drag; this.drag = null; if (!d) return;
+    const c = this.cardRef.current; c.style.cursor = 'grab';
+    const s = d.samples; let vx = 0, vy = 0;
+    if (s.length > 1) { const a = s[0], b = s[s.length - 1]; const dt = Math.max(b.t - a.t, 1); vx = (b.x - a.x) / dt; vy = (b.y - a.y) / dt; }
+    if (d.dy < -150 || vy < -0.5) this.fling(d.dx, d.dy, vx);
+    else {
+      c.style.transition = 'transform 420ms cubic-bezier(.34,1.56,.64,1)'; c.style.transform = 'none';
+      const z = this.zoneRef.current; if (z) { z.style.transition = 'opacity 300ms'; z.style.opacity = '0'; }
+    }
+  };
+  fling(dx, dy, vx) {
+    const c = this.cardRef.current, z = this.zoneRef.current; if (!c) return;
+    const reduced = (this.props.motion ?? 'Toʻliq') === 'Kam (reduced)';
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
+    const ex = dx + vx * 220;
+    if (reduced) { c.style.transition = 'opacity 200ms ease'; c.style.opacity = '0'; }
+    else {
+      c.style.transition = 'transform 280ms cubic-bezier(.3,.7,.4,1), opacity 280ms';
+      c.style.transform = `translate(${ex}px,-820px) rotate(${ex * 0.06 - 8}deg) scale(.7)`;
+    }
+    if (z) { z.style.transition = 'opacity 200ms'; z.style.opacity = '1'; setTimeout(() => { z.style.transition = 'opacity 500ms'; z.style.opacity = '0'; }, 240); }
+    this.setState({ phase: 'sending' });
+    const out = this.props.outcome ?? 'Yetib bordi';
+    clearTimeout(this.t1);
+    this.t1 = setTimeout(() => {
+      if (out === 'Yetib bordi') {
+        const bg = this.PHOTOS[this.state.photo];
+        this.setState(st => ({ phase: 'arrived', ms: 18 + Math.round(Math.random() * 40), sent: [{ bg }, ...st.sent].slice(0, 5), photo: (st.photo + 1) % this.PHOTOS.length }));
+      } else this.setState({ phase: out === 'Rad etildi' ? 'rejected' : 'timeout' });
+      this.returnCard(reduced);
+    }, out === 'Javob yoʻq' ? 1400 : 650);
+  }
+  returnCard(reduced) {
+    const c = this.cardRef.current; if (!c) return;
+    c.style.transition = 'none';
+    if (reduced) { c.style.transform = 'none'; c.getBoundingClientRect(); c.style.transition = 'opacity 200ms'; c.style.opacity = '1'; return; }
+    c.style.opacity = '1'; c.style.transform = 'translate(0,560px) scale(.9)';
+    c.getBoundingClientRect();
+    c.style.transition = 'transform 560ms cubic-bezier(.34,1.56,.64,1)'; c.style.transform = 'none';
+  }
+
+  renderVals() {
+    const p = this.state.phase;
+    return {
+      rootRef: this.rootRef, cardRef: this.cardRef, zoneRef: this.zoneRef,
+      phoneCardRef: this.phoneCardRef, phoneSlitRef: this.phoneSlitRef, macCardRef: this.macCardRef, macSlitRef: this.macSlitRef, macToastRef: this.macToastRef,
+      onDown: this.onDown, onMove: this.onMove, onUp: this.onUp,
+      onSend: () => { if (p !== 'sending') this.fling(0, 0, 0); },
+      onNext: () => { if (p !== 'sending') this.setState(st => ({ photo: (st.photo + 1) % this.PHOTOS.length, phase: 'ready' })); },
+      onReset: () => this.setState({ phase: 'ready' }),
+      cardBg: this.PHOTOS[this.state.photo],
+      isReady: p === 'ready', isSending: p === 'sending', isArrived: p === 'arrived', isRejected: p === 'rejected', isTimeout: p === 'timeout',
+      ms: this.state.ms, sent: this.state.sent,
+      themes: this.THEMES.map(t => ({ id: t.id, name: t.name, tag: t.tag, desc: t.desc, a: t.v[0], b: t.v[9], on: t.id === this.currentTheme(),
+        vars: Object.assign(this.themeVars(t.id), { position: 'relative', width: '216px', height: '469px', color: t.v[3], fontFamily: t.v[21], outline: t.id === this.currentTheme() ? '3px solid ' + t.v[9] : 'none', outlineOffset: '14px', borderRadius: '30px' }),
+        pick: () => this.setState({ theme: t.id }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -15,6 +15,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 [dependencies]
 anyhow.workspace = true
 flutter_rust_bridge = "=2.13.0"
+serde_json = "1"
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 vutric-core.workspace = true
 vutric-net = { path = "../vutric-net" }
