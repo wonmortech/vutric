@@ -222,6 +222,33 @@ pub fn ticket_addrs(
     addrs
 }
 
+/// Self-assigned addresses (`169.254/16`, `fe80::/10`) of our interfaces, on the port of the socket bound to the
+/// unspecified address of the same family (backlog R5a, ADR-0068). iroh's own list leaves `fe80::` out always and
+/// `169.254` out whenever any other address exists, so two laptops on one cable, each also on Wi-Fi, would never
+/// put the cable in their QR. [`ticket_addrs`] ranks them with the rest.
+#[must_use]
+pub fn self_assigned_addrs(bound: &[SocketAddr], locals: &[LocalAddr]) -> Vec<SocketAddr> {
+    let port = |v6: bool| {
+        bound
+            .iter()
+            .find(|b| b.is_ipv6() == v6 && b.ip().is_unspecified())
+            .map(SocketAddr::port)
+    };
+    locals
+        .iter()
+        .filter_map(|l| match l.ip {
+            IpAddr::V4(v4) if v4.is_link_local() => Some(SocketAddr::new(l.ip, port(false)?)),
+            IpAddr::V6(v6) if is_link_local_v6(v6) => Some(SocketAddr::V6(SocketAddrV6::new(
+                v6,
+                port(true)?,
+                0,
+                l.iface,
+            ))),
+            _ => None,
+        })
+        .collect()
+}
+
 /// Most dial candidates after link-local expansion.
 pub const MAX_CANDIDATES: usize = 32;
 
@@ -290,6 +317,9 @@ pub enum Unreachable {
     OtherNetwork { internet: bool },
     /// This device has no network address at all: offer hotspot or cable.
     NoNetwork,
+    /// The Wi-Fi shows a login page before it lets anything through (hotel, airport, guest network; R1a,
+    /// ADR-0068). "Sign in to this Wi-Fi first", with the login link from [`crate::captive::Portal`] when known.
+    Captive,
 }
 
 impl Unreachable {
@@ -301,6 +331,7 @@ impl Unreachable {
             Self::Isolated { .. } => "isolated",
             Self::OtherNetwork { .. } => "other_network",
             Self::NoNetwork => "no_network",
+            Self::Captive => "captive",
         }
     }
 
@@ -309,6 +340,7 @@ impl Unreachable {
     pub fn next_routes(self) -> &'static [NextRoute] {
         match self {
             Self::LocalNetworkDenied => &[NextRoute::FixPermission, NextRoute::Relay],
+            Self::Captive => &[NextRoute::SignIn, NextRoute::Hotspot, NextRoute::Cable],
             Self::Isolated { internet: true } | Self::OtherNetwork { internet: true } => {
                 &[NextRoute::Relay, NextRoute::Hotspot, NextRoute::Cable]
             }
@@ -330,10 +362,13 @@ pub enum NextRoute {
     Hotspot,
     /// USB or Ethernet cable (R5).
     Cable,
+    /// Open the Wi-Fi's login page, then try again (R1a).
+    SignIn,
 }
 
-/// What a host saw while trying to reach a device on the LAN.
+/// What a host saw while trying to reach a device on the LAN. Each flag is one independent observation.
 #[derive(Debug, Clone, Default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Evidence {
     pub locals: Vec<LocalAddr>,
     /// The other device's LAN hints (ticket or beacon).
@@ -345,6 +380,8 @@ pub struct Evidence {
     pub probe_answered: bool,
     /// We have a home relay (internet works).
     pub internet: bool,
+    /// [`crate::captive::check`] found a login page in the way.
+    pub captive: bool,
 }
 
 /// The verdict for a failed or relay-only connection.
@@ -355,6 +392,9 @@ pub fn diagnose(e: &Evidence) -> Unreachable {
     }
     if e.locals.is_empty() {
         return Unreachable::NoNetwork;
+    }
+    if e.captive && !e.probe_answered {
+        return Unreachable::Captive;
     }
     let shared = e.hints.iter().any(|h| same_network(h.ip(), &e.locals));
     if shared && !e.probe_answered {
@@ -377,6 +417,7 @@ pub fn diagnose_ticket(t: &PairingTicket, probe_answered: bool, internet: bool) 
         local_network_denied: false,
         probe_answered,
         internet,
+        captive: false,
     })
 }
 
@@ -578,6 +619,50 @@ mod tests {
     }
 
     #[test]
+    fn self_assigned_addresses_join_the_hints() {
+        let locals = vec![
+            l("192.168.1.20", 24, 1, Medium::WiFi),
+            l("169.254.7.7", 16, 2, Medium::Wired),
+            l("fe80::abcd", 64, 2, Medium::Wired),
+        ];
+        let bound: Vec<SocketAddr> = vec![
+            "0.0.0.0:5000".parse().unwrap(),
+            "[::]:5001".parse().unwrap(),
+        ];
+        let got = self_assigned_addrs(&bound, &locals);
+        assert_eq!(
+            got,
+            vec![
+                "169.254.7.7:5000".parse::<SocketAddr>().unwrap(),
+                "[fe80::abcd%2]:5001".parse().unwrap()
+            ]
+        );
+        let hints = ticket_addrs(
+            got.iter()
+                .copied()
+                .chain(["192.168.1.20:5000".parse().unwrap()]),
+            &locals,
+        );
+        assert_eq!(
+            hints[0],
+            "169.254.7.7:5000".parse::<SocketAddr>().unwrap(),
+            "the cable ranks first"
+        );
+        assert!(
+            hints.contains(&"[fe80::abcd]:5001".parse().unwrap()),
+            "zone stripped for the QR"
+        );
+        let v4_only: Vec<SocketAddr> = vec!["0.0.0.0:5000".parse().unwrap()];
+        assert_eq!(
+            self_assigned_addrs(&v4_only, &locals).len(),
+            1,
+            "no IPv6 socket, no IPv6 hint"
+        );
+        let specific: Vec<SocketAddr> = vec!["192.168.1.20:5000".parse().unwrap()];
+        assert!(self_assigned_addrs(&specific, &locals).is_empty());
+    }
+
+    #[test]
     fn verdicts() {
         let locals = vec![l("192.168.1.20", 24, 1, Medium::WiFi)];
         let near: Vec<SocketAddr> = vec!["192.168.1.30:1".parse().unwrap()];
@@ -588,6 +673,7 @@ mod tests {
             local_network_denied: denied,
             probe_answered: probe,
             internet,
+            captive: false,
         };
         assert_eq!(
             diagnose(&e(&near, false, true, true)),
@@ -606,6 +692,22 @@ mod tests {
             Unreachable::OtherNetwork { internet: true }
         );
         assert_eq!(diagnose(&Evidence::default()), Unreachable::NoNetwork);
+        let portal = Evidence {
+            captive: true,
+            ..e(&near, false, false, false)
+        };
+        assert_eq!(diagnose(&portal), Unreachable::Captive);
+        assert_eq!(Unreachable::Captive.key(), "captive");
+        assert_eq!(Unreachable::Captive.next_routes()[0], NextRoute::SignIn);
+        let answered = Evidence {
+            captive: true,
+            ..e(&near, true, false, false)
+        };
+        assert_eq!(
+            diagnose(&answered),
+            Unreachable::OtherNetwork { internet: false },
+            "the LAN path works, so the portal is not why"
+        );
         assert_eq!(
             Unreachable::Isolated { internet: false }.next_routes()[0],
             NextRoute::Hotspot

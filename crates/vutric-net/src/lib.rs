@@ -17,6 +17,7 @@
 //! stall a caller for seconds, never forever.
 
 pub mod beacon;
+pub mod captive;
 pub mod disk;
 pub mod find;
 pub mod lan;
@@ -347,9 +348,12 @@ impl Peer {
     pub fn ticket(&self) -> PairingTicket {
         // Ranked by interface (wired, Wi-Fi, tethering, virtual last); link-local IPv6 goes in without its zone and
         // the dialer expands it to its own interfaces (`lan::expand_link_local`).
+        // iroh leaves out self-assigned addresses when any other exists; add them so a cable shows up (R5a).
+        let locals = lan::local_addrs();
+        let extra = lan::self_assigned_addrs(&self.endpoint.bound_sockets(), &locals);
         let addrs = lan::ticket_addrs(
-            self.endpoint.addr().ip_addrs().copied(),
-            &lan::local_addrs(),
+            self.endpoint.addr().ip_addrs().copied().chain(extra),
+            &locals,
         );
         PairingTicket {
             endpoint: self.id(),
@@ -754,6 +758,52 @@ impl Session {
             iroh::TransportAddr::Relay(u) => Some(u.to_string()),
             _ => None,
         }
+    }
+
+    /// The other device's IP address on the selected direct path (`None` while relayed or connecting).
+    #[must_use]
+    pub fn remote_ip(&self) -> Option<std::net::IpAddr> {
+        let paths = self.conn.paths();
+        match paths
+            .iter()
+            .find(iroh::endpoint::Path::is_selected)?
+            .remote_addr()
+        {
+            iroh::TransportAddr::Ip(a) => Some(a.ip()),
+            _ => None,
+        }
+    }
+
+    /// Whether the selected path goes through a relay right now (`false` while no path is chosen).
+    #[must_use]
+    pub fn is_relayed(&self) -> bool {
+        self.conn
+            .paths()
+            .iter()
+            .find(iroh::endpoint::Path::is_selected)
+            .is_some_and(|p| p.is_relay())
+    }
+
+    /// Waits up to `wait` for a direct path (a relayed start often turns direct after hole punching). `true`
+    /// when the session is direct by then.
+    pub async fn wait_direct(&self, wait: Duration) -> bool {
+        let until = tokio::time::Instant::now() + wait;
+        loop {
+            if !self.is_relayed() {
+                return true;
+            }
+            if tokio::time::Instant::now() >= until {
+                return false;
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    }
+
+    /// The bulk verdict for sending `total` bytes on this session now (backlog Rb, ADR-0068). The UI asks on
+    /// [`vutric_core::route::Bulk::Ask`]; [`transfer::send`] itself refuses [`vutric_core::route::Bulk::TooBig`].
+    #[must_use]
+    pub fn bulk(&self, total: u64) -> vutric_core::route::Bulk {
+        vutric_core::route::Bulk::of(self.is_relayed(), total)
     }
 
     /// Bytes moved so far, for [`Speed`].

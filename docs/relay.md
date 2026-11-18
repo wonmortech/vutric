@@ -22,6 +22,13 @@ to whom: only counters (`metrics_bind`, Prometheus, on localhost).
 Once both devices find a direct path (hole punching), the relay stops carrying their traffic. The app shows the
 current route: direct, or via which relay.
 
+The relay also answers `GET /generate_204` over plain HTTP (port 80 with TLS on). The app uses it to tell a
+hotel or guest Wi-Fi login page from a dead network (ADR-0068). That request carries no key and no device name.
+The operator sees an IP address asking, like any web request.
+
+Files above 10 GiB are never sent through a relay. The app waits 10 s for a direct path, then offers a hotspot
+or a cable (ADR-0068). Above 2 GiB, the app asks the user first.
+
 ## Limits
 
 | Limit | Default | Why |

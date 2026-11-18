@@ -155,3 +155,11 @@ test = false
 doc = false
 bench = false
 required-features = ["libfuzzer"]
+
+[[bin]]
+name = "captive_answer"
+path = "fuzz_targets/captive_answer.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]

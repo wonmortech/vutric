@@ -233,9 +233,59 @@ impl Badge {
     }
 }
 
+/// Up to this many bytes go through a relay without asking (backlog Rb, ADR-0068).
+pub const RELAY_ASK_BYTES: u64 = 2 << 30;
+/// Above this many bytes a relayed session refuses to send: offer a hotspot or a cable, or wait for a direct path
+/// (TM §2.6: "never push 10–100 GB through the relay").
+pub const RELAY_MAX_BYTES: u64 = 10 << 30;
+
+/// What to do with `total` bytes on a path, before the first byte moves (backlog Rb).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Bulk {
+    /// Send.
+    Go,
+    /// Relayed and big: ask first ("~N GB through the relay; a hotspot is faster"), offering [`Bulk::better`].
+    Ask,
+    /// Relayed and too big: do not send through the relay; offer [`Bulk::better`].
+    TooBig,
+}
+
+impl Bulk {
+    /// The verdict for `total` bytes when the path is `relayed`.
+    #[must_use]
+    pub fn of(relayed: bool, total: u64) -> Self {
+        match total {
+            _ if !relayed => Self::Go,
+            t if t > RELAY_MAX_BYTES => Self::TooBig,
+            t if t > RELAY_ASK_BYTES => Self::Ask,
+            _ => Self::Go,
+        }
+    }
+
+    /// Routes to offer instead of the relay, best first.
+    #[must_use]
+    pub fn better(self) -> &'static [Offer] {
+        match self {
+            Self::Go => &[],
+            Self::Ask | Self::TooBig => &[Offer::Hotspot, Offer::Cable],
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bulk_limits_only_apply_to_relayed_paths() {
+        assert_eq!(Bulk::of(false, u64::MAX), Bulk::Go);
+        assert_eq!(Bulk::of(true, RELAY_ASK_BYTES), Bulk::Go);
+        assert_eq!(Bulk::of(true, RELAY_ASK_BYTES + 1), Bulk::Ask);
+        assert_eq!(Bulk::of(true, RELAY_MAX_BYTES), Bulk::Ask);
+        assert_eq!(Bulk::of(true, RELAY_MAX_BYTES + 1), Bulk::TooBig);
+        assert!(Bulk::Go.better().is_empty());
+        assert_eq!(Bulk::TooBig.better()[0], Offer::Hotspot);
+    }
 
     const ALL_ON: Situation = Situation {
         lan: true,

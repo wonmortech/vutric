@@ -55,6 +55,49 @@ impl std::fmt::Display for Declined {
 
 impl std::error::Error for Declined {}
 
+/// The session is relayed and the files are more than [`vutric_core::route::RELAY_MAX_BYTES`]: offer a hotspot
+/// or a cable instead (backlog Rb, ADR-0068). Nothing was offered to the receiver.
+#[derive(Debug)]
+pub struct TooBigForRelay {
+    pub total: u64,
+}
+
+impl std::fmt::Display for TooBigForRelay {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} bytes are too many for the relay; use a hotspot or a cable",
+            self.total
+        )
+    }
+}
+
+impl std::error::Error for TooBigForRelay {}
+
+/// How long [`send`] waits for a relayed session to turn direct before refusing a [`TooBigForRelay`] batch.
+pub const DIRECT_WAIT: Duration = Duration::from_secs(10);
+
+/// Refuses `total` bytes when the path is relayed and stays relayed for `wait` (polled every 200 ms): the
+/// [`TooBigForRelay`] rule of [`send`], apart so it is tested without a relay-only network.
+pub(crate) async fn relay_guard(
+    total: u64,
+    relayed: impl Fn() -> bool,
+    wait: Duration,
+) -> Result<(), TooBigForRelay> {
+    use vutric_core::route::Bulk;
+    if Bulk::of(relayed(), total) != Bulk::TooBig {
+        return Ok(());
+    }
+    let until = tokio::time::Instant::now() + wait;
+    while tokio::time::Instant::now() < until {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        if !relayed() {
+            return Ok(());
+        }
+    }
+    Err(TooBigForRelay { total })
+}
+
 /// The other side has no room for the files (its free-space guard said no).
 #[derive(Debug)]
 pub struct NoRoom;
@@ -391,12 +434,14 @@ fn batch_end(files: &[Outgoing], first: usize) -> usize {
 // ---- Sending ----
 
 /// Offers `files` on the session and sends what the receiver accepts. Errors with [`Declined`] when the
-/// receiver says no; a file that could not be read or did not verify is listed in [`Summary::failed`].
+/// receiver says no, and with [`TooBigForRelay`] (before offering anything) when a relayed session stays
+/// relayed; a file that could not be read or did not verify is listed in [`Summary::failed`].
 #[allow(clippy::too_many_lines)] // one protocol exchange, read top to bottom
 pub async fn send(s: &mut Session, files: Vec<Outgoing>, on: OnProgress) -> Result<Summary> {
     ensure!(!files.is_empty(), "nothing to send");
     let total_files = u32::try_from(files.len()).context("too many files")?;
-    let total_bytes = files.iter().map(|f| f.size).sum();
+    let total_bytes: u64 = files.iter().map(|f| f.size).sum();
+    relay_guard(total_bytes, || s.is_relayed(), DIRECT_WAIT).await?;
     let id = crate::new_fling_id();
     let meter = Meter::new(total_bytes, total_files);
     let ticker = meter.ticker(Arc::clone(&on));
@@ -972,6 +1017,40 @@ pub fn shown_name(path: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn relay_guard_waits_for_a_direct_path_then_refuses() {
+        use std::sync::atomic::AtomicBool;
+        use vutric_core::route::{RELAY_ASK_BYTES, RELAY_MAX_BYTES};
+        let wait = Duration::from_millis(600);
+        let huge = RELAY_MAX_BYTES + 1;
+        assert!(
+            relay_guard(huge, || false, wait).await.is_ok(),
+            "direct: anything goes"
+        );
+        assert!(
+            relay_guard(RELAY_ASK_BYTES * 2, || true, wait)
+                .await
+                .is_ok(),
+            "asking is the UI's job"
+        );
+        let t = Instant::now();
+        let err = relay_guard(huge, || true, wait).await.unwrap_err();
+        assert_eq!(err.total, huge);
+        assert!(t.elapsed() >= wait);
+        let direct = Arc::new(AtomicBool::new(false));
+        let flip = Arc::clone(&direct);
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            flip.store(true, Ordering::Relaxed);
+        });
+        assert!(
+            relay_guard(huge, || !direct.load(Ordering::Relaxed), wait)
+                .await
+                .is_ok(),
+            "turned direct in time"
+        );
+    }
 
     #[test]
     fn targets_stay_inside_the_save_folder() {

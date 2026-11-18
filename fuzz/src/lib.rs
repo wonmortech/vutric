@@ -235,6 +235,17 @@ pub fn wormhole_messages(data: &[u8]) {
     }
 }
 
+/// A captive-portal check answer from an untrusted network (R1a, ADR-0068): never panics, and a login URL it
+/// passes on is short, `http(s)` and printable.
+pub fn captive_answer(data: &[u8]) {
+    use vutric_core::captive::{MAX_LOGIN_URL, Portal, classify};
+    if let Portal::Captive { login: Some(url) } = classify(data) {
+        assert!(url.len() <= MAX_LOGIN_URL);
+        assert!(url.starts_with("http://") || url.starts_with("https://"));
+        assert!(url.bytes().all(|b| b.is_ascii_graphic()));
+    }
+}
+
 #[derive(Debug, Arbitrary)]
 struct TargetInput {
     path: String,
@@ -689,6 +700,33 @@ mod smoke {
                 let pool = b"\"{}[]:,0-9aZ\\\x00\xff";
                 v[i] = pool[(r.next() as usize) % pool.len()];
                 wormhole_messages(&v);
+            }
+        }
+    }
+
+    #[test]
+    fn captive_random_and_near_valid() {
+        run(captive_answer, 2048, 37);
+        let seeds = [
+            "HTTP/1.1 204 No Content
+
+",
+            "HTTP/1.1 302 Found
+Location: https://wifi.example/login?a=1
+
+",
+            "HTTP/1.0 200 OK
+Content-Length: 0
+
+",
+        ];
+        let mut r = Rng(41);
+        for seed in seeds {
+            for _ in 0..RUNS {
+                let mut v = seed.as_bytes().to_vec();
+                let i = (r.next() as usize) % v.len();
+                v[i] = (r.next() & 0xff) as u8;
+                captive_answer(&v);
             }
         }
     }
