@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.provider.Settings
 import androidx.lifecycle.Lifecycle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -60,6 +61,8 @@ class MainActivity : FlutterActivity() {
             }
         }
         channel = MethodChannel(messenger, "vutric/android").apply { setMethodCallHandler(::onCall) }
+        CompanionPrefs.sink = { event -> runOnUiThread { channel?.invokeMethod("event", event) } }
+        ForeignDiscovery.sink = { event -> runOnUiThread { channel?.invokeMethod("event", event) } }
     }
 
     private fun onCall(call: MethodCall, result: MethodChannel.Result) {
@@ -121,6 +124,44 @@ class MainActivity : FlutterActivity() {
             "hotspotStart" -> startHotspot(result)
             "hotspotStop" -> {
                 LinkManager.stop()
+                result.success(null)
+            }
+            "hotspotJoin" -> LinkManager.join(
+                this,
+                call.argument<String>("ssid") ?: "",
+                call.argument<String>("password") ?: "",
+                call.argument<String>("security") ?: "wpa2",
+                call.argument<Boolean>("hidden") ?: false,
+                { result.success(true) },
+                { result.error(it, it, null) },
+            )
+            "hotspotLeave" -> {
+                LinkManager.leave(this)
+                result.success(null)
+            }
+            // Companion (A12): notification access is granted on a system page, never by a prompt.
+            "notificationAccess" -> {
+                val has = CompanionPrefs.hasAccess(this)
+                if (!has && call.argument<Boolean>("ask") == true) {
+                    runCatching { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+                }
+                result.success(has)
+            }
+            "companionMirror" -> {
+                CompanionPrefs.configure(
+                    this,
+                    call.argument<Boolean>("on") ?: false,
+                    call.argument<List<String>>("apps") ?: emptyList(),
+                )
+                result.success(null)
+            }
+            // ForeignDiscovery (A13): LocalSend and KDE Connect devices on this Wi-Fi, while a screen asks.
+            "foreignStart" -> {
+                ForeignDiscovery.start(applicationContext)
+                result.success(null)
+            }
+            "foreignStop" -> {
+                ForeignDiscovery.stop()
                 result.success(null)
             }
             else -> result.notImplemented()
@@ -209,11 +250,17 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        CompanionPrefs.sink = null
+        ForeignDiscovery.sink = null
+        ForeignDiscovery.stop()
         lock?.release()
         lock = null
         // A rotation or a system-recreated activity is not "leaving": Dart's hotspotStop owns the hotspot then.
         // Only a real finish with no transfer still running closes it here.
-        if (isFinishing && !TransferService.isRunning) LinkManager.stop()
+        if (isFinishing && !TransferService.isRunning) {
+            LinkManager.stop()
+            LinkManager.leave(this)
+        }
         io.shutdown()
         super.onDestroy()
     }

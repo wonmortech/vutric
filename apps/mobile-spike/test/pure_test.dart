@@ -4,9 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vutric_spike/design/themes.g.dart';
 import 'package:vutric_spike/main.dart' show themeFor;
-import 'package:vutric_spike/screens/hotspot_page.dart' show wifiQr;
+import 'package:vutric_spike/companion.dart' show clipboardFileName;
+import 'package:vutric_spike/i18n.dart';
+import 'package:vutric_spike/screens/connect.dart' show ConnectWay, waysFor;
+import 'package:vutric_spike/screens/device_page.dart' show agoText;
+import 'package:vutric_spike/screens/hotspot_page.dart' show hotspotError;
 import 'package:vutric_spike/session.dart';
 import 'package:vutric_spike/transfer_ui.dart';
+import 'package:vutric_spike/ui.dart' show errorText, routeLabel;
 
 /// WCAG 2.2 contrast ratio of [fg] over [bg] (alpha composited onto [bg] first).
 double contrast(Color fg, Color bg) {
@@ -54,13 +59,111 @@ void main() {
     }
   });
 
-  group('wifiQr', () {
-    test('plain network', () {
-      expect(wifiQr('AndroidShare_1234', 'abcd1234'), 'WIFI:T:WPA;S:AndroidShare_1234;P:abcd1234;;');
+  group('route plan to connect ways (ADR-0060)', () {
+    const auto = ['same_network', 'internet_direct', 'relay', 'offer_hotspot'];
+    test('Avtomatik: every way, the hotspot last', () {
+      expect(waysFor(auto, mdns: true, android: true), [
+        ConnectWay.scan,
+        ConnectWay.find,
+        ConnectWay.typed,
+        ConnectWay.wait,
+        ConnectWay.hotspot,
+      ]);
     });
+    test('iPhone: no mDNS row, no hotspot row', () {
+      expect(waysFor(auto, mdns: false, android: false), [ConnectWay.scan, ConnectWay.typed, ConnectWay.wait]);
+    });
+    test('Internet orqali: no LAN search, no typed address', () {
+      expect(waysFor(['internet_direct', 'relay'], mdns: true, android: true), [ConnectWay.scan, ConnectWay.wait]);
+    });
+    test('Tarmoqsiz leads with the hotspot; nothing when nothing works', () {
+      expect(waysFor(['offer_hotspot'], mdns: true, android: true), [ConnectWay.hotspot]);
+      expect(waysFor(const [], mdns: true, android: true), isEmpty);
+    });
+    test('a restart only when the reach changes', () {
+      expect(routeReachChanges('auto', 'internet'), isFalse);
+      expect(routeReachChanges('lan_only', 'offline'), isFalse);
+      expect(routeReachChanges('auto', 'lan_only'), isTrue);
+      expect(routeReachChanges('offline', 'internet'), isTrue);
+    });
+  });
 
-    test('special characters are escaped so the camera reads the right password', () {
-      expect(wifiQr(r'a;b,c', r'p:"\'), r'WIFI:T:WPA;S:a\;b\,c;P:p\:\"\\;;');
+  group('i18n', () {
+    test('every key the engine hands over has an Uzbek line', () {
+      const fromRust = [
+        'route.picker.auto',
+        'route.picker.lan_only',
+        'route.picker.internet',
+        'route.picker.offline',
+        'route.picker.bluetooth',
+        'route.badge.direct_lan',
+        'route.badge.direct_internet',
+        'route.badge.relay',
+        'route.badge.hotspot',
+        'route.badge.cable',
+        'route.badge.connecting',
+        'route.none.not_built',
+        'route.none.unavailable',
+        'privacy.encrypted',
+        'privacy.nothing_leaves',
+        'find.silent',
+        'find.denied',
+        'find.unreadable',
+        'find.no_beacon',
+      ];
+      expect([
+        for (final k in fromRust)
+          if (!hasUzbek(k)) k,
+      ], isEmpty);
+      expect([
+        for (final k in allKeys)
+          if (!hasUzbek(k)) k,
+      ], isEmpty);
+    });
+    test('the S6 lines say exactly what ADR-0061 says', () {
+      uiLanguage = 'uz';
+      expect(tr('privacy.encrypted'), 'Fayllar shifrlangan, faqat siz va qabul qiluvchi koʻradi');
+      expect(tr('privacy.nothing_leaves'), 'Hech narsa internetga chiqmaydi');
+    });
+    test('placeholders, the English fallback and unknown keys', () {
+      uiLanguage = 'en';
+      expect(tr('route.picker.lan_only'), 'This network only');
+      expect(tr('pair.yes'), 'Bir xil'); // no English line yet: Uzbek, never empty
+      uiLanguage = 'uz';
+      expect(tr('visibility.everyone.left', {'m': '7'}), 'yana 7 daqiqa');
+      expect(tr('no.such.key'), 'no.such.key');
+    });
+    test('Rust errors that carry a key are shown through it; badges read', () {
+      uiLanguage = 'uz';
+      expect(errorText('AnyhowException(find.silent)'), tr('find.silent'));
+      expect(
+        errorText('AnyhowException(the other device accepts only its trusted devices right now)'),
+        contains('juftlang'),
+      );
+      expect(routeLabel('route.badge.hotspot'), 'Hotspot');
+      expect(routeLabel(''), tr('route.badge.connecting'));
+    });
+  });
+
+  group('small helpers', () {
+    test('clipboard file name has no character an OS refuses', () {
+      final n = clipboardFileName(DateTime(2026, 11, 8, 4, 5, 6));
+      expect(n, 'Bufer 2026-11-08 04.05.06.txt');
+      expect(n.contains(RegExp(r'[\\/:*?"<>|]')), isFalse);
+    });
+    test('last seen in words', () {
+      final now = DateTime(2026, 11, 18, 12);
+      int ago(Duration d) => now.subtract(d).millisecondsSinceEpoch ~/ 1000;
+      expect(agoText(0, now), '—');
+      expect(agoText(ago(const Duration(seconds: 20)), now), 'hozirgina');
+      expect(agoText(ago(const Duration(minutes: 5)), now), '5 daqiqa oldin');
+      expect(agoText(ago(const Duration(hours: 3)), now), '3 soat oldin');
+      expect(agoText(ago(const Duration(days: 3)), now), '3 kun oldin');
+      expect(agoText(ago(const Duration(days: 65)), now), '2 oy oldin');
+    });
+    test('hotspot errors are said plainly, unknown codes still show', () {
+      expect(hotspotError('permission'), contains('ruxsati'));
+      expect(hotspotError('weird'), contains('weird'));
     });
   });
 

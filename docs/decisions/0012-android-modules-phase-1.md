@@ -63,4 +63,5 @@ always brings the listener back.
 
 - When UniFFI arrives, the same modules call Rust directly; the Dart-side calls in `lib/android.dart` then
   shrink to UI events only.
-- Two W3 asks are open (#8 settings field, #9 typed address). Two `TEMP` notes mark the code to change.
+- Two W3 asks were open (#8 settings field, #9 typed address). Both landed; [ADR-0013](0013-phone-on-the-w3-api.md)
+  moves the SAF tree into settings (decision 5) and replaces the paste-the-link fallback (decision 9).

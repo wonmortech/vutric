@@ -19,9 +19,15 @@ use std::time::{Duration, Instant};
 use anyhow::{Context as _, Result, bail};
 use tokio::runtime::Runtime;
 use tokio::sync::{Mutex as AsyncMutex, Notify, watch};
+use vutric_core::code::ShortCode;
+use vutric_core::hotspot::{HotspotTicket, Security, Wifi};
 use vutric_core::message::FailReason;
-use vutric_core::{FlingId, Message, PairingTicket, Platform};
-use vutric_net::{Peer, Reach, Route, Session, preview, probe, transfer};
+use vutric_core::route::{Offer, Picker, Situation, Step};
+use vutric_core::storage::DeviceRules;
+use vutric_core::{EndpointId, FlingId, Message, PairingTicket, Platform};
+use vutric_net::beacon::BeaconService;
+use vutric_net::trust::{Admission, PairMethod, TrustStore, Visibility};
+use vutric_net::{Peer, Reach, Route, Session, find, lan, preview, probe, transfer};
 
 use crate::frb_generated::StreamSink;
 
@@ -95,12 +101,27 @@ pub fn new_identity() -> Vec<u8> {
     vutric_net::new_identity().to_vec()
 }
 
-/// Starts (or restarts, e.g. after a rename) this device's peer; returns its pairing link for the QR code.
-/// `lan_only` keeps it off the internet; otherwise it is reachable on this network first and, failing that,
-/// over the internet (direct through NAT where possible, else an encrypted relay). Cancels whatever was
-/// running and closes the open session. Returns at once: the link carries this network's addresses, and
-/// [`wait_online`] then [`current_link`] give the one that also carries the internet relay.
-pub fn start(name: String, identity: Vec<u8>, lan_only: bool) -> Result<String> {
+/// The LAN beacon (ADR-0052): answers address and short-code lookups (ADR-0059) and runs ours.
+fn beacon_slot() -> &'static Mutex<Option<Arc<BeaconService>>> {
+    static BEACON: Mutex<Option<Arc<BeaconService>>> = Mutex::new(None);
+    &BEACON
+}
+
+fn beacon() -> Result<Arc<BeaconService>> {
+    beacon_slot()
+        .lock()
+        .expect("beacon lock")
+        .clone()
+        .context("find.no_beacon")
+}
+
+/// Starts (or restarts, after a rename or a new route choice) this device's peer; returns its pairing link for
+/// the QR code. The route choice in the settings (ADR-0060) decides the reach: "Avtomatik" and "Internet orqali"
+/// can use the internet (direct through NAT, else the encrypted relay); every other choice keeps everything on
+/// the local network. Also starts the LAN beacon, so this phone can be found by its address or short code.
+/// Cancels whatever was running and closes the open session. Returns at once: the link carries this network's
+/// addresses, and [`wait_online`] then [`current_link`] give the one that also carries the internet relay.
+pub fn start(name: String, identity: Vec<u8>) -> Result<String> {
     static STARTING: Mutex<()> = Mutex::new(());
     let key: [u8; 32] = identity
         .as_slice()
@@ -110,20 +131,202 @@ pub fn start(name: String, identity: Vec<u8>, lan_only: bool) -> Result<String> 
     let _one = STARTING.lock().expect("start lock");
     drop_session();
     let old = peer_slot().lock().expect("peer lock").take();
+    let old_beacon = beacon_slot().lock().expect("beacon lock").take();
+    drop(old_beacon);
+    let reach = Reach::for_picker(load_settings().route);
     runtime().block_on(async {
         if let Some(old) = old {
             old.close().await;
         }
-        let reach = if lan_only {
-            Reach::Lan
-        } else {
-            Reach::Anywhere
-        };
         let p = Peer::bind(key, &name, PLATFORM, reach).await?;
-        let link = p.ticket().to_uri();
+        let t = p.ticket();
+        let quic = t.addrs.first().map_or(0, std::net::SocketAddr::port);
+        // A beacon that cannot bind (the port is taken, no network yet) only costs the typed-code lookup.
+        match BeaconService::start(p.id(), quic, true) {
+            Ok(b) => {
+                b.set_answering(visibility_now() != Visibility::Off);
+                *beacon_slot().lock().expect("beacon lock") = Some(Arc::new(b));
+            }
+            Err(e) => vutric_net::say(format!("beacon off: {e:#}")),
+        }
         *peer_slot().lock().expect("peer lock") = Some(p);
-        Ok(link)
+        Ok(t.to_uri())
     })
+}
+
+/// This phone's short connect code (`ABCD-EFGH`, ADR-0059), shown under its QR for typing on another device.
+pub fn my_code() -> Result<String> {
+    Ok(ShortCode::of(&peer()?.id()).to_string())
+}
+
+// ---- Who may connect (ADR-0050): the trust store and the visibility window ----
+
+fn visibility_slot() -> &'static Mutex<Visibility> {
+    static VIS: Mutex<Visibility> = Mutex::new(Visibility::TrustedOnly);
+    &VIS
+}
+
+fn visibility_now() -> Visibility {
+    visibility_slot()
+        .lock()
+        .expect("visibility lock")
+        .at(vutric_net::trust::now())
+}
+
+/// What the visibility switch shows: `mode` is `off`, `trusted_only`, `everyone` or `pairing`, and
+/// `remaining_secs` the countdown of a window (0 otherwise).
+#[derive(Debug, Clone)]
+pub struct VisibilityState {
+    pub mode: String,
+    pub remaining_secs: u32,
+}
+
+fn visibility_state_of(v: Visibility, now: u64) -> VisibilityState {
+    let v = v.at(now);
+    let mode = match v {
+        Visibility::Off => "off",
+        Visibility::TrustedOnly => "trusted_only",
+        Visibility::Everyone(_) => "everyone",
+        Visibility::Pairing(_) => "pairing",
+    };
+    VisibilityState {
+        mode: mode.into(),
+        remaining_secs: v
+            .remaining(now)
+            .map_or(0, |s| s.min(u64::from(u32::MAX)) as u32),
+    }
+}
+
+/// Sets who may connect: `off` (pause), `trusted_only` (the default), `everyone` (10 minutes, every offer asked
+/// about) or `pairing` (10 minutes, while this phone's QR or code is on screen).
+pub fn set_visibility(mode: String) -> Result<VisibilityState> {
+    let now = vutric_net::trust::now();
+    let v = match mode.as_str() {
+        "off" => Visibility::Off,
+        "trusted_only" => Visibility::TrustedOnly,
+        "everyone" => Visibility::everyone(now),
+        "pairing" => Visibility::pairing(now),
+        other => bail!("unknown visibility {other:?}"),
+    };
+    *visibility_slot().lock().expect("visibility lock") = v;
+    if let Ok(b) = beacon() {
+        b.set_answering(v != Visibility::Off);
+    }
+    Ok(visibility_state_of(v, now))
+}
+
+/// The visibility in force now (an expired window reads as `trusted_only`).
+#[must_use]
+pub fn visibility() -> VisibilityState {
+    visibility_state_of(
+        *visibility_slot().lock().expect("visibility lock"),
+        vutric_net::trust::now(),
+    )
+}
+
+fn trust_path() -> Option<std::path::PathBuf> {
+    settings_dir()
+        .as_deref()
+        .map(|d| d.join(vutric_net::trust::FILE))
+}
+
+fn load_trust() -> TrustStore {
+    trust_path()
+        .as_deref()
+        .map(vutric_net::trust::load)
+        .unwrap_or_default()
+}
+
+fn edit_trust(change: impl FnOnce(&mut TrustStore)) -> Result<()> {
+    let path = trust_path().context("settings folder not set")?;
+    let mut t = vutric_net::trust::load(&path);
+    change(&mut t);
+    vutric_net::trust::save(&path, &t)
+}
+
+/// A paired device, for the device list and the device detail screen (T3).
+#[derive(Debug, Clone)]
+pub struct DeviceInfo {
+    /// The endpoint id, 64 hex: the key of its overrides.
+    pub id: String,
+    pub name: String,
+    /// `android`, `ios`, `windows`, `linux`, `macos` or "".
+    pub platform: String,
+    /// `ticket` (QR or link), `code` (six digits compared) or `pinned` (a foreign app).
+    pub method: String,
+    pub paired_at: u64,
+    pub last_seen: u64,
+    /// Its short code (`ABCD-EFGH`), to tell two devices with one name apart.
+    pub code: String,
+    /// Whether any override is set for it.
+    pub has_rules: bool,
+}
+
+fn platform_key(p: Option<Platform>) -> String {
+    p.map(|p| format!("{p:?}").to_ascii_lowercase())
+        .unwrap_or_default()
+}
+
+fn method_key(m: PairMethod) -> String {
+    match m {
+        PairMethod::Ticket => "ticket",
+        PairMethod::Code => "code",
+        PairMethod::Pinned => "pinned",
+    }
+    .into()
+}
+
+/// The paired devices, the one seen most recently first.
+#[must_use]
+pub fn devices() -> Vec<DeviceInfo> {
+    let settings = load_settings();
+    let mut out: Vec<DeviceInfo> = load_trust()
+        .iter()
+        .map(|(id, d)| DeviceInfo {
+            id: id.to_string(),
+            name: d.name.clone(),
+            platform: platform_key(d.platform),
+            method: method_key(d.method),
+            paired_at: d.paired_at,
+            last_seen: d.last_seen,
+            code: ShortCode::of(&id).to_string(),
+            has_rules: settings.devices.contains_key(&id.to_string()),
+        })
+        .collect();
+    out.sort_by_key(|d| std::cmp::Reverse(d.last_seen));
+    out
+}
+
+/// Forgets a device and its overrides; it has to pair again.
+pub fn forget_device(id: String) -> Result<bool> {
+    let key: EndpointId = id.parse().context("not a device id")?;
+    let mut was = false;
+    edit_trust(|t| was = t.forget(&key))?;
+    let mut s = load_settings();
+    if s.devices.remove(&key.to_string()).is_some() {
+        save_settings(&s)?;
+    }
+    Ok(was)
+}
+
+/// One device's overrides as JSON (`{"folder":null,"split_by_type":null,"subfolder":null,"accept":null,
+/// "gallery":null}`; `null` follows the general setting).
+pub fn device_rules(id: String) -> Result<String> {
+    let key: EndpointId = id.parse().context("not a device id")?;
+    let s = load_settings();
+    let rules = s.devices.get(&key.to_string()).cloned().unwrap_or_default();
+    Ok(serde_json::to_string(&rules)?)
+}
+
+/// Saves one device's overrides (all `null` removes the entry). Invalid JSON is refused whole.
+pub fn put_device_rules(id: String, json: String) -> Result<()> {
+    let rules: DeviceRules = serde_json::from_str(&json).context("overrides are not valid")?;
+    let mut s = load_settings();
+    anyhow::ensure!(
+        s.set_device_rules(&id, rules),
+        "not a device id, or too many devices"
+    );
+    save_settings(&s)
 }
 
 /// Waits up to `max_ms` for the internet relay (about 3 s on a good line). True: devices on other networks
@@ -318,6 +521,13 @@ pub struct Connected {
     /// "direct" (same network, or through NAT), "relay" (encrypted, through the internet relay) or "" while
     /// the path is still being chosen.
     pub route: String,
+    /// The peer's endpoint id (64 hex): the key of its overrides on the device screen.
+    pub peer_id: String,
+    /// Its short code (`ABCD-EFGH`).
+    pub peer_code: String,
+    /// In this phone's trust list (paired before, or by the QR just scanned). False: run [`pair_start`] and
+    /// [`pair_confirm`] before anything else, or close the session.
+    pub trusted: bool,
 }
 
 fn route_name(s: &Session) -> String {
@@ -338,14 +548,62 @@ pub fn current_route() -> String {
     runtime().block_on(async { route_name(&*s.lock().await) })
 }
 
+/// The open session's route badge (ADR-0060) as its i18n key (`route.badge.direct_lan`, `route.badge.relay`,
+/// `route.badge.hotspot`, …); "" when not connected.
+#[must_use]
+pub fn current_badge() -> String {
+    let Ok((_, s)) = session() else {
+        return String::new();
+    };
+    runtime().block_on(async { s.lock().await.badge().key().to_owned() })
+}
+
+/// How a session was opened, which decides what it takes to trust the peer (ADR-0050).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Pairing {
+    /// We dialed the key from its QR or link: pinned out of band, trusted at once.
+    Ticket,
+    /// The peer dialed us while our QR was on screen (the pairing window), with the key it read from it.
+    QrShown,
+    /// Found by mDNS, a typed address or a short code: nothing pins the key; the six digits must be compared.
+    Nearby,
+}
+
+/// Records the peer in the trust store as `how` allows; returns whether it is trusted now.
+fn admit_peer(s: &Session, how: Pairing) -> bool {
+    let id = s.remote_id();
+    let now = vutric_net::trust::now();
+    let platform = Some(s.remote_platform);
+    let mut trusted = false;
+    let r = edit_trust(|t| {
+        match how {
+            Pairing::Ticket | Pairing::QrShown => {
+                t.trust(id, &s.remote_name, platform, PairMethod::Ticket, now);
+            }
+            Pairing::Nearby => t.seen(&id, &s.remote_name, now),
+        }
+        trusted = t.is_trusted(&id);
+    });
+    if let Err(e) = r {
+        vutric_net::say(format!("trust store not written: {e:#}"));
+        // Without a store, only a pinned key counts.
+        return how != Pairing::Nearby;
+    }
+    trusted
+}
+
 /// Makes `s` the open session, unless the call that opened it was cancelled meanwhile (then `s` is closed).
-fn keep(at: u64, s: Session, connect: Duration) -> Result<Connected> {
+fn keep(at: u64, s: Session, connect: Duration, how: Pairing) -> Result<Connected> {
+    let trusted = admit_peer(&s, how);
     let c = Connected {
         peer_name: s.remote_name.clone(),
         peer_platform: format!("{:?}", s.remote_platform),
         check_code: s.check_code()?,
         connect_ms: ms(connect),
         route: route_name(&s),
+        peer_id: s.remote_id().to_string(),
+        peer_code: ShortCode::of(&s.remote_id()).to_string(),
+        trusted,
     };
     let mut slot = session_slot().lock().expect("session lock");
     if now_epoch() != at {
@@ -361,37 +619,147 @@ fn keep(at: u64, s: Session, connect: Duration) -> Result<Connected> {
     Ok(c)
 }
 
-fn open(job: impl Future<Output = Result<Session>>) -> Result<Connected> {
+fn open(how: Pairing, job: impl Future<Output = Result<Session>>) -> Result<Connected> {
     let at = now_epoch();
     runtime().block_on(async {
         let t0 = Instant::now();
         let s = cancellable(at, job).await?;
-        keep(at, s, t0.elapsed())
+        keep(at, s, t0.elapsed(), how)
     })
 }
 
-/// Opens the session with a pairing link (scanned or pasted). Cancelled by [`disconnect`].
+/// Opens the session with a pairing link (scanned or pasted). With the "Internet orqali" route the link's LAN
+/// hints are skipped (ADR-0060). Cancelled by [`disconnect`].
 pub fn connect_link(link: String) -> Result<Connected> {
     let p = peer()?;
     let t = PairingTicket::parse(link.trim())?;
-    open(async move { p.connect_ticket(&t).await })
+    let lan = load_settings().route.uses_lan();
+    open(Pairing::Ticket, async move {
+        if lan {
+            p.connect_ticket(&t).await
+        } else {
+            p.connect(t.endpoint, &[]).await
+        }
+    })
 }
 
-/// Opens the session with the first device found over mDNS (not on iPhone: no multicast there). Cancelled by
-/// [`disconnect`].
+/// Opens the session with the first device found over mDNS (not on iPhone: no multicast there). An unpaired
+/// device comes back with `trusted: false`. Cancelled by [`disconnect`].
 pub fn connect_discovered() -> Result<Connected> {
     let p = peer()?;
-    open(async move {
+    open(Pairing::Nearby, async move {
         let near = p.discover(DISCOVER_TIMEOUT).await?;
         p.connect(near.id, &near.addrs).await
     })
 }
 
-/// Waits for another device to connect to this phone (it scanned our QR code) and keeps that session.
-/// Cancelled by [`disconnect`].
+/// How long a typed address or code is looked for.
+const FIND_WAIT: Duration = Duration::from_secs(6);
+
+/// What a typed text is: `link`, `address`, `code` or "" (nothing we can use), for the field's hint as the
+/// user types.
+#[must_use]
+pub fn typed_kind(text: String) -> String {
+    let t = text.trim();
+    if t.starts_with("vutric://pair?") {
+        return "link".into();
+    }
+    match find::Target::parse(t) {
+        Some(find::Target::Address(_)) => "address".into(),
+        Some(find::Target::Code(_)) => "code".into(),
+        None => String::new(),
+    }
+}
+
+/// Connects with whatever the user typed (issue #9, ADR-0059): a pairing link, an IPv4 address (with or
+/// without a port) or a short code. An address or code is looked up through the LAN beacon (`scan` also sweeps
+/// this phone's /24 for a code); the device found is not authenticated, so unless it is already paired it comes
+/// back with `trusted: false` and the six digits must be compared. Errors carry an i18n key: `find.silent`,
+/// `find.denied` or `find.unreadable`. Cancelled by [`disconnect`].
+pub fn connect_typed(text: String, scan: bool) -> Result<Connected> {
+    let t = text.trim();
+    if t.starts_with("vutric://pair?") {
+        return connect_link(t.to_owned());
+    }
+    let target = find::Target::parse(t).context("find.unreadable")?;
+    let p = peer()?;
+    let b = beacon()?;
+    open(Pairing::Nearby, async move {
+        let found = find::resolve(&b, target, vutric_core::beacon::PORT, FIND_WAIT, scan)
+            .await
+            .map_err(|nf| anyhow::anyhow!(nf.key()))?;
+        p.connect(found.id, &[found.addr]).await
+    })
+}
+
+/// Waits for another device to connect to this phone and keeps that session. Who gets in follows the trust
+/// list and the visibility (ADR-0050): a paired device always (unless paused); an unknown one only while the
+/// pairing window (this phone's QR on screen) or "everyone" is open. A device let in through the pairing
+/// window read our key from the QR, so it is paired as `ticket`; one let in through "everyone" stays unknown
+/// (`trusted: false`) and its offers are always asked about. Cancelled by [`disconnect`].
 pub fn accept_session() -> Result<Connected> {
     let p = peer()?;
-    open(async move { p.accept().await })
+    let at = now_epoch();
+    runtime().block_on(async {
+        let t0 = Instant::now();
+        let (s, admission) = cancellable(at, async {
+            let store = load_trust();
+            p.accept_with(move |id: &EndpointId| {
+                vutric_net::trust::admit(&store, visibility_now(), id, vutric_net::trust::now())
+            })
+            .await
+        })
+        .await?;
+        // TEMP until W3 #13: the listener cannot tell whether the dialer will run `pair_code`, so it never runs
+        // it; a stranger admitted while our QR is on screen is taken as a QR scan (it read our key from it).
+        let how = match (admission, visibility_now()) {
+            (Admission::Unknown, Visibility::Pairing(_)) => Pairing::QrShown,
+            (Admission::Trusted, _) => Pairing::Ticket,
+            _ => Pairing::Nearby,
+        };
+        keep(at, s, t0.elapsed(), how)
+    })
+}
+
+/// Pairing without a QR (ADR-0050): the commit-then-reveal exchange on the open session, run by both devices at
+/// once. Returns the six digits both screens show. Call it right after a connect that returned
+/// `trusted: false`, before anything else uses the session. Cancelled by [`disconnect`].
+pub fn pair_start() -> Result<String> {
+    let (at, s) = session()?;
+    let r = runtime().block_on(cancellable(at, async { s.lock().await.pair_code().await }));
+    forget_on_error(&s, r)
+}
+
+/// Sends this user's answer to the six digits and waits for the other user's (up to two minutes). True only when
+/// both said yes: the device is then paired (`code`). Otherwise the session is closed.
+pub fn pair_confirm(matches: bool) -> Result<bool> {
+    let (at, s) = session()?;
+    let r = runtime().block_on(cancellable(at, async {
+        let mut guard = s.lock().await;
+        let both = guard.pair_finish(matches).await?;
+        if both {
+            let (id, name, platform) = (
+                guard.remote_id(),
+                guard.remote_name.clone(),
+                guard.remote_platform,
+            );
+            edit_trust(|t| {
+                t.trust(
+                    id,
+                    &name,
+                    Some(platform),
+                    PairMethod::Code,
+                    vutric_net::trust::now(),
+                );
+            })?;
+        }
+        Ok(both)
+    }));
+    let both = forget_on_error(&s, r)?;
+    if !both {
+        drop_session();
+    }
+    Ok(both)
 }
 
 /// Closes the open session and cancels every call still waiting (on it or on opening one). Returns at once.
@@ -491,24 +859,34 @@ pub struct FilesOffer {
 
 // ---- Settings (ADR-0007 part 4) ----
 
-fn settings_path() -> &'static Mutex<Option<std::path::PathBuf>> {
-    static PATH: Mutex<Option<std::path::PathBuf>> = Mutex::new(None);
-    &PATH
+fn settings_dir_slot() -> &'static Mutex<Option<std::path::PathBuf>> {
+    static DIR: Mutex<Option<std::path::PathBuf>> = Mutex::new(None);
+    &DIR
 }
 
-/// Where this phone keeps its settings file (the app's support folder). Call once at start.
+fn settings_dir() -> Option<std::path::PathBuf> {
+    settings_dir_slot().lock().expect("settings lock").clone()
+}
+
+fn settings_path() -> Option<std::path::PathBuf> {
+    settings_dir().map(|d| d.join(vutric_net::settings::FILE))
+}
+
+/// Where this phone keeps its settings and trust files (the app's support folder). Call once at start.
 pub fn set_settings_dir(dir: String) {
-    *settings_path().lock().expect("settings lock") =
-        Some(std::path::Path::new(&dir).join(vutric_net::settings::FILE));
+    *settings_dir_slot().lock().expect("settings lock") = Some(dir.into());
 }
 
 fn load_settings() -> vutric_net::settings::Settings {
     settings_path()
-        .lock()
-        .expect("settings lock")
         .as_deref()
         .map(vutric_net::settings::load)
         .unwrap_or_default()
+}
+
+fn save_settings(s: &vutric_net::settings::Settings) -> Result<()> {
+    let path = settings_path().context("settings folder not set")?;
+    vutric_net::settings::save(&path, &s.clone().migrate())
 }
 
 /// The settings as JSON (every field present, defaults filled in), for the Settings screen.
@@ -521,12 +899,7 @@ pub fn get_settings() -> Result<String> {
 pub fn put_settings(json: String) -> Result<()> {
     let s: vutric_net::settings::Settings =
         serde_json::from_str(&json).context("settings are not valid")?;
-    let path = settings_path()
-        .lock()
-        .expect("settings lock")
-        .clone()
-        .context("settings folder not set")?;
-    vutric_net::settings::save(&path, &s.migrate())
+    save_settings(&s)
 }
 
 /// What arrived on the open session: a photo thrown at this phone, or files offered to it.
@@ -594,12 +967,13 @@ pub fn next_incoming() -> Result<Incoming> {
             };
             if let Some(offer) = transfer::IncomingOffer::from_message(&msg) {
                 let (_, accept) = load_settings().rules_for(&guard.remote_id().to_string());
+                // A device let in through "everyone" is not in the store: its offers are always asked about.
+                let trusted = load_trust().is_trusted(&guard.remote_id());
                 let files = FilesOffer {
                     files: offer.total_files,
                     bytes: offer.total_bytes,
                     names: offer.names(5),
-                    // Only paired devices, checked by key, ever reach a session: the sender is trusted.
-                    auto_accept: accept.auto(true, offer.total_bytes),
+                    auto_accept: accept.auto(trusted, offer.total_bytes),
                 };
                 *pending_slot().lock().expect("pending lock") = Some((Arc::clone(&s), offer));
                 return Ok(Incoming {
@@ -816,4 +1190,251 @@ fn take_offer() -> Result<(u64, Shared, transfer::IncomingOffer)> {
         "that offer came on a session that is closed"
     );
     Ok((at, s, offer))
+}
+
+// ---- Routes (ADR-0060) and the privacy line (ADR-0061) ----
+
+fn picker_of(choice: &str) -> Result<Picker> {
+    serde_json::from_value(serde_json::Value::String(choice.to_owned()))
+        .with_context(|| format!("unknown route {choice:?}"))
+}
+
+fn picker_name(p: Picker) -> String {
+    p.key().trim_start_matches("route.picker.").to_owned()
+}
+
+/// Every route choice, in the order the picker lists them (`auto`, `lan_only`, `internet`, `offline`,
+/// `bluetooth`); the i18n key of each is `route.picker.<choice>`.
+#[must_use]
+pub fn route_choices() -> Vec<String> {
+    Picker::ALL.into_iter().map(picker_name).collect()
+}
+
+/// Whether the choice works on any device yet (`bluetooth` waits for R4).
+pub fn route_built(choice: String) -> Result<bool> {
+    Ok(picker_of(&choice)?.built())
+}
+
+/// The privacy lines for the choice, as i18n keys: `privacy.encrypted` always, `privacy.nothing_leaves` only
+/// when nothing can leave the local network (ADR-0061).
+pub fn privacy_lines(choice: String) -> Result<Vec<String>> {
+    Ok(picker_of(&choice)?
+        .privacy_lines()
+        .iter()
+        .map(|k| (*k).to_owned())
+        .collect())
+}
+
+/// The routes to try for a choice, best first.
+#[derive(Debug, Clone)]
+pub struct RoutePlan {
+    /// `same_network`, `internet_direct`, `relay`, `offer_hotspot`, `offer_wifi_aware`, `offer_cable`.
+    pub steps: Vec<String>,
+    /// When `steps` is empty: why, as an i18n key (`route.none.not_built`, `route.none.unavailable`).
+    pub none: String,
+}
+
+fn step_name(s: Step) -> &'static str {
+    match s {
+        Step::SameNetwork => "same_network",
+        Step::InternetDirect => "internet_direct",
+        Step::Relay => "relay",
+        Step::Offer(Offer::Hotspot) => "offer_hotspot",
+        Step::Offer(Offer::WifiAware) => "offer_wifi_aware",
+        Step::Offer(Offer::Cable) => "offer_cable",
+    }
+}
+
+/// The "Avtomatik" order and the forced choices (ADR-0060) for what this phone can do now: `lan` (it has a
+/// local network address, see [`has_lan`]), `internet` (the relay answered) and `hotspot` (it can open one).
+pub fn route_plan(choice: String, lan: bool, internet: bool, hotspot: bool) -> Result<RoutePlan> {
+    let s = Situation {
+        lan,
+        internet,
+        hotspot,
+        wifi_aware: false,
+        cable: false,
+    };
+    Ok(match picker_of(&choice)?.plan(s) {
+        Ok(steps) => RoutePlan {
+            steps: steps.into_iter().map(|s| step_name(s).to_owned()).collect(),
+            none: String::new(),
+        },
+        Err(e) => RoutePlan {
+            steps: Vec::new(),
+            none: e.key().to_owned(),
+        },
+    })
+}
+
+/// Whether this phone has a local network address another device could reach (Wi-Fi, Ethernet, a hotspot);
+/// VPN and virtual adapters do not count.
+#[must_use]
+pub fn has_lan() -> bool {
+    lan::local_addrs()
+        .iter()
+        .any(|a| a.medium != lan::Medium::Virtual)
+}
+
+// ---- Hotspot in the pairing link (ADR-0058) ----
+
+/// A Wi-Fi network carried by a pairing link.
+#[derive(Debug, Clone)]
+pub struct HotspotNet {
+    pub ssid: String,
+    /// "" for an open network.
+    pub password: String,
+    /// `wpa2`, `wpa3` or `open`.
+    pub security: String,
+    pub hidden: bool,
+}
+
+fn wifi_of(ssid: &str, password: &str, security: &str, hidden: bool) -> Result<Wifi> {
+    let sec = match security {
+        "wpa2" => Security::Wpa2,
+        "wpa3" => Security::Wpa3,
+        "open" => Security::Open,
+        other => bail!("unknown hotspot security {other:?}"),
+    };
+    let pw = (sec != Security::Open).then_some(password);
+    Ok(Wifi::new(ssid, pw, sec, hidden)?)
+}
+
+fn net_of(w: &Wifi) -> HotspotNet {
+    HotspotNet {
+        ssid: w.ssid().to_owned(),
+        password: w.password().unwrap_or_default().to_owned(),
+        security: match w.security() {
+            Security::Wpa2 => "wpa2",
+            Security::Wpa3 => "wpa3",
+            Security::Open => "open",
+        }
+        .into(),
+        hidden: w.hidden(),
+    }
+}
+
+/// This phone's pairing link with its hotspot in it: one QR both joins the network and pairs (R3). Refuses a
+/// network another phone could not join.
+pub fn hotspot_link(ssid: String, password: String, security: String) -> Result<String> {
+    let wifi = wifi_of(&ssid, &password, &security, false)?;
+    Ok(HotspotTicket {
+        pair: peer()?.ticket(),
+        wifi,
+    }
+    .to_uri())
+}
+
+/// The standard `WIFI:` payload for a phone's camera app (no Vutric needed to join).
+pub fn wifi_qr(ssid: String, password: String, security: String, hidden: bool) -> Result<String> {
+    Ok(wifi_of(&ssid, &password, &security, hidden)?.to_wifi_qr())
+}
+
+/// The hotspot a scanned link carries, if any. A half or broken hotspot part is an error, so the user is not
+/// sent to a network that cannot work.
+pub fn hotspot_of_link(link: String) -> Result<Option<HotspotNet>> {
+    Ok(Wifi::in_link(link.trim())?.as_ref().map(net_of))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn route_names_round_trip_and_privacy_is_honest() {
+        let all = route_choices();
+        assert_eq!(
+            all,
+            ["auto", "lan_only", "internet", "offline", "bluetooth"]
+        );
+        for c in &all {
+            assert_eq!(picker_name(picker_of(c).unwrap()), *c);
+        }
+        assert!(picker_of("everywhere").is_err());
+        assert_eq!(privacy_lines("auto".into()).unwrap(), ["privacy.encrypted"]);
+        assert_eq!(
+            privacy_lines("lan_only".into()).unwrap(),
+            ["privacy.encrypted", "privacy.nothing_leaves"]
+        );
+        assert!(!route_built("bluetooth".into()).unwrap());
+    }
+
+    #[test]
+    fn plans_follow_the_engine() {
+        let p = route_plan("auto".into(), true, true, true).unwrap();
+        assert_eq!(
+            p.steps,
+            ["same_network", "internet_direct", "relay", "offer_hotspot"]
+        );
+        let off = route_plan("offline".into(), false, false, true).unwrap();
+        assert_eq!(off.steps, ["offer_hotspot"]);
+        let none = route_plan("lan_only".into(), false, true, true).unwrap();
+        assert!(none.steps.is_empty());
+        assert_eq!(none.none, "route.none.unavailable");
+        assert_eq!(
+            route_plan("bluetooth".into(), true, true, true)
+                .unwrap()
+                .none,
+            "route.none.not_built"
+        );
+    }
+
+    #[test]
+    fn hotspot_wifi_checks_and_round_trips() {
+        assert!(wifi_of("Vutric_1", "short", "wpa2", false).is_err());
+        assert!(wifi_of("Vutric_1", "abcd1234", "wep", false).is_err());
+        let open = wifi_of("Kafe", "ignored", "open", false).unwrap();
+        assert_eq!(open.password(), None);
+        let w = wifi_of("AndroidShare_7", "a;b,c:d\"e", "wpa2", false).unwrap();
+        assert_eq!(
+            w.to_wifi_qr(),
+            "WIFI:T:WPA;S:AndroidShare_7;P:a\\;b\\,c\\:d\\\"e;;"
+        );
+        let t = PairingTicket {
+            endpoint: EndpointId([7; 32]),
+            device_name: "Pixel".into(),
+            addrs: vec!["192.168.43.1:41000".parse().unwrap()],
+            relay: None,
+        };
+        let link = HotspotTicket { pair: t, wifi: w }.to_uri();
+        let net = hotspot_of_link(link).unwrap().unwrap();
+        assert_eq!(
+            (
+                net.ssid.as_str(),
+                net.password.as_str(),
+                net.security.as_str()
+            ),
+            ("AndroidShare_7", "a;b,c:d\"e", "wpa2")
+        );
+        let plain = PairingTicket {
+            endpoint: EndpointId([7; 32]),
+            device_name: "Pixel".into(),
+            addrs: vec![],
+            relay: None,
+        };
+        assert!(hotspot_of_link(plain.to_uri()).unwrap().is_none());
+    }
+
+    #[test]
+    fn typed_text_is_recognised() {
+        assert_eq!(typed_kind("vutric://pair?v=2&id=1".into()), "link");
+        assert_eq!(typed_kind(" 192.168.1.24 ".into()), "address");
+        assert_eq!(typed_kind("192.168.1.24:47110".into()), "address");
+        assert_eq!(typed_kind("k7qd-2m9x".into()), "code");
+        assert_eq!(typed_kind("fe80::1".into()), "");
+        assert_eq!(typed_kind("salom".into()), "");
+    }
+
+    #[test]
+    fn visibility_reads_with_its_countdown() {
+        let now = 1_795_000_000;
+        let s = visibility_state_of(Visibility::everyone(now), now + 60);
+        assert_eq!((s.mode.as_str(), s.remaining_secs), ("everyone", 540));
+        let gone = visibility_state_of(Visibility::pairing(now), now + 601);
+        assert_eq!(
+            (gone.mode.as_str(), gone.remaining_secs),
+            ("trusted_only", 0)
+        );
+        assert_eq!(visibility_state_of(Visibility::Off, now).mode, "off");
+    }
 }

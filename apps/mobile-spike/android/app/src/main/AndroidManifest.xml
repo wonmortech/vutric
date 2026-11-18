@@ -65,6 +65,22 @@
             </intent-filter>
             <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="false" />
         </service>
+        <!-- Companion (A12): notification mirroring, opt-in; the user grants access on the system page. -->
+        <service
+            android:name=".CompanionListener"
+            android:exported="false"
+            android:label="Vutric"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+        <!-- ForeignDiscovery (A13): LocalSend datagrams are parsed here, in a throwaway process with no permissions. -->
+        <service
+            android:name=".ForeignParser"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":foreign" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

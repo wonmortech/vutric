@@ -117,12 +117,19 @@ class Session extends ChangeNotifier {
         final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
         themeId = j['theme'] as String? ?? autoTheme;
         onboarded = j['onboarded'] == true;
+        // Before W3 #8 the SAF folder lived here; it moves into the settings file once (loadTransferSettings).
         final folder = j['folder'];
         if (folder is Map && folder['uri'] is String) {
-          saveFolder = (uri: folder['uri'] as String, label: '${folder['label'] ?? ''}');
+          _legacyFolder = (uri: folder['uri'] as String, label: '${folder['label'] ?? ''}');
         }
         final name = (j['name'] as String?)?.trim();
         if (name != null && name.isNotEmpty) deviceName = name;
+        final c = j['companion'];
+        if (c is Map) {
+          mirrorNotifications = c['notifications'] == true;
+          clipboardButton = c['clipboard'] == true;
+          mirrorApps = [for (final a in (c['apps'] as List? ?? const [])) '$a'];
+        }
       }
     } catch (_) {
       // A broken file is replaced on the next save.
@@ -145,20 +152,110 @@ class Session extends ChangeNotifier {
         'theme': themeId,
         'name': deviceName,
         'onboarded': onboarded,
-        if (saveFolder != null) 'folder': {'uri': saveFolder!.uri, 'label': saveFolder!.label},
+        'companion': {'notifications': mirrorNotifications, 'clipboard': clipboardButton, 'apps': mirrorApps},
       }),
       flush: true,
     );
   }
 
-  /// Android: a folder picked through the system (SafStore) where received files go after they are checked.
-  /// TEMP until W3 #8 adds a SAF tree field to vutric-core's settings (its serde drops unknown keys); ADR-0012.
+  /// Android: a folder picked through the system (SafStore) where received files go after they are checked. Kept
+  /// in the settings file as `save.android_tree` (W3 #8, ADR-0057 addendum), so it lives with the other
+  /// receiving rules and Rust checks it.
   ({String uri, String label})? saveFolder;
+  ({String uri, String label})? _legacyFolder;
+
+  /// The route choice (ADR-0060): `auto`, `lan_only`, `internet`, `offline` or `bluetooth`.
+  String route = 'auto';
+
+  /// The privacy lines for [route] (ADR-0061), as i18n keys.
+  List<String> privacy = const ['privacy.encrypted'];
+
+  /// Companion (A12): both off by default; the user turns them on in Sozlamalar.
+  bool mirrorNotifications = false;
+  bool clipboardButton = false;
+  List<String> mirrorApps = const [];
+
+  /// Reads the transfer settings this UI shows outside Sozlamalar (route, SAF folder), and moves an old
+  /// ui.json folder into the settings file once.
+  Future<void> loadTransferSettings() async {
+    try {
+      final j = jsonDecode(await vutric.getSettings()) as Map<String, dynamic>;
+      final save = j['save'] as Map<String, dynamic>? ?? {};
+      final tree = save['android_tree'];
+      if (tree is Map && tree['uri'] is String) {
+        saveFolder = (uri: tree['uri'] as String, label: '${tree['label'] ?? ''}');
+      } else if (_legacyFolder != null) {
+        save['android_tree'] = {'uri': _legacyFolder!.uri, 'label': _legacyFolder!.label};
+        j['save'] = save;
+        await vutric.putSettings(json: jsonEncode(j));
+        saveFolder = _legacyFolder;
+      }
+      final hadLegacy = _legacyFolder != null;
+      _legacyFolder = null;
+      route = j['route'] as String? ?? 'auto';
+      privacy = await vutric.privacyLines(choice: route);
+      notifyListeners();
+      if (hadLegacy) await _saveUi();
+    } catch (e) {
+      debugPrint('vutric: settings not read: $e');
+    }
+  }
 
   Future<void> setSaveFolder(({String uri, String label})? folder) async {
+    final j = jsonDecode(await vutric.getSettings()) as Map<String, dynamic>;
+    final save = j['save'] as Map<String, dynamic>? ?? {};
+    save['android_tree'] = folder == null ? null : {'uri': folder.uri, 'label': folder.label};
+    j['save'] = save;
+    await vutric.putSettings(json: jsonEncode(j));
     saveFolder = folder;
     notifyListeners();
+  }
+
+  /// Changes the route choice; the node restarts when the new choice reaches differently (internet or not).
+  /// An open session closes then, so the caller asks first.
+  Future<void> setRoute(String choice) async {
+    if (choice == route) return;
+    final j = jsonDecode(await vutric.getSettings()) as Map<String, dynamic>;
+    j['route'] = choice;
+    await vutric.putSettings(json: jsonEncode(j));
+    final changed = routeReachChanges(route, choice);
+    route = choice;
+    privacy = await vutric.privacyLines(choice: choice);
+    notifyListeners();
+    if (changed) await restart();
+  }
+
+  Future<void> setCompanion({bool? notifications, bool? clipboard, List<String>? apps}) async {
+    if (notifications != null) mirrorNotifications = notifications;
+    if (clipboard != null) clipboardButton = clipboard;
+    if (apps != null) mirrorApps = apps;
+    notifyListeners();
     await _saveUi();
+  }
+
+  /// The open session's route badge key (`route.badge.*`), refreshed every 2 s while connected.
+  String badge = '';
+  Timer? _badgeTimer;
+
+  void _watchBadge() {
+    _badgeTimer?.cancel();
+    _badgeTimer = Timer.periodic(const Duration(seconds: 2), (_) => _refreshBadge());
+    _refreshBadge();
+  }
+
+  Future<void> _refreshBadge() async {
+    if (peer == null) {
+      _badgeTimer?.cancel();
+      _badgeTimer = null;
+      return;
+    }
+    try {
+      final b = await vutric.currentBadge();
+      if (b != badge) {
+        badge = b;
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   /// Fetches this device's pairing link again (a new network, such as the phone's own hotspot, adds addresses).
@@ -230,11 +327,24 @@ class Session extends ChangeNotifier {
 
   /// Runs a connect job (scan link, find on this network, wait for a scan) and keeps the peer it returns. From
   /// then on the session listens for photos and files from the other side, whichever tab is open.
-  Future<vutric.Connected> connect(Future<vutric.Connected> Function() job) async {
+  ///
+  /// A peer that is not paired yet (found nearby, by address or by code: ADR-0050) goes through [verify] first,
+  /// which runs the six-digit comparison; nothing else touches the session until it says yes. A "no" closes the
+  /// session and ends in the cancelled error.
+  Future<vutric.Connected> connect(
+    Future<vutric.Connected> Function() job, {
+    Future<bool> Function(vutric.Connected peer)? verify,
+  }) async {
     final c = await afterDisconnect(job);
+    if (!c.trusted && verify != null && !await verify(c)) {
+      await disconnectNow();
+      throw StateError('vutric: cancelled');
+    }
     peer = c;
     lostPeer = null;
+    badge = '';
     notifyListeners();
+    _watchBadge();
     unawaited(_listen());
     return c;
   }
@@ -332,7 +442,7 @@ class Session extends ChangeNotifier {
     try {
       await disconnect();
       if (Platform.isAndroid) await _multicast.invokeMethod<void>('acquire');
-      myLink = await vutric.start(name: deviceName, identity: await loadIdentity(), lanOnly: false);
+      myLink = await vutric.start(name: deviceName, identity: await loadIdentity());
       notifyListeners();
       online = await vutric.waitOnline(maxMs: 10000);
       myLink = await vutric.currentLink();
@@ -361,4 +471,11 @@ class Session extends ChangeNotifier {
     _ended();
     notifyListeners();
   }
+}
+
+/// Whether switching the route from [from] to [to] changes how far the node reaches (internet or not), which
+/// needs a restart (ADR-0060 `Reach::for_picker`).
+bool routeReachChanges(String from, String to) {
+  const internet = {'auto', 'internet'};
+  return internet.contains(from) != internet.contains(to);
 }

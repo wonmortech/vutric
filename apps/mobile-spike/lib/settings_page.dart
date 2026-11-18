@@ -1,7 +1,10 @@
-// Sozlamalar: the look (9 themes, S6 of the handoff), this phone's name, and receiving (when to accept, the
-// gallery album, folders, name conflicts). Receiving settings belong to Rust (settings.json, written back whole);
-// the theme and the name are UI-only and live in Session (ADR-0011).
+// Sozlamalar: the look (9 themes, S6 of the handoff), this phone's name, the route (ADR-0060), who may connect
+// (ADR-0050), the paired devices and their own rules (T3), receiving (when to accept, the gallery album, folders
+// with the Android SAF tree, name conflicts) and the companion features (A12, off by default). Receiving settings
+// belong to Rust (settings.json, written back whole); the theme, the name and the companion switches are UI-only
+// and live in Session (ADR-0011).
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -11,7 +14,11 @@ import 'android.dart';
 import 'design/themes.g.dart';
 import 'design/tokens.dart';
 import 'design/widgets.dart';
+import 'i18n.dart';
+import 'screens/connect.dart' show PrivacyLine;
+import 'screens/device_page.dart';
 import 'screens/measure_page.dart';
+import 'screens/route_picker.dart';
 import 'session.dart';
 import 'src/rust/api.dart' as vutric;
 import 'ui.dart';
@@ -28,19 +35,58 @@ class _SettingsPageState extends State<SettingsPage> {
   Map<String, dynamic>? _s;
   String? _error;
   final _album = TextEditingController();
+  List<vutric.DeviceInfo> _devices = const [];
+  vutric.VisibilityState? _vis;
+  Timer? _tick;
 
   @override
   void initState() {
     super.initState();
     _session.addListener(_changed);
     _load();
+    _loadPeople();
+    // The "everyone" countdown.
+    _tick = Timer.periodic(const Duration(seconds: 30), (_) => _loadPeople());
   }
 
   @override
   void dispose() {
+    _tick?.cancel();
     _session.removeListener(_changed);
     _album.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPeople() async {
+    try {
+      final d = await vutric.devices();
+      final vis = await vutric.visibility();
+      if (mounted) {
+        setState(() {
+          _devices = d;
+          _vis = vis;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _setVisibility(String mode) async {
+    try {
+      final vis = await vutric.setVisibility(mode: mode);
+      if (mounted) setState(() => _vis = vis);
+    } catch (e) {
+      if (mounted) setState(() => _error = errorText(e));
+    }
+  }
+
+  Future<void> _openDevice(vutric.DeviceInfo d) async {
+    await Navigator.of(context).push(MaterialPageRoute<bool>(builder: (_) => DevicePage(device: d)));
+    await _loadPeople();
+  }
+
+  Future<void> _route(String r) async {
+    await applyRoute(context, r);
+    await _load();
   }
 
   void _changed() {
@@ -84,13 +130,29 @@ class _SettingsPageState extends State<SettingsPage> {
     final f = await AndroidBridge.instance.pickFolder();
     if (f == null) return;
     if (old != null && old.uri != f.uri) await AndroidBridge.instance.releaseFolder(old.uri);
-    await _session.setSaveFolder(f);
+    try {
+      await _session.setSaveFolder(f);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Saqlab boʻlmadi: ${errorText(e)}');
+    }
+    // The tree now lives in settings.json (W3 #8): read it back, so the next change does not write an old copy.
+    await _load();
   }
 
   Future<void> _clearFolder() async {
     final old = _session.saveFolder;
     if (old != null) await AndroidBridge.instance.releaseFolder(old.uri);
     await _session.setSaveFolder(null);
+    await _load();
+  }
+
+  Future<void> _companionNotifications(bool on) async {
+    if (on && !await AndroidBridge.instance.notificationAccess(ask: true)) {
+      // The system page opened; the switch follows once the user is back and access is on.
+      return;
+    }
+    await _session.setCompanion(notifications: on);
+    await AndroidBridge.instance.companionMirror(on, _session.mirrorApps);
   }
 
   Future<void> _rename() async {
@@ -100,12 +162,7 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Qurilma nomi', style: v.heading),
-        content: TextField(
-          controller: c,
-          autofocus: true,
-          maxLength: 32,
-          onSubmitted: (t) => Navigator.pop(ctx, t),
-        ),
+        content: TextField(controller: c, autofocus: true, maxLength: 32, onSubmitted: (t) => Navigator.pop(ctx, t)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Bekor qilish')),
           FilledButton(onPressed: () => Navigator.pop(ctx, c.text), child: const Text('Saqlash')),
@@ -139,8 +196,36 @@ class _SettingsPageState extends State<SettingsPage> {
               trailing: Icon(Icons.edit_outlined, size: 18, color: v.muted),
             ),
             if (_error != null) ...[const SizedBox(height: 12), VNotice(title: 'Xato', body: _error)],
+            _Header(tr('route.title')),
+            _Group(
+              children: [RouteList(current: _session.route, onPick: _route)],
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: PrivacyLine(keys: _session.privacy),
+            ),
+            _Header(tr('visibility.title')),
+            _Group(
+              children: [
+                for (final mode in const ['trusted_only', 'everyone', 'off'])
+                  _Choice(
+                    label: mode == 'everyone' && _vis?.mode == 'everyone'
+                        ? '${tr('visibility.everyone')} · '
+                              '${tr('visibility.everyone.left', {'m': '${((_vis!.remainingSecs + 59) ~/ 60)}'})}'
+                        : tr('visibility.$mode'),
+                    on: (_vis?.mode == 'pairing' ? 'trusted_only' : _vis?.mode ?? 'trusted_only') == mode,
+                    onTap: () => _setVisibility(mode),
+                  ),
+              ],
+            ),
+            _Header(tr('devices.title')),
+            DeviceList(devices: _devices, onOpen: _openDevice),
             if (s == null)
-              const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              )
             else ...[
               const _Header('Qabul qilish'),
               _Group(
@@ -219,14 +304,42 @@ class _SettingsPageState extends State<SettingsPage> {
                   _Drop(
                     label: 'Ichki papka',
                     value: (_save(s)['subfolder'] as String?) ?? 'none',
-                    items: const {'none': 'Yoʻq', 'device': 'Qurilma nomi', 'date': 'Sana', 'device_date': 'Qurilma / sana'},
+                    items: const {
+                      'none': 'Yoʻq',
+                      'device': 'Qurilma nomi',
+                      'date': 'Sana',
+                      'device_date': 'Qurilma / sana',
+                    },
                     onChanged: (x) => _set((s) => _save(s)['subfolder'] = x),
                   ),
                   _Drop(
                     label: 'Shu nomli fayl bor boʻlsa',
                     value: (_save(s)['conflict'] as String?) ?? 'keep_both',
-                    items: const {'keep_both': 'Ikkalasi qolsin', 'replace': 'Almashtirish', 'skip': 'Oʻtkazib yuborish'},
+                    items: const {
+                      'keep_both': 'Ikkalasi qolsin',
+                      'replace': 'Almashtirish',
+                      'skip': 'Oʻtkazib yuborish',
+                    },
                     onChanged: (x) => _set((s) => _save(s)['conflict'] = x),
+                  ),
+                ],
+              ),
+            ],
+            if (Platform.isAndroid) ...[
+              _Header(tr('companion.title')),
+              _Group(
+                children: [
+                  _Switch(
+                    label: tr('companion.notifications'),
+                    hint: _session.mirrorNotifications ? tr('companion.waiting') : tr('companion.notifications.hint'),
+                    value: _session.mirrorNotifications,
+                    onChanged: _companionNotifications,
+                  ),
+                  _Switch(
+                    label: tr('companion.clipboard'),
+                    hint: tr('companion.clipboard.hint'),
+                    value: _session.clipboardButton,
+                    onChanged: (x) => _session.setCompanion(clipboard: x),
                   ),
                 ],
               ),
@@ -292,7 +405,10 @@ class _ThemeGrid extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: id == current ? v.accent : v.line, width: id == current ? 2.5 : 1),
                     ),
-                    child: ClipRRect(borderRadius: BorderRadius.circular(11), child: _Mini(t: t)),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: _Mini(t: t),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -300,7 +416,11 @@ class _ThemeGrid extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: v.text(11, id == current ? FontWeight.w700 : FontWeight.w500, color: id == current ? v.accent : v.ink),
+                  style: v.text(
+                    11,
+                    id == current ? FontWeight.w700 : FontWeight.w500,
+                    color: id == current ? v.accent : v.ink,
+                  ),
                 ),
               ],
             ),
@@ -319,7 +439,12 @@ class _Mini extends StatelessWidget {
     final t = this.t;
     if (t == null) {
       final light = vutricThemes[0], dark = vutricThemes[1];
-      return Row(children: [Expanded(child: _Mini(t: light)), Expanded(child: _Mini(t: dark))]);
+      return Row(
+        children: [
+          Expanded(child: _Mini(t: light)),
+          Expanded(child: _Mini(t: dark)),
+        ],
+      );
     }
     return ColoredBox(
       color: t.bg,
@@ -335,11 +460,18 @@ class _Mini extends StatelessWidget {
                 decoration: BoxDecoration(color: t.hero, borderRadius: BorderRadius.circular(4)),
                 alignment: Alignment.bottomRight,
                 padding: const EdgeInsets.all(3),
-                child: Container(width: 8, height: 8, decoration: BoxDecoration(color: t.accent, shape: BoxShape.circle)),
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(color: t.accent, shape: BoxShape.circle),
+                ),
               ),
             ),
             const SizedBox(height: 4),
-            Container(height: 7, decoration: BoxDecoration(color: t.raised, borderRadius: BorderRadius.circular(3))),
+            Container(
+              height: 7,
+              decoration: BoxDecoration(color: t.raised, borderRadius: BorderRadius.circular(3)),
+            ),
           ],
         ),
       ),

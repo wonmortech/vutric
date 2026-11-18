@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../android.dart';
+import '../companion.dart';
 import '../design/tokens.dart';
 import '../design/widgets.dart';
 import '../session.dart';
@@ -68,6 +69,10 @@ class _HomeShellState extends State<HomeShell> {
           await Future<void>.delayed(const Duration(milliseconds: 250));
         }
         if (mounted && _s.myLink != null) await connectFlow(context, way: ConnectWay.wait);
+      case PhoneNotice():
+        NoticeQueue.instance.add(e);
+      case ForeignDevice():
+        ForeignDevices.instance.add(e);
     }
   }
 
@@ -152,9 +157,8 @@ class _HomeShellState extends State<HomeShell> {
       return;
     }
     if (_s.myLink == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_s.bootError ?? 'Tayyorlanmoqda, bir soniya…')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(_s.bootError ?? 'Tayyorlanmoqda, bir soniya…')));
       return;
     }
     await connectFlow(context);

@@ -34,6 +34,7 @@ Future<void> main() async {
     return;
   }
   await Session.instance.loadLocal();
+  await Session.instance.loadTransferSettings();
   runApp(const VutricApp());
   await Session.instance.restart();
 }
