@@ -188,6 +188,53 @@ pub fn companion(data: &[u8]) {
     }
 }
 
+/// Everything a magic-wormhole peer or server sends us before and after the key exchange (C7, ADR-0067): mailbox
+/// server frames, the `pake` body, transit hints and file-transfer offers. Bounded output, no panic.
+pub fn wormhole_messages(data: &[u8]) {
+    use vutric_compat_wormhole::{mailbox, transfer, transit, wormhole};
+    if let Some(m) = mailbox::parse(data) {
+        if let mailbox::ServerMsg::Message { side, phase, body } = &m {
+            assert!(side.len() <= mailbox::MAX_ID && phase.len() <= mailbox::MAX_ID);
+            assert!(body.len() <= mailbox::MAX_BODY);
+        }
+        if let mailbox::ServerMsg::Allocated { nameplate } = &m {
+            assert!(nameplate.bytes().all(|b| b.is_ascii_digit()));
+        }
+    }
+    if let Some(p) = wormhole::pake_message(data) {
+        assert!(p.len() <= 128);
+    }
+    let Ok(v) = serde_json::from_slice::<serde_json::Value>(data) else {
+        return;
+    };
+    if let Some(h) = transit::Hints::parse(&v) {
+        assert!(h.direct.len() <= transit::MAX_HINTS && h.relays.len() <= transit::MAX_RELAYS);
+        assert_eq!(
+            transit::Hints::parse(&h.to_json()),
+            Some(h),
+            "hints round-trip"
+        );
+    }
+    match transfer::parse_offer(&v) {
+        Some(transfer::Offer::Text(t)) => assert!(t.len() <= transfer::MAX_TEXT),
+        Some(transfer::Offer::File { name, .. }) => {
+            assert_eq!(filename::sanitize(&name), name, "offered name is sanitized");
+        }
+        None => {}
+    }
+    if let Some(code) = data
+        .get(..data.len().min(200))
+        .and_then(|d| std::str::from_utf8(d).ok())
+        && let Some(c) = vutric_compat_wormhole::code::Code::parse(code)
+    {
+        assert_eq!(
+            vutric_compat_wormhole::code::Code::parse(c.as_str()),
+            Some(c.clone())
+        );
+        assert!(c.nameplate().bytes().all(|b| b.is_ascii_digit()));
+    }
+}
+
 #[derive(Debug, Arbitrary)]
 struct TargetInput {
     path: String,
@@ -619,6 +666,31 @@ mod smoke {
         run(companion, 1024, 23);
         companion(b"\x00\x08Telegram\x03Ali\x05salom\x2a");
         companion(b"\x01\x04\xe2\x80\xaeab");
+    }
+
+    #[test]
+    fn wormhole_random_and_near_valid() {
+        run(wormhole_messages, 1024, 29);
+        let seeds = [
+            r#"{"type":"message","side":"0a1b2c3d4e","phase":"pake","body":"7b7d","id":"x"}"#,
+            r#"{"type":"welcome","welcome":{"motd":"hi","permission-required":{"none":{}}}}"#,
+            r#"{"pake_v1":"00112233"}"#,
+            r#"{"hints-v1":[{"type":"direct-tcp-v1","hostname":"10.0.0.2","port":4000},{"type":"relay-v1","hints":[{"type":"direct-tcp-v1","hostname":"r.example","port":4001}]}]}"#,
+            r#"{"file":{"filename":"../a.txt","filesize":12}}"#,
+            r#"{"directory":{"mode":"zipfile/deflated","dirname":"CON","zipsize":9}}"#,
+            "7-guitarist-revenge",
+        ];
+        let mut r = Rng(31);
+        for seed in seeds {
+            wormhole_messages(seed.as_bytes());
+            for _ in 0..RUNS {
+                let mut v = seed.as_bytes().to_vec();
+                let i = (r.next() as usize) % v.len();
+                let pool = b"\"{}[]:,0-9aZ\\\x00\xff";
+                v[i] = pool[(r.next() as usize) % pool.len()];
+                wormhole_messages(&v);
+            }
+        }
     }
 
     #[test]

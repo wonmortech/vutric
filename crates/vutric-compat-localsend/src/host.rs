@@ -179,6 +179,17 @@ impl Adapter {
         self.tell(&cmd).await
     }
 
+    /// Starts a magic-wormhole send or receive (`ToAdapter::WormholeSend` / `WormholeReceive`, ADR-0067).
+    pub async fn wormhole(&mut self, cmd: ToAdapter) -> Result<()> {
+        if !matches!(
+            cmd,
+            ToAdapter::WormholeSend { .. } | ToAdapter::WormholeReceive { .. }
+        ) {
+            bail!("not a magic-wormhole command");
+        }
+        self.tell(&cmd).await
+    }
+
     pub async fn decide(&mut self, session_id: &str, accept: Vec<String>) -> Result<()> {
         self.tell(&ToAdapter::Decide {
             session_id: session_id.to_owned(),

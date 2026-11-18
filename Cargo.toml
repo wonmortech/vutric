@@ -12,6 +12,7 @@ members = [
     "apps/net-spike",
     "crates/vutric-mobile",
     "apps/overlay-spike",
+    "crates/vutric-compat-wormhole",
 ]
 
 [workspace.package]

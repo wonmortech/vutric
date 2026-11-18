@@ -23,6 +23,7 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite, AsyncWriteExt as _, BufRead
 use tokio::sync::{Mutex, mpsc, oneshot};
 use vutric_compat_kdeconnect as kdc;
 use vutric_compat_quickshare as qs;
+use vutric_compat_wormhole as wh;
 
 type Out = mpsc::Sender<FromAdapter>;
 
@@ -64,6 +65,7 @@ where
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)] // one dispatch over every command, read top to bottom
 async fn run<R: AsyncBufRead + Unpin>(start: Start, input: &mut R, out: Out) -> Result<()> {
     let identity = Identity::load_or_create(&start.identity).context("identity")?;
     let (receiver, events) = Receiver::start(
@@ -115,6 +117,29 @@ async fn run<R: AsyncBufRead + Unpin>(start: Start, input: &mut R, out: Out) -> 
                 announce(discovery.as_ref(), kde.as_ref(), start.multicast).await;
             }
             cmd @ ToAdapter::KdeSend { .. } => kde_send(kde.as_ref(), &out, cmd),
+            ToAdapter::WormholeSend {
+                request_id,
+                paths,
+                text,
+                servers,
+            } => {
+                let cfg = wormhole_config(&start, servers);
+                tokio::spawn(wormhole_send(cfg, out.clone(), request_id, paths, text));
+            }
+            ToAdapter::WormholeReceive {
+                request_id,
+                code,
+                servers,
+            } => {
+                let job = WormholeReceive {
+                    cfg: wormhole_config(&start, servers),
+                    out: out.clone(),
+                    pending: Arc::clone(&pending),
+                    staging: start.staging.clone(),
+                    decide_timeout: Duration::from_secs(start.decide_timeout_secs.clamp(5, 600)),
+                };
+                tokio::spawn(job.run(request_id, code));
+            }
             ToAdapter::Send {
                 request_id,
                 to,
@@ -161,6 +186,7 @@ enum Reply {
     LocalSend(oneshot::Sender<Decision>),
     QuickShare(oneshot::Sender<qs::server::Decision>),
     KdePair(oneshot::Sender<bool>),
+    Wormhole(oneshot::Sender<bool>),
 }
 
 type Pending = Arc<Mutex<HashMap<String, Reply>>>;
@@ -182,7 +208,7 @@ async fn decide(pending: &Pending, session_id: &str, accept: Vec<String>) {
                 qs::server::Decision::Accept
             });
         }
-        Some(Reply::KdePair(r)) => {
+        Some(Reply::KdePair(r) | Reply::Wormhole(r)) => {
             let _ = r.send(!accept.is_empty());
         }
         None => {}
@@ -510,6 +536,175 @@ fn spawn_bridge(mut events: mpsc::Receiver<Event>, out: Out, pending: Pending) {
             }
         }
     });
+}
+
+fn wormhole_config(start: &Start, servers: ipc::WormholeServers) -> wh::transfer::Config {
+    let d = wh::transfer::Config::default();
+    wh::transfer::Config {
+        mailbox: servers.mailbox.unwrap_or(d.mailbox),
+        relay: servers.relay.or(d.relay),
+        bind: start.bind,
+    }
+}
+
+/// One magic-wormhole send (C7): allocate a code, report it, wait for the receiver, send, report.
+async fn wormhole_send(
+    cfg: wh::transfer::Config,
+    out: Out,
+    request_id: u64,
+    paths: Vec<std::path::PathBuf>,
+    text: Option<String>,
+) {
+    let r: Result<(usize, u64)> = async {
+        if text.is_some() != paths.is_empty() || paths.len() > 1 {
+            anyhow::bail!("magic-wormhole sends one file or one text per code");
+        }
+        let pending = wh::wormhole::Wormhole::create(&cfg.mailbox, wh::transfer::APPID).await?;
+        out.send(FromAdapter::WormholeCode {
+            request_id,
+            code: pending.code.as_str().to_owned(),
+        })
+        .await?;
+        let mut w = pending.open().await?;
+        let done = match (&text, paths.first()) {
+            (Some(t), _) => wh::transfer::send_text(&mut w, t)
+                .await
+                .map(|()| (1, t.len() as u64)),
+            (None, Some(p)) => wh::transfer::send_file(&mut w, p, &cfg, &|_| {})
+                .await
+                .map(|b| (1, b)),
+            (None, None) => unreachable!("checked above"),
+        };
+        w.close(if done.is_ok() { "happy" } else { "errory" }).await;
+        done
+    }
+    .await;
+    let msg = match r {
+        Ok((files, bytes)) => FromAdapter::Sent {
+            request_id,
+            files,
+            bytes,
+            peer_cert: None,
+        },
+        Err(e) => FromAdapter::SendFailed {
+            request_id,
+            reason: format!("{e:#}"),
+        },
+    };
+    let _ = out.send(msg).await;
+}
+
+/// One magic-wormhole receive (C7): join by code, ask the user about a file, stage it.
+struct WormholeReceive {
+    cfg: wh::transfer::Config,
+    out: Out,
+    pending: Pending,
+    staging: std::path::PathBuf,
+    decide_timeout: Duration,
+}
+
+impl WormholeReceive {
+    async fn run(self, request_id: u64, code: String) {
+        let session_id = format!("wh-{request_id}");
+        if let Err(e) = self.receive(request_id, &session_id, &code).await {
+            self.pending.lock().await.remove(&session_id);
+            let _ = self
+                .out
+                .send(FromAdapter::WormholeFailed {
+                    request_id,
+                    reason: format!("{e:#}"),
+                })
+                .await;
+        }
+    }
+
+    async fn receive(&self, request_id: u64, session_id: &str, code: &str) -> Result<()> {
+        use wh::transfer::{self as t, Offer};
+        let code = wh::code::Code::parse(code).context("not a wormhole code")?;
+        let mut w = wh::wormhole::Wormhole::join(&self.cfg.mailbox, t::APPID, &code).await?;
+        let (offer, hints) = t::receive_offer(&mut w).await?;
+        let (name, size) = match offer {
+            Offer::Text(text) => {
+                t::accept_text(&mut w).await?;
+                w.close("happy").await;
+                self.out
+                    .send(FromAdapter::Text {
+                        session_id: session_id.to_owned(),
+                        kind: 1,
+                        text,
+                    })
+                    .await?;
+                self.out
+                    .send(FromAdapter::Finished {
+                        session_id: session_id.to_owned(),
+                    })
+                    .await?;
+                return Ok(());
+            }
+            Offer::File { name, size } => (name, size),
+        };
+        let (tx, rx) = oneshot::channel();
+        self.pending
+            .lock()
+            .await
+            .insert(session_id.to_owned(), Reply::Wormhole(tx));
+        self.out
+            .send(FromAdapter::Offer {
+                session_id: session_id.to_owned(),
+                peer: std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
+                peer_cert: None,
+                alias: "magic-wormhole".into(),
+                files: vec![OfferFile {
+                    id: "0".into(),
+                    name: name.clone(),
+                    size,
+                    file_type: String::new(),
+                }],
+                via: Via::Wormhole,
+                code: None,
+            })
+            .await?;
+        let yes = tokio::time::timeout(self.decide_timeout, rx)
+            .await
+            .unwrap_or(Ok(false))
+            .unwrap_or(false);
+        if !yes {
+            self.pending.lock().await.remove(session_id);
+            t::reject(&mut w).await?;
+            w.close("happy").await;
+            self.out
+                .send(FromAdapter::Cancelled {
+                    session_id: session_id.to_owned(),
+                })
+                .await?;
+            return Ok(());
+        }
+        tokio::fs::create_dir_all(&self.staging).await?;
+        let part = self.staging.join(format!("wh-{request_id}.vutric-part"));
+        let got = t::accept_file(&mut w, size, hints, &part, &self.cfg, &|_| {}).await;
+        w.close(if got.is_ok() { "happy" } else { "errory" }).await;
+        if let Err(e) = got {
+            let _ = tokio::fs::remove_file(&part).await;
+            return Err(e);
+        }
+        let path = t::free_name(&self.staging, &name);
+        tokio::fs::rename(&part, &path).await?;
+        self.out
+            .send(FromAdapter::Received {
+                session_id: session_id.to_owned(),
+                file_id: "0".into(),
+                name,
+                path,
+                size,
+            })
+            .await?;
+        self.out
+            .send(FromAdapter::Finished {
+                session_id: session_id.to_owned(),
+            })
+            .await?;
+        Ok(())
+    }
 }
 
 /// Runs one send in the background and reports how it went.

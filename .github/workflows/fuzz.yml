@@ -68,7 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [frame_stream, message, pairing_ticket, save_target, filename, settings_json, trust_json, beacon, localsend_prepare, localsend_announce, localsend_ipc, quickshare_frames, quickshare_secure, kdeconnect_packet, companion]
+        target: [frame_stream, message, pairing_ticket, save_target, filename, settings_json, trust_json, beacon, localsend_prepare, localsend_announce, localsend_ipc, quickshare_frames, quickshare_secure, kdeconnect_packet, companion, wormhole_messages]
     steps:
       - uses: actions/checkout@v5
         with:
