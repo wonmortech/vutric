@@ -15,6 +15,7 @@ import 'package:share_plus/share_plus.dart';
 import 'android.dart';
 import 'design/tokens.dart';
 import 'design/widgets.dart';
+import 'i18n.dart';
 import 'session.dart';
 import 'src/rust/api.dart' as vutric;
 import 'ui.dart';
@@ -68,8 +69,7 @@ String _ext(String path) {
   return dot < 0 ? '' : path.substring(dot + 1).toLowerCase();
 }
 
-String baseName(String path) =>
-    path.split(RegExp(r'[/\\]')).lastWhere((s) => s.isNotEmpty, orElse: () => 'fayl');
+String baseName(String path) => path.split(RegExp(r'[/\\]')).lastWhere((s) => s.isNotEmpty, orElse: () => 'fayl');
 
 IconData fileIcon(String name) => switch (_ext(name)) {
   'jpg' || 'jpeg' || 'png' || 'heic' || 'heif' || 'webp' || 'gif' => Icons.image_outlined,
@@ -84,7 +84,8 @@ IconData fileIcon(String name) => switch (_ext(name)) {
 };
 
 /// Hands files to the system share sheet (any app on the phone).
-Future<void> shareFiles(List<String> paths) => SharePlus.instance.share(ShareParams(files: [for (final p in paths) XFile(p)]));
+Future<void> shareFiles(List<String> paths) =>
+    SharePlus.instance.share(ShareParams(files: [for (final p in paths) XFile(p)]));
 
 /// Today in the phone's calendar, `YYYY-MM-DD`, for a per-day save folder.
 String localDate() {
@@ -125,8 +126,14 @@ Future<int> saveMediaToGallery(List<String> saved) async {
 Future<vutric.TransferProgress?> sendPaths(BuildContext context, List<String> paths, List<String> names) async {
   final s = Session.instance;
   final peer = s.peer?.peerName ?? 'qurilma';
+  final bytes = await totalBytes(paths);
+  if (!context.mounted || !await bulkAllowed(context, bytes) || !context.mounted) return null;
   final r = await s.exclusive(
-    () => runTransfer(context, title: '$peer’ga yuborilmoqda', stream: vutric.sendFiles(paths: paths, names: names)),
+    () => runTransfer(
+      context,
+      title: '$peer’ga yuborilmoqda',
+      stream: vutric.sendFiles(paths: paths, names: names),
+    ),
   );
   if (r == null) {
     await s.stillConnected();
@@ -147,6 +154,68 @@ Future<vutric.TransferProgress?> sendPaths(BuildContext context, List<String> pa
     ),
   );
   return r;
+}
+
+/// The size of [paths] on disk (folders counted through), for the relay rule below.
+Future<int> totalBytes(List<String> paths) async {
+  var n = 0;
+  for (final p in paths) {
+    try {
+      final t = await FileSystemEntity.type(p);
+      if (t == FileSystemEntityType.directory) {
+        await for (final f in Directory(p).list(recursive: true, followLinks: false)) {
+          if (f is File) n += await f.length();
+        }
+      } else if (t == FileSystemEntityType.file) {
+        n += await File(p).length();
+      }
+    } on FileSystemException {
+      // Unreadable: the send itself reports it.
+    }
+  }
+  return n;
+}
+
+/// Big batches through the relay (Rb, ADR-0068): over 2 GiB on a relayed path asks first (a hotspot or cable is
+/// faster), over 10 GiB is refused with the same advice. A direct path, or no answer from Rust, sends as before.
+Future<bool> bulkAllowed(BuildContext context, int bytes) async {
+  String verdict;
+  try {
+    verdict = await Session.instance.exclusive(() => vutric.bulkVerdict(total: BigInt.from(bytes)));
+  } catch (_) {
+    return true;
+  }
+  if (verdict == 'go' || !context.mounted) return verdict == 'go';
+  if (verdict == 'too_big') {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => BulkDialog(bytes: bytes, refuse: true),
+    );
+    return false;
+  }
+  return await showDialog<bool>(
+        context: context,
+        builder: (_) => BulkDialog(bytes: bytes, refuse: false),
+      ) ==
+      true;
+}
+
+class BulkDialog extends StatelessWidget {
+  const BulkDialog({super.key, required this.bytes, required this.refuse});
+  final int bytes;
+  final bool refuse;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(tr('bulk.ask.title', {'size': sizeText(bytes.toDouble())})),
+      content: Text(refuse ? tr('bulk.too_big') : tr('bulk.ask.body')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('companion.clipboard.close'))),
+        if (!refuse) FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(tr('bulk.ask.go'))),
+      ],
+    );
+  }
 }
 
 /// Runs a transfer with a progress sheet the user can cancel. Returns the last event (done), or null when it

@@ -4,13 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vutric_spike/design/themes.g.dart';
 import 'package:vutric_spike/main.dart' show themeFor;
-import 'package:vutric_spike/companion.dart' show clipboardFileName;
+import 'package:vutric_spike/companion.dart' show clipboardProblem;
+import 'package:vutric_spike/compat.dart';
 import 'package:vutric_spike/i18n.dart';
-import 'package:vutric_spike/screens/connect.dart' show ConnectWay, waysFor;
+import 'package:vutric_spike/screens/connect.dart' show ConnectWay, diagnosisText, waysFor;
 import 'package:vutric_spike/screens/device_page.dart' show agoText;
 import 'package:vutric_spike/screens/hotspot_page.dart' show hotspotError;
 import 'package:vutric_spike/session.dart';
 import 'package:vutric_spike/transfer_ui.dart';
+import 'package:vutric_spike/src/rust/api.dart' as vutric;
 import 'package:vutric_spike/ui.dart' show errorText, routeLabel;
 
 /// WCAG 2.2 contrast ratio of [fg] over [bg] (alpha composited onto [bg] first).
@@ -146,10 +148,102 @@ void main() {
   });
 
   group('small helpers', () {
-    test('clipboard file name has no character an OS refuses', () {
-      final n = clipboardFileName(DateTime(2026, 11, 8, 4, 5, 6));
-      expect(n, 'Bufer 2026-11-08 04.05.06.txt');
-      expect(n.contains(RegExp(r'[\\/:*?"<>|]')), isFalse);
+    test('clipboard text is checked before it goes (ADR-0065: empty or over 64 KiB is refused)', () {
+      expect(clipboardProblem(''), 'companion.clipboard.empty');
+      expect(clipboardProblem('   \n'), 'companion.clipboard.empty');
+      expect(clipboardProblem('salom'), isNull);
+      expect(clipboardProblem('a' * (64 * 1024)), isNull);
+      expect(clipboardProblem('a' * (64 * 1024 + 1)), 'companion.clipboard.too_long');
+      // Bytes, not characters: 2-byte letters reach the cap at half the count.
+      expect(clipboardProblem('ʻ' * (32 * 1024 + 1)), 'companion.clipboard.too_long');
+    });
+    test('an empty incoming means paused, any content does not', () {
+      expect(isPaused(const vutric.Incoming()), isTrue);
+      expect(isPaused(const vutric.Incoming(clipboard: 'x')), isFalse);
+      expect(
+        isPaused(
+          vutric.Incoming(
+            notice: vutric.CompanionNotice(app: 'a', title: 't', text: '', atMs: BigInt.zero),
+          ),
+        ),
+        isFalse,
+      );
+    });
+    test('failed connects are explained, the captive portal with its login page (R1a)', () {
+      final c = diagnosisText(
+        const vutric.Diagnosis(
+          key: 'lan.unreachable.captive',
+          next: ['sign_in', 'hotspot', 'cable'],
+          login: 'http://login.hotel.example/',
+        ),
+      );
+      expect(c.title, tr('lan.unreachable.captive'));
+      expect(c.body, contains(tr('lan.captive.body')));
+      expect(c.body, contains('http://login.hotel.example/'));
+      expect(c.body, contains(tr('lan.next.sign_in')));
+      final iso = diagnosisText(const vutric.Diagnosis(key: 'lan.unreachable.isolated', next: ['relay'], login: ''));
+      expect(iso.body, tr('lan.next.relay'));
+      for (final k in ['local_network_denied', 'isolated', 'other_network', 'no_network', 'captive']) {
+        expect(hasUzbek('lan.unreachable.$k'), isTrue, reason: k);
+      }
+      for (final n in ['fix_permission', 'relay', 'hotspot', 'cable', 'sign_in']) {
+        expect(hasUzbek('lan.next.$n'), isTrue, reason: n);
+      }
+    });
+    test('compat events from the :compat process are parsed and capped (C10, ADR-0066)', () {
+      final seen = parseCompatEvent(
+        '{"t":"seen","alias":"Ali\\u0007 PC","device_type":"desktop","to":"192.168.1.5:53317","https":true,'
+        '"via":"localsend"}',
+      );
+      expect(seen, isA<CompatSeen>());
+      final d = (seen! as CompatSeen).device;
+      expect(d.name, 'Ali  PC');
+      expect(d.host, '192.168.1.5');
+      expect(d.https, isTrue);
+      expect(d.key, 'localsend:192.168.1.5:53317');
+      final kde =
+          parseCompatEvent(
+                '{"t":"seen","alias":"${'x' * 300}","to":"10.0.0.2:1716","https":false,"via":"kdeconnect","device_id":"abc"}',
+              )!
+              as CompatSeen;
+      expect(kde.device.key, 'kdeconnect:abc');
+      expect(kde.device.name.length, 64);
+      final offer =
+          parseCompatEvent(
+                '{"t":"offer","session_id":"s1","peer":"10.0.0.2","peer_cert":null,"alias":"Telefon",'
+                '"files":[{"id":"a","name":"x.jpg","size":10,"file_type":"image/jpeg"},'
+                '{"id":"b","name":"y.pdf","size":5,"file_type":"application/pdf"}],"via":"localsend"}',
+              )!
+              as CompatOffer;
+      expect(offer.files.length, 2);
+      expect(offer.bytes, 15);
+      expect(parseCompatEvent('{"t":"received","session_id":"s1","file_id":"a","name":"x","size":1}'), isNull);
+      expect(parseCompatEvent('{"t":"wormhole_code","request_id":3,"code":"7-a-b"}'), isA<CompatAnswer>());
+      expect((parseCompatEvent('{"t":"send_failed","request_id":4,"reason":""}')! as CompatAnswer).reason, 'failed');
+      expect(parseCompatEvent('{"t":"ready","fingerprint":"f","port":1}'), isNull);
+      expect(parseCompatEvent('not json'), isNull);
+      expect(parseCompatEvent('[1,2]'), isNull);
+    });
+    test('the adapters keep devices and answers, and drop them when the process ends', () {
+      final c = Compat.instance;
+      c.handle(
+        const CompatSeen(CompatDevice(via: 'localsend', name: 'PC', to: '1.2.3.4:53317', https: true, type: '')),
+      );
+      expect(c.devices.length, 1);
+      c.handle(const CompatPaired('kde1', on: true));
+      expect(c.pairedKde, contains('kde1'));
+      c.handle(const CompatPaired('kde1', on: false));
+      expect(c.pairedKde, isEmpty);
+      c.handle(const CompatClosed());
+      expect(c.devices, isEmpty);
+      expect(c.running, isFalse);
+    });
+    test('magic-wormhole is offered only when the route may use the internet (ADR-0067)', () {
+      expect(wormholeAllowed('auto'), isTrue);
+      expect(wormholeAllowed('internet'), isTrue);
+      expect(wormholeAllowed('lan_only'), isFalse);
+      expect(wormholeAllowed('offline'), isFalse);
+      expect(wormholeAllowed('bluetooth'), isFalse);
     });
     test('last seen in words', () {
       final now = DateTime(2026, 11, 18, 12);

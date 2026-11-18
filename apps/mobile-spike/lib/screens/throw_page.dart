@@ -633,7 +633,7 @@ class PeerSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
               ],
-              if (s.clipboardButton) ...[
+              if (s.clipboardButton && peer.trusted) ...[
                 VButton(
                   label: tr('companion.clipboard.send'),
                   icon: Icons.content_paste_go_rounded,

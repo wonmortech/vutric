@@ -4,6 +4,8 @@
   is clean, `flutter test` and `cargo test -p vutric-mobile` pass, the release APK builds. Nothing has been tried
   on a real phone yet.
 - Date: 2026-11-18
+- Superseded in part: decisions 9, 10 and 11 (the `TEMP until W3 #n` shims) and checklist items 25–27 are replaced by
+  [ADR-0014](0014-phone-pairing-companion-compat.md).
 - Builds on: [ADR-0011](0011-phone-ui-from-claude-design.md), [ADR-0012](0012-android-modules-phase-1.md).
   Uses W3's [ADR-0050](0050-trust-store-and-pairing-code.md), [0052](0052-lan-finding-beacon-and-diagnosis.md),
   [0057](0057-storage-engine-rules.md), [0058](0058-hotspot-in-the-pairing-link.md),

@@ -20,6 +20,7 @@ import '../i18n.dart';
 import '../session.dart';
 import '../src/rust/api.dart' as vutric;
 import '../ui.dart';
+import 'foreign_page.dart';
 import 'hotspot_page.dart';
 import 'route_picker.dart';
 import 'scan_page.dart';
@@ -240,11 +241,15 @@ class _WaySheetState extends State<WaySheet> {
   }
 }
 
-/// LocalSend and KDE Connect devices heard on this Wi-Fi (A13). Shown for what they are; sending to them opens
-/// when the phone host of the compat adapters exists (W3 #11).
+/// LocalSend and KDE Connect devices heard on this Wi-Fi (A13). A tap opens [ForeignPage], where the adapters in
+/// the `:compat` process send to them (C10, ADR-0066).
 class ForeignList extends StatelessWidget {
   const ForeignList({super.key, required this.devices});
   final List<ForeignDevice> devices;
+
+  void _open(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ForeignPage()));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -260,7 +265,8 @@ class ForeignList extends StatelessWidget {
             child: VRowCard(
               icon: d.type == 'mobile' || d.type == 'phone' ? Icons.smartphone_rounded : Icons.computer_rounded,
               title: d.name.isEmpty ? d.host : d.name,
-              subtitle: '${tr('foreign.${d.app}')} · ${d.host}',
+              subtitle: '${tr('foreign.via', {'app': tr('foreign.${d.app}')})} · ${d.host}',
+              onTap: Platform.isAndroid ? () => _open(context) : null,
             ),
           ),
         Text(tr('foreign.hint'), style: v.caption),
@@ -319,6 +325,17 @@ class PrivacyLine extends StatelessWidget {
   }
 }
 
+/// The failure screen's words for a [vutric.Diagnosis] (R1, R1a captive portal): a title, and a body with what to
+/// do and what to try next. The login page, when the Wi-Fi named one, is shown as text to open in a browser.
+({String title, String body}) diagnosisText(vutric.Diagnosis d) {
+  final lines = <String>[
+    if (d.key == 'lan.unreachable.captive') tr('lan.captive.body'),
+    if (d.login.isNotEmpty) d.login,
+    if (d.next.isNotEmpty) [for (final n in d.next) tr('lan.next.$n')].join(' · '),
+  ];
+  return (title: tr(d.key), body: lines.join('\n'));
+}
+
 /// S3-2: the V inside expanding rings while the session opens; cancel goes back.
 class ConnectingPage extends StatefulWidget {
   const ConnectingPage({super.key, required this.job, this.link});
@@ -336,6 +353,9 @@ class _ConnectingPageState extends State<ConnectingPage> with SingleTickerProvid
   );
   String? _error;
   bool _closing = false;
+
+  /// Why the link's device was not reached, once the failed connect was diagnosed (R1, R1a).
+  vutric.Diagnosis? _why;
 
   /// The six digits while a device found nearby is being paired (ADR-0050), and the user's answer.
   String? _digits;
@@ -378,7 +398,10 @@ class _ConnectingPageState extends State<ConnectingPage> with SingleTickerProvid
   }
 
   Future<void> _go() async {
-    setState(() => _error = null);
+    setState(() {
+      _error = null;
+      _why = null;
+    });
     try {
       final c = await Session.instance.connect(widget.job, verify: _verify);
       if (!mounted) return;
@@ -391,10 +414,22 @@ class _ConnectingPageState extends State<ConnectingPage> with SingleTickerProvid
         Navigator.of(context).pop();
         return;
       }
+      final refused = isCancelled(e) || e is PairRefused;
       setState(() {
-        _error ??= isCancelled(e) ? tr('pair.refused') : errorText(e);
+        _error ??= refused ? tr('pair.refused') : errorText(e);
         _digits = null;
       });
+      final link = widget.link;
+      if (!refused && link != null) unawaited(_diagnose(link));
+    }
+  }
+
+  Future<void> _diagnose(String link) async {
+    try {
+      final d = await vutric.diagnoseLink(link: link);
+      if (mounted && _error != null) setState(() => _why = d);
+    } catch (_) {
+      // No diagnosis: the plain error stays.
     }
   }
 
@@ -500,10 +535,13 @@ class _ConnectingPageState extends State<ConnectingPage> with SingleTickerProvid
               else
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: VNotice(
-                    title: 'Aloqa oʻrnatilmadi',
-                    body: '$_error\nIkkala qurilma yoqilgan va Wi-Fi’da ekanini tekshiring.',
-                  ),
+                  child: switch (_why) {
+                    final why? => VNotice(title: diagnosisText(why).title, body: diagnosisText(why).body),
+                    null => VNotice(
+                      title: 'Aloqa oʻrnatilmadi',
+                      body: '$_error\nIkkala qurilma yoqilgan va Wi-Fi’da ekanini tekshiring.',
+                    ),
+                  },
                 ),
               const Spacer(),
               Padding(
@@ -664,22 +702,28 @@ class _MyQrPageState extends State<MyQrPage> {
   /// The link gains the relay and new addresses (Wi-Fi switch, hotspot) while the page is open: keep the QR fresh.
   Timer? _refresh;
 
+  /// The QR is drawn only once it carries this window's one-time secret (ADR-0064): a QR shown a moment earlier
+  /// would let a scanner in only as a guest.
+  bool _ready = false;
+
   @override
   void initState() {
     super.initState();
     Session.instance.addListener(_changed);
-    Session.instance.refreshLink();
     _refresh = Timer.periodic(const Duration(seconds: 4), (_) => Session.instance.refreshLink());
     _open();
   }
 
   /// Unknown devices may connect only while this QR is on screen (ADR-0050 pairing window, 10 minutes at most).
+  /// Opening the window makes a new secret, so the link is fetched again after it.
   Future<void> _open() async {
     try {
       await vutric.setVisibility(mode: 'pairing');
+      await Session.instance.refreshLink();
       final code = await vutric.myCode();
       if (mounted) setState(() => _code = code);
     } catch (_) {}
+    if (mounted) setState(() => _ready = true);
     _wait();
   }
 
@@ -687,7 +731,10 @@ class _MyQrPageState extends State<MyQrPage> {
   void dispose() {
     _refresh?.cancel();
     Session.instance.removeListener(_changed);
-    vutric.setVisibility(mode: 'trusted_only').catchError((Object _) => vutric.visibility());
+    vutric
+        .setVisibility(mode: 'trusted_only')
+        .then((_) => Session.instance.refreshLink())
+        .catchError((Object _) => Session.instance.refreshLink());
     super.dispose();
   }
 
@@ -698,13 +745,19 @@ class _MyQrPageState extends State<MyQrPage> {
   Future<void> _wait() async {
     setState(() => _error = null);
     try {
-      final c = await Session.instance.connect(vutric.acceptSession);
+      final c = await Session.instance.connect(vutric.acceptSession, verify: (_) => checkDigits(context));
       if (!mounted) return;
       HapticFeedback.mediumImpact();
       _closing = true;
       Navigator.of(context).pop(c);
     } catch (e) {
       if (!mounted || _closing) return;
+      if (e is PairRefused) {
+        // "Farq qiladi" on either screen: nothing trusted, this QR keeps waiting for the next device.
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('pair.refused'))));
+        unawaited(_wait());
+        return;
+      }
       if (isCancelled(e)) {
         Navigator.of(context).pop();
         return;
@@ -739,7 +792,13 @@ class _MyQrPageState extends State<MyQrPage> {
               const SizedBox(height: 8),
               Text('Boshqa qurilmada: Vutric → Ulanish → QR skanerlash', style: v.caption),
               const Spacer(),
-              PairingQr(data: s.myLink ?? '', size: (w * 0.56).clamp(200.0, 300.0)),
+              if (_ready && s.myLink != null)
+                PairingQr(data: s.myLink!, size: (w * 0.56).clamp(200.0, 300.0))
+              else
+                SizedBox.square(
+                  dimension: (w * 0.56).clamp(200.0, 300.0) + 36,
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
               if (_code != null) ...[
                 const SizedBox(height: 14),
                 Semantics(
@@ -772,6 +831,120 @@ class _MyQrPageState extends State<MyQrPage> {
                 child: _error == null
                     ? VButton(label: 'Bekor qilish', kind: VButtonKind.secondary, onPressed: _cancel)
                     : VButton(label: 'Yana kutish', icon: Icons.refresh_rounded, onPressed: _wait),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The six-digit check on a session this phone accepted (ADR-0064 `Code`: the other device typed this phone's
+/// short code or address). True only when both users said "Bir xil"; the device is then paired.
+Future<bool> checkDigits(BuildContext context) async {
+  if (!context.mounted) return false;
+  final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const PairCheckPage()));
+  return ok == true;
+}
+
+/// The full-screen six-digit comparison for the listening phone (the dialer's side is inside [ConnectingPage]).
+class PairCheckPage extends StatefulWidget {
+  const PairCheckPage({super.key});
+
+  @override
+  State<PairCheckPage> createState() => _PairCheckPageState();
+}
+
+class _PairCheckPageState extends State<PairCheckPage> {
+  String? _digits;
+  String? _error;
+  bool _sent = false;
+  bool _done = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  Future<void> _start() async {
+    try {
+      final d = await vutric.pairStart();
+      if (!mounted) return;
+      HapticFeedback.selectionClick();
+      setState(() => _digits = d);
+    } catch (e) {
+      if (mounted) setState(() => _error = errorText(e));
+    }
+  }
+
+  Future<void> _answer(bool yes) async {
+    setState(() => _sent = true);
+    var both = false;
+    try {
+      both = await vutric.pairConfirm(matches: yes);
+    } catch (e) {
+      if (mounted) setState(() => _error = errorText(e));
+      return;
+    }
+    _finish(both);
+  }
+
+  void _finish(bool ok) {
+    if (_done || !mounted) return;
+    _done = true;
+    Navigator.of(context).pop(ok);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = _digits;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (did, _) {
+        if (!did) _finish(false);
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              VNavHeader(title: 'Juftlash', onBack: () => _finish(false)),
+              const Spacer(),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: VNotice(title: tr('pair.refused'), body: _error),
+                )
+              else if (d == null)
+                const CircularProgressIndicator()
+              else
+                PairDigits(digits: d, waiting: _sent),
+              const Spacer(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: _error != null || d == null
+                    ? VButton(label: 'Orqaga', kind: VButtonKind.secondary, onPressed: () => _finish(false))
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: VButton(
+                              label: tr('pair.no'),
+                              kind: VButtonKind.secondary,
+                              onPressed: _sent ? null : () => _answer(false),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: VButton(
+                              label: tr('pair.yes'),
+                              icon: Icons.check_rounded,
+                              busy: _sent,
+                              onPressed: _sent ? null : () => _answer(true),
+                            ),
+                          ),
+                        ],
+                      ),
               ),
             ],
           ),

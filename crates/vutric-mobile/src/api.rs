@@ -20,14 +20,20 @@ use anyhow::{Context as _, Result, bail};
 use tokio::runtime::Runtime;
 use tokio::sync::{Mutex as AsyncMutex, Notify, watch};
 use vutric_core::code::ShortCode;
+use vutric_core::companion::{self, NoticeLimit};
 use vutric_core::hotspot::{HotspotTicket, Security, Wifi};
-use vutric_core::message::FailReason;
+use vutric_core::message::{
+    FailReason, MAX_CLIPBOARD_BYTES, MAX_NOTICE_LINE_CHARS, MAX_NOTICE_TEXT_CHARS,
+};
 use vutric_core::route::{Offer, Picker, Situation, Step};
+use vutric_core::sas::{LINK_SECRET_BYTES, LinkSecret};
 use vutric_core::storage::DeviceRules;
-use vutric_core::{EndpointId, FlingId, Message, PairingTicket, Platform};
+use vutric_core::{EndpointId, FlingId, Message, PairingTicket, Platform, pairing};
 use vutric_net::beacon::BeaconService;
 use vutric_net::trust::{Admission, PairMethod, TrustStore, Visibility};
-use vutric_net::{Peer, Reach, Route, Session, find, lan, preview, probe, transfer};
+use vutric_net::{
+    PAIR_INTENT_WAIT, PairIntent, Peer, Reach, Route, Session, find, lan, preview, probe, transfer,
+};
 
 use crate::frb_generated::StreamSink;
 
@@ -42,7 +48,7 @@ pub const CANCELLED: &str = "vutric: cancelled";
 /// How long "find a computer" looks over mDNS.
 const DISCOVER_TIMEOUT: Duration = Duration::from_secs(15);
 
-fn runtime() -> &'static Runtime {
+pub(crate) fn runtime() -> &'static Runtime {
     static RT: OnceLock<Runtime> = OnceLock::new();
     RT.get_or_init(|| {
         tokio::runtime::Builder::new_multi_thread()
@@ -150,7 +156,7 @@ pub fn start(name: String, identity: Vec<u8>) -> Result<String> {
             Err(e) => vutric_net::say(format!("beacon off: {e:#}")),
         }
         *peer_slot().lock().expect("peer lock") = Some(p);
-        Ok(t.to_uri())
+        Ok(shown_link(t.to_uri()))
     })
 }
 
@@ -198,7 +204,8 @@ fn visibility_state_of(v: Visibility, now: u64) -> VisibilityState {
 }
 
 /// Sets who may connect: `off` (pause), `trusted_only` (the default), `everyone` (10 minutes, every offer asked
-/// about) or `pairing` (10 minutes, while this phone's QR or code is on screen).
+/// about) or `pairing` (10 minutes, while this phone's QR or code is on screen). Opening the pairing window makes
+/// a new one-time link secret (ADR-0064): the QR shown from then on carries it, and an older QR stops pairing.
 pub fn set_visibility(mode: String) -> Result<VisibilityState> {
     let now = vutric_net::trust::now();
     let v = match mode.as_str() {
@@ -208,11 +215,40 @@ pub fn set_visibility(mode: String) -> Result<VisibilityState> {
         "pairing" => Visibility::pairing(now),
         other => bail!("unknown visibility {other:?}"),
     };
+    *secret_slot().lock().expect("secret lock") =
+        matches!(v, Visibility::Pairing(_)).then(new_link_secret);
     *visibility_slot().lock().expect("visibility lock") = v;
     if let Ok(b) = beacon() {
         b.set_answering(v != Visibility::Off);
     }
     Ok(visibility_state_of(v, now))
+}
+
+/// The one-time secret of the open pairing window (ADR-0064), `None` outside it.
+fn secret_slot() -> &'static Mutex<Option<LinkSecret>> {
+    static SECRET: Mutex<Option<LinkSecret>> = Mutex::new(None);
+    &SECRET
+}
+
+fn new_link_secret() -> LinkSecret {
+    let mut s = [0u8; LINK_SECRET_BYTES];
+    s.copy_from_slice(&vutric_net::new_identity()[..LINK_SECRET_BYTES]);
+    LinkSecret(s)
+}
+
+/// The secret a dialer must prove right now: only while the pairing window is still open.
+fn window_secret() -> Option<LinkSecret> {
+    matches!(visibility_now(), Visibility::Pairing(_))
+        .then(|| *secret_slot().lock().expect("secret lock"))
+        .flatten()
+}
+
+/// `uri` as the QR shows it: with the window's secret while the pairing window is open.
+fn shown_link(uri: String) -> String {
+    match window_secret() {
+        Some(s) => pairing::with_secret(&uri, &s),
+        None => uri,
+    }
 }
 
 /// The visibility in force now (an expired window reads as `trusted_only`).
@@ -336,9 +372,10 @@ pub fn wait_online(max_ms: u32) -> Result<bool> {
     Ok(runtime().block_on(p.wait_online(Duration::from_millis(max_ms.into()))))
 }
 
-/// This device's pairing link as of now; once online it also carries the relay.
+/// This device's pairing link as of now; once online it also carries the relay. While the pairing window is open
+/// it also carries the window's one-time secret (ADR-0064), so a phone that scans it is trusted without digits.
 pub fn current_link() -> Result<String> {
-    Ok(peer()?.ticket().to_uri())
+    Ok(shown_link(peer()?.ticket().to_uri()))
 }
 
 // ---- Measurement runs (spike 0.2) ----
@@ -430,11 +467,10 @@ pub fn run_discovered(runs: u32) -> Result<RunReport> {
 /// Connects with a pairing link (scanned or pasted), then measures both directions. Cancelled by [`disconnect`].
 pub fn run_link(link: String, runs: u32) -> Result<RunReport> {
     let p = peer()?;
-    let t = PairingTicket::parse(link.trim())?;
     let at = now_epoch();
     runtime().block_on(cancellable(at, async {
         let t1 = Instant::now();
-        let s = p.connect_ticket(&t).await?;
+        let s = p.connect_link(link.trim()).await?;
         as_initiator(s, Duration::ZERO, t1.elapsed(), runs).await
     }))
 }
@@ -500,6 +536,7 @@ fn forget_on_error<T>(s: &Shared, r: Result<T>) -> Result<T> {
         && e.to_string() != CANCELLED
         && e.downcast_ref::<probe::Refused>().is_none()
         && e.downcast_ref::<transfer::Declined>().is_none()
+        && e.downcast_ref::<transfer::TooBigForRelay>().is_none()
     {
         let mut slot = session_slot().lock().expect("session lock");
         if slot.as_ref().is_some_and(|cur| Arc::ptr_eq(cur, s))
@@ -525,9 +562,13 @@ pub struct Connected {
     pub peer_id: String,
     /// Its short code (`ABCD-EFGH`).
     pub peer_code: String,
-    /// In this phone's trust list (paired before, or by the QR just scanned). False: run [`pair_start`] and
-    /// [`pair_confirm`] before anything else, or close the session.
+    /// In this phone's trust list (paired before, by the QR just scanned, or by a dialer that proved our QR).
     pub trusted: bool,
+    /// The six digits must be compared now ([`pair_start`], then [`pair_confirm`]) before anything else uses the
+    /// session: we found the device nearby, by address or by code, or it dialed us that way (ADR-0064 `Code`).
+    /// False with `trusted` false: a guest (let in through "everyone" or the pairing window without proving our
+    /// QR); it is never stored as trusted and every offer from it is asked about.
+    pub needs_check: bool,
 }
 
 fn route_name(s: &Session) -> String {
@@ -558,15 +599,17 @@ pub fn current_badge() -> String {
     runtime().block_on(async { s.lock().await.badge().key().to_owned() })
 }
 
-/// How a session was opened, which decides what it takes to trust the peer (ADR-0050).
-#[derive(Clone, Copy, PartialEq, Eq)]
+/// How a session was opened, which decides what it takes to trust the peer (ADR-0050, ADR-0064).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Pairing {
-    /// We dialed the key from its QR or link: pinned out of band, trusted at once.
+    /// We dialed the key from its QR or link (pinned out of band), or the peer dialed us and proved our QR's
+    /// one-time secret: trusted at once as `ticket`.
     Ticket,
-    /// The peer dialed us while our QR was on screen (the pairing window), with the key it read from it.
-    QrShown,
-    /// Found by mDNS, a typed address or a short code: nothing pins the key; the six digits must be compared.
-    Nearby,
+    /// Found by mDNS, a typed address or a short code, or the dialer started the six-digit check on us: nothing
+    /// pins the key, so the six digits must be compared unless it is paired already.
+    Check,
+    /// Let in through "everyone" or the pairing window without proving anything: never trusted here, a guest.
+    Guest,
 }
 
 /// Records the peer in the trust store as `how` allows; returns whether it is trusted now.
@@ -577,19 +620,27 @@ fn admit_peer(s: &Session, how: Pairing) -> bool {
     let mut trusted = false;
     let r = edit_trust(|t| {
         match how {
-            Pairing::Ticket | Pairing::QrShown => {
-                t.trust(id, &s.remote_name, platform, PairMethod::Ticket, now);
-            }
-            Pairing::Nearby => t.seen(&id, &s.remote_name, now),
+            Pairing::Ticket => t.trust(id, &s.remote_name, platform, PairMethod::Ticket, now),
+            Pairing::Check | Pairing::Guest => t.seen(&id, &s.remote_name, now),
         }
         trusted = t.is_trusted(&id);
     });
     if let Err(e) = r {
         vutric_net::say(format!("trust store not written: {e:#}"));
         // Without a store, only a pinned key counts.
-        return how != Pairing::Nearby;
+        return how == Pairing::Ticket;
     }
     trusted
+}
+
+/// What the listener does with an unknown dialer's [`PairIntent`] (ADR-0064); `None`: drop the session.
+fn pairing_of(intent: PairIntent) -> Option<Pairing> {
+    match intent {
+        PairIntent::Link => Some(Pairing::Ticket),
+        PairIntent::Code => Some(Pairing::Check),
+        PairIntent::WrongLink => None,
+        PairIntent::Neither => Some(Pairing::Guest),
+    }
 }
 
 /// Makes `s` the open session, unless the call that opened it was cancelled meanwhile (then `s` is closed).
@@ -604,6 +655,7 @@ fn keep(at: u64, s: Session, connect: Duration, how: Pairing) -> Result<Connecte
         peer_id: s.remote_id().to_string(),
         peer_code: ShortCode::of(&s.remote_id()).to_string(),
         trusted,
+        needs_check: !trusted && how == Pairing::Check,
     };
     let mut slot = session_slot().lock().expect("session lock");
     if now_epoch() != at {
@@ -628,26 +680,33 @@ fn open(how: Pairing, job: impl Future<Output = Result<Session>>) -> Result<Conn
     })
 }
 
-/// Opens the session with a pairing link (scanned or pasted). With the "Internet orqali" route the link's LAN
-/// hints are skipped (ADR-0060). Cancelled by [`disconnect`].
+/// Opens the session with a pairing link (scanned or pasted). When the link carries the other device's one-time
+/// secret (its pairing window, ADR-0064), the proof goes out first, so that device trusts this phone without the
+/// six digits. With the "Internet orqali" route the link's LAN hints are skipped (ADR-0060). Cancelled by
+/// [`disconnect`].
 pub fn connect_link(link: String) -> Result<Connected> {
     let p = peer()?;
-    let t = PairingTicket::parse(link.trim())?;
+    let link = link.trim().to_owned();
+    let t = PairingTicket::parse(&link)?;
+    let secret = pairing::secret_in(&link)?;
     let lan = load_settings().route.uses_lan();
     open(Pairing::Ticket, async move {
         if lan {
-            p.connect_ticket(&t).await
-        } else {
-            p.connect(t.endpoint, &[]).await
+            return p.connect_link(&link).await;
         }
+        let mut s = p.connect(t.endpoint, &[]).await?;
+        if let Some(secret) = secret {
+            s.prove_link(&secret).await?;
+        }
+        Ok(s)
     })
 }
 
 /// Opens the session with the first device found over mDNS (not on iPhone: no multicast there). An unpaired
-/// device comes back with `trusted: false`. Cancelled by [`disconnect`].
+/// device comes back with `needs_check`. Cancelled by [`disconnect`].
 pub fn connect_discovered() -> Result<Connected> {
     let p = peer()?;
-    open(Pairing::Nearby, async move {
+    open(Pairing::Check, async move {
         let near = p.discover(DISCOVER_TIMEOUT).await?;
         p.connect(near.id, &near.addrs).await
     })
@@ -684,7 +743,7 @@ pub fn connect_typed(text: String, scan: bool) -> Result<Connected> {
     let target = find::Target::parse(t).context("find.unreadable")?;
     let p = peer()?;
     let b = beacon()?;
-    open(Pairing::Nearby, async move {
+    open(Pairing::Check, async move {
         let found = find::resolve(&b, target, vutric_core::beacon::PORT, FIND_WAIT, scan)
             .await
             .map_err(|nf| anyhow::anyhow!(nf.key()))?;
@@ -694,30 +753,46 @@ pub fn connect_typed(text: String, scan: bool) -> Result<Connected> {
 
 /// Waits for another device to connect to this phone and keeps that session. Who gets in follows the trust
 /// list and the visibility (ADR-0050): a paired device always (unless paused); an unknown one only while the
-/// pairing window (this phone's QR on screen) or "everyone" is open. A device let in through the pairing
-/// window read our key from the QR, so it is paired as `ticket`; one let in through "everyone" stays unknown
-/// (`trusted: false`) and its offers are always asked about. Cancelled by [`disconnect`].
+/// pairing window (this phone's QR on screen) or "everyone" is open. An unknown device then shows how it pairs
+/// (ADR-0064, [`Session::pair_intent`], up to [`PAIR_INTENT_WAIT`]):
+///
+/// - it proved our QR's one-time secret: paired as `ticket` at once;
+/// - it started the six-digit check (it typed our short code or address): `needs_check`, and the screen runs
+///   [`pair_start`] / [`pair_confirm`];
+/// - it proved the secret of an older QR: dropped, and this phone keeps waiting;
+/// - neither: a guest, never stored as trusted, every offer from it asked about.
+///
+/// Cancelled by [`disconnect`].
 pub fn accept_session() -> Result<Connected> {
     let p = peer()?;
     let at = now_epoch();
     runtime().block_on(async {
         let t0 = Instant::now();
-        let (s, admission) = cancellable(at, async {
-            let store = load_trust();
-            p.accept_with(move |id: &EndpointId| {
-                vutric_net::trust::admit(&store, visibility_now(), id, vutric_net::trust::now())
+        loop {
+            let (mut s, admission) = cancellable(at, async {
+                let store = load_trust();
+                p.accept_with(move |id: &EndpointId| {
+                    vutric_net::trust::admit(&store, visibility_now(), id, vutric_net::trust::now())
+                })
+                .await
             })
-            .await
-        })
-        .await?;
-        // TEMP until W3 #13: the listener cannot tell whether the dialer will run `pair_code`, so it never runs
-        // it; a stranger admitted while our QR is on screen is taken as a QR scan (it read our key from it).
-        let how = match (admission, visibility_now()) {
-            (Admission::Unknown, Visibility::Pairing(_)) => Pairing::QrShown,
-            (Admission::Trusted, _) => Pairing::Ticket,
-            _ => Pairing::Nearby,
-        };
-        keep(at, s, t0.elapsed(), how)
+            .await?;
+            let how = if admission == Admission::Trusted {
+                Pairing::Ticket
+            } else {
+                let secret = window_secret();
+                let intent =
+                    cancellable(at, s.pair_intent(secret.as_ref(), PAIR_INTENT_WAIT)).await?;
+                if let Some(how) = pairing_of(intent) {
+                    how
+                } else {
+                    vutric_net::say("pairing: a proof for another QR, dropped".into());
+                    s.close();
+                    continue;
+                }
+            };
+            return keep(at, s, t0.elapsed(), how);
+        }
     })
 }
 
@@ -877,7 +952,7 @@ pub fn set_settings_dir(dir: String) {
     *settings_dir_slot().lock().expect("settings lock") = Some(dir.into());
 }
 
-fn load_settings() -> vutric_net::settings::Settings {
+pub(crate) fn load_settings() -> vutric_net::settings::Settings {
     settings_path()
         .as_deref()
         .map(vutric_net::settings::load)
@@ -902,11 +977,129 @@ pub fn put_settings(json: String) -> Result<()> {
     save_settings(&s)
 }
 
-/// What arrived on the open session: a photo thrown at this phone, or files offered to it.
+/// What arrived on the open session: a photo thrown at this phone, files offered to it, or (from a paired device
+/// only, ADR-0065) a mirrored notification or clipboard text. At most one field is set; none when paused.
 #[derive(Debug, Clone)]
 pub struct Incoming {
     pub photo: Option<Caught>,
     pub files: Option<FilesOffer>,
+    pub notice: Option<CompanionNotice>,
+    /// Text the other device sent for this phone's clipboard, cleaned for display ([`companion::shown`]). The
+    /// screen offers "Nusxalash"; nothing is copied without the user's tap.
+    pub clipboard: Option<String>,
+}
+
+impl Incoming {
+    fn none() -> Self {
+        Self {
+            photo: None,
+            files: None,
+            notice: None,
+            clipboard: None,
+        }
+    }
+}
+
+/// A notification mirrored from the other device, every field cleaned for display.
+#[derive(Debug, Clone)]
+pub struct CompanionNotice {
+    pub app: String,
+    pub title: String,
+    pub text: String,
+    /// The other device's clock, Unix milliseconds (display only).
+    pub at_ms: u64,
+}
+
+/// The rate limit on notices shown from the open session's peer (burst 10, then 1 per 500 ms, ADR-0065).
+fn notice_limit() -> &'static Mutex<(Option<EndpointId>, NoticeLimit)> {
+    static LIMIT: OnceLock<Mutex<(Option<EndpointId>, NoticeLimit)>> = OnceLock::new();
+    LIMIT.get_or_init(|| Mutex::new((None, NoticeLimit::default())))
+}
+
+/// What to hand the screen for a companion message from `from` (trusted or not), or `None` to drop it: only a
+/// paired device's messages are taken, text is cleaned and bounded, notices are rate-limited (ADR-0065).
+fn companion_incoming(msg: &Message, from: EndpointId, trusted: bool) -> Option<Incoming> {
+    let admission = if trusted {
+        Admission::Trusted
+    } else {
+        Admission::Unknown
+    };
+    if !companion::accepts(msg, admission) {
+        return None;
+    }
+    match msg {
+        Message::Notice(n) => {
+            let mut limit = notice_limit().lock().expect("notice limit");
+            if limit.0 != Some(from) {
+                *limit = (Some(from), NoticeLimit::default());
+            }
+            if !limit.1.allow(Instant::now()) {
+                return None;
+            }
+            let notice = CompanionNotice {
+                app: companion::shown(&n.app, MAX_NOTICE_LINE_CHARS, false),
+                title: companion::shown(&n.title, MAX_NOTICE_LINE_CHARS, false),
+                text: companion::shown(&n.text, MAX_NOTICE_TEXT_CHARS, true),
+                at_ms: n.at_ms,
+            };
+            Some(Incoming {
+                notice: Some(notice),
+                ..Incoming::none()
+            })
+        }
+        Message::Clipboard { text } => {
+            let clean = companion::shown(text, MAX_CLIPBOARD_BYTES, true);
+            (!clean.is_empty()).then(|| Incoming {
+                clipboard: Some(clean),
+                ..Incoming::none()
+            })
+        }
+        _ => None,
+    }
+}
+
+/// Sends text to the open session's device for its clipboard prompt (ADR-0065); only on the user's tap. Only to a
+/// paired device. Errors carry an i18n key: `companion.clipboard.empty`, `companion.clipboard.too_long`,
+/// `companion.untrusted`.
+pub fn send_clipboard(text: String) -> Result<()> {
+    if text.trim().is_empty() {
+        bail!("companion.clipboard.empty");
+    }
+    if text.len() > MAX_CLIPBOARD_BYTES {
+        bail!("companion.clipboard.too_long");
+    }
+    let (at, s) = session()?;
+    let r = runtime().block_on(cancellable(at, async {
+        let mut guard = s.lock().await;
+        anyhow::ensure!(
+            load_trust().is_trusted(&guard.remote_id()),
+            "companion.untrusted"
+        );
+        guard.send_clipboard(&text).await
+    }));
+    forget_on_error(&s, r)
+}
+
+/// Mirrors one notification of this phone to the open session's device (ADR-0065). Sent only to a paired
+/// device: returns `false` (and sends nothing) for a guest or with no session. Long text is cut to the caps.
+pub fn send_notice(app: String, title: String, text: String, at_ms: u64) -> Result<bool> {
+    let Ok((at, s)) = session() else {
+        return Ok(false);
+    };
+    let r = runtime().block_on(cancellable(at, async {
+        let mut guard = s.lock().await;
+        if !load_trust().is_trusted(&guard.remote_id()) {
+            return Ok(false);
+        }
+        let app = if app.trim().is_empty() {
+            "Android"
+        } else {
+            &app
+        };
+        guard.send_notice(app, &title, &text, at_ms).await?;
+        Ok(true)
+    }));
+    forget_on_error(&s, r)
 }
 
 /// The offer [`next_incoming`] returned, with the session it came on.
@@ -939,15 +1132,13 @@ pub fn resume_incoming() {
     pause_flag().store(false, Ordering::SeqCst);
 }
 
-/// Waits for the next photo or file offer on the open session (either side may have opened it). Latency probes
-/// are answered here and never shown; a fling whose preview is not a sane JPEG is refused (`FlingFailed`), so its
-/// thrower learns at once. Returns an empty [`Incoming`] (neither photo nor files) when [`pause_incoming`] asks
-/// for the session. Cancelled by [`disconnect`].
+/// Waits for the next photo, file offer or companion message on the open session (either side may have opened
+/// it). Latency probes are answered here and never shown; a fling whose preview is not a sane JPEG is refused
+/// (`FlingFailed`), so its thrower learns at once; a notice or clipboard text from a device that is not paired is
+/// dropped unread (ADR-0065). Returns an empty [`Incoming`] when [`pause_incoming`] asks for the session.
+/// Cancelled by [`disconnect`].
 pub fn next_incoming() -> Result<Incoming> {
-    let paused = || Incoming {
-        photo: None,
-        files: None,
-    };
+    let paused = Incoming::none;
     let (at, s) = session()?;
     let r = runtime().block_on(cancellable(at, async {
         let mut guard = s.lock().await;
@@ -977,9 +1168,16 @@ pub fn next_incoming() -> Result<Incoming> {
                 };
                 *pending_slot().lock().expect("pending lock") = Some((Arc::clone(&s), offer));
                 return Ok(Incoming {
-                    photo: None,
                     files: Some(files),
+                    ..Incoming::none()
                 });
+            }
+            if matches!(msg, Message::Notice(_) | Message::Clipboard { .. }) {
+                let from = guard.remote_id();
+                if let Some(c) = companion_incoming(&msg, from, load_trust().is_trusted(&from)) {
+                    return Ok(c);
+                }
+                continue;
             }
             let Message::FlingStart(f) = msg else {
                 continue;
@@ -1017,7 +1215,7 @@ pub fn next_incoming() -> Result<Incoming> {
                     angle: f.gesture.angle,
                     exit_x: f.gesture.exit_x,
                 }),
-                files: None,
+                ..Incoming::none()
             });
         }
     }));
@@ -1146,9 +1344,238 @@ pub fn send_files(
     let r = runtime().block_on(cancellable(at, async {
         transfer::send(&mut *s.lock().await, files, on).await
     }));
-    let sum = forget_on_error(&s, r)?;
+    let sum = forget_on_error(&s, r).map_err(|e| {
+        if e.downcast_ref::<transfer::TooBigForRelay>().is_some() {
+            anyhow::anyhow!("bulk.too_big")
+        } else {
+            e
+        }
+    })?;
     sink.add(finished(&last, sum))
         .map_err(|e| anyhow::anyhow!("progress stream: {e:?}"))
+}
+
+/// Before sending `total` bytes on the open session (backlog Rb, ADR-0068): `go`, `ask` (the path goes through
+/// the relay and it is over 2 GiB: ask, offering a hotspot or cable) or `too_big` (relayed and over 10 GiB:
+/// [`send_files`] refuses with `bulk.too_big` unless the path turns direct within 10 s). Call it with the session
+/// to itself (the app's `exclusive`), like a send.
+pub fn bulk_verdict(total: u64) -> Result<String> {
+    let (at, s) = session()?;
+    let r = runtime().block_on(cancellable(at, async {
+        Ok(match s.lock().await.bulk(total) {
+            vutric_core::route::Bulk::Go => "go",
+            vutric_core::route::Bulk::Ask => "ask",
+            vutric_core::route::Bulk::TooBig => "too_big",
+        }
+        .to_owned())
+    }));
+    forget_on_error(&s, r)
+}
+
+// ---- Why a connection failed (R1, R1a: ADR-0052, ADR-0068) ----
+
+/// Why the device of a link could not be reached, for the screen after a failed connect.
+#[derive(Debug, Clone)]
+pub struct Diagnosis {
+    /// i18n key `lan.unreachable.<key>`: `local_network_denied`, `isolated`, `other_network`, `no_network`,
+    /// `captive`.
+    pub key: String,
+    /// What to offer next, best first: `fix_permission`, `relay`, `hotspot`, `cable`, `sign_in`.
+    pub next: Vec<String>,
+    /// The Wi-Fi's login page for `captive`, when the network said where it is (http(s) only, bounded); "".
+    pub login: String,
+}
+
+fn next_name(n: lan::NextRoute) -> &'static str {
+    match n {
+        lan::NextRoute::FixPermission => "fix_permission",
+        lan::NextRoute::Relay => "relay",
+        lan::NextRoute::Hotspot => "hotspot",
+        lan::NextRoute::Cable => "cable",
+        lan::NextRoute::SignIn => "sign_in",
+    }
+}
+
+/// How long the diagnosis waits for a beacon answer, and for the captive check.
+const DIAGNOSE_WAIT: Duration = Duration::from_millis(1500);
+
+/// After a failed connect to `link`: asks the other device's beacon at each of the link's addresses, and, when
+/// nothing answers and this phone may use the internet, checks for a Wi-Fi login page against our own relay's
+/// `/generate_204` (never a third-party server, ADR-0068). Then names the reason ([`lan::diagnose`]).
+pub fn diagnose_link(link: String) -> Result<Diagnosis> {
+    let t = PairingTicket::parse(link.trim())?;
+    let p = peer()?;
+    let b = beacon().ok();
+    let ours = p.ticket().relay;
+    let may_check = p.reach() == Reach::Anywhere;
+    runtime().block_on(async move {
+        let probe_answered = match &b {
+            Some(b) => {
+                let mut heard = b.subscribe();
+                let ips: Vec<_> = t.addrs.iter().map(std::net::SocketAddr::ip).collect();
+                b.probe(&ips).await;
+                tokio::time::timeout(DIAGNOSE_WAIT, async {
+                    while let Ok(h) = heard.recv().await {
+                        if h.id == t.endpoint {
+                            return true;
+                        }
+                    }
+                    false
+                })
+                .await
+                .unwrap_or(false)
+            }
+            None => false,
+        };
+        let mut login = String::new();
+        let mut captive = false;
+        if !probe_answered
+            && may_check
+            && let Some(host) = ours
+                .as_deref()
+                .or(t.relay.as_deref())
+                .and_then(vutric_net::captive::host_for_relay)
+            && let vutric_core::captive::Portal::Captive { login: l } =
+                vutric_net::captive::check(&host, DIAGNOSE_WAIT).await
+        {
+            captive = true;
+            login = l.unwrap_or_default();
+        }
+        let verdict = lan::diagnose(&lan::Evidence {
+            locals: lan::local_addrs(),
+            hints: t.addrs.clone(),
+            local_network_denied: b.as_ref().is_some_and(|b| b.health().denied_sends > 0),
+            probe_answered,
+            internet: ours.is_some(),
+            captive,
+        });
+        Ok(Diagnosis {
+            key: format!("lan.unreachable.{}", verdict.key()),
+            next: verdict
+                .next_routes()
+                .iter()
+                .map(|n| next_name(*n).to_owned())
+                .collect(),
+            login,
+        })
+    })
+}
+
+// ---- Other apps on the phone: LocalSend, KDE Connect, magic-wormhole (C10, ADR-0066, ADR-0067) ----
+
+/// Starts driving the adapters over `fd`, the app process's end of the socket pair whose other end Kotlin gave
+/// to the `:compat` service (ADR-0066). `alias` is the name other apps see; `data_dir` keeps the adapters' own
+/// identity files (never Vutric's), `cache_dir` their staging folder. Events go to `sink`, one JSON object per
+/// event in the adapter's own IPC shape (`{"t":"seen",…}`, `offer`, `pair_request`, `received`, `sent`,
+/// `send_failed`, `text`, `wormhole_code`, `wormhole_failed`, …), plus `{"t":"closed"}` when the loop ends; a
+/// `received` path is already checked (a plain file directly inside the staging folder, or the event becomes
+/// `{"t":"error"}`). A loop already running is stopped first. Android only; elsewhere `compat.unavailable`.
+pub fn compat_start(
+    fd: i32,
+    alias: String,
+    data_dir: String,
+    cache_dir: String,
+    sink: StreamSink<String>,
+) -> Result<()> {
+    #[cfg(not(target_os = "ios"))]
+    return crate::compat_host::compat_start(fd, alias, data_dir, cache_dir, sink);
+    #[cfg(target_os = "ios")]
+    {
+        let _ = (fd, alias, data_dir, cache_dir, sink);
+        bail!("compat.unavailable")
+    }
+}
+
+/// Whether the adapters run now.
+#[must_use]
+pub fn compat_running() -> bool {
+    #[cfg(not(target_os = "ios"))]
+    return crate::compat_host::compat_running();
+    #[cfg(target_os = "ios")]
+    false
+}
+
+/// Makes `LocalSend` devices on this Wi-Fi answer (they announce only now and then).
+pub fn compat_announce() -> Result<()> {
+    #[cfg(not(target_os = "ios"))]
+    return crate::compat_host::compat_announce();
+    #[cfg(target_os = "ios")]
+    bail!("compat.off")
+}
+
+/// Answers an `offer` or a `pair_request`: the file ids to take (all of them for "Qabul qilish"), or none to
+/// refuse; for a pair request any non-empty list pairs. Foreign offers are always asked about (ADR-0010 rule 2).
+pub fn compat_decide(session_id: String, accept: Vec<String>) -> Result<()> {
+    #[cfg(not(target_os = "ios"))]
+    return crate::compat_host::compat_decide(session_id, accept);
+    #[cfg(target_os = "ios")]
+    {
+        let _ = (session_id, accept);
+        bail!("compat.off")
+    }
+}
+
+/// Sends files to a `LocalSend` device at `to` (`ip:port` from its `seen` event). The answer is a `sent` or
+/// `send_failed` event with `request_id`.
+pub fn compat_send(request_id: u64, to: String, https: bool, paths: Vec<String>) -> Result<()> {
+    #[cfg(not(target_os = "ios"))]
+    return crate::compat_host::compat_send(request_id, to, https, paths);
+    #[cfg(target_os = "ios")]
+    {
+        let _ = (request_id, to, https, paths);
+        bail!("compat.off")
+    }
+}
+
+/// Sends files to a KDE Connect device (its `seen` event's address and `device_id`). It must have paired with
+/// this phone first (from the KDE Connect app; this phone answers the `pair_request`).
+pub fn compat_kde_send(
+    request_id: u64,
+    to: String,
+    device_id: String,
+    paths: Vec<String>,
+) -> Result<()> {
+    #[cfg(not(target_os = "ios"))]
+    return crate::compat_host::compat_kde_send(request_id, to, device_id, paths);
+    #[cfg(target_os = "ios")]
+    {
+        let _ = (request_id, to, device_id, paths);
+        bail!("compat.off")
+    }
+}
+
+/// Sends one file or a text by magic-wormhole (C7). The code to read out arrives as `wormhole_code`, the end as
+/// `sent` or `send_failed`. Refused with `wormhole.lan_only` when the route keeps everything on this network.
+pub fn compat_wormhole_send(
+    request_id: u64,
+    paths: Vec<String>,
+    text: Option<String>,
+) -> Result<()> {
+    #[cfg(not(target_os = "ios"))]
+    return crate::compat_host::compat_wormhole_send(request_id, paths, text);
+    #[cfg(target_os = "ios")]
+    {
+        let _ = (request_id, paths, text);
+        bail!("compat.off")
+    }
+}
+
+/// Receives by a magic-wormhole code the user typed (C7): a file arrives as an `offer` (session
+/// `wh-<request_id>`, asked about like any other), a text as `text`, a failure as `wormhole_failed`.
+pub fn compat_wormhole_receive(request_id: u64, code: String) -> Result<()> {
+    #[cfg(not(target_os = "ios"))]
+    return crate::compat_host::compat_wormhole_receive(request_id, code);
+    #[cfg(target_os = "ios")]
+    {
+        let _ = (request_id, code);
+        bail!("compat.off")
+    }
+}
+
+/// Stops the adapters; the `:compat` process ends its loop and the service stops itself.
+pub fn compat_stop() {
+    #[cfg(not(target_os = "ios"))]
+    crate::compat_host::compat_stop();
 }
 
 /// Accepts the offer [`next_incoming`] returned and saves it under `dir` (folders kept). Each file appears
@@ -1318,11 +1745,13 @@ fn net_of(w: &Wifi) -> HotspotNet {
 /// network another phone could not join.
 pub fn hotspot_link(ssid: String, password: String, security: String) -> Result<String> {
     let wifi = wifi_of(&ssid, &password, &security, false)?;
-    Ok(HotspotTicket {
-        pair: peer()?.ticket(),
-        wifi,
-    }
-    .to_uri())
+    Ok(shown_link(
+        HotspotTicket {
+            pair: peer()?.ticket(),
+            wifi,
+        }
+        .to_uri(),
+    ))
 }
 
 /// The standard `WIFI:` payload for a phone's camera app (no Vutric needed to join).

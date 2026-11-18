@@ -29,10 +29,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  *   datagram (4 KiB at most) goes to [ForeignParser], an `isolatedProcess` service with no permissions and no
  *   network, which answers with a few capped strings.
  *
- * TEMP until W3 #11: the W3 compat adapters run in a desktop sandbox process (`vutric-compat`) that a phone cannot
- * spawn; sending to these devices, and LocalSend's register handshake (which makes silent devices answer), wait for
- * a phone host from W3. Each device found is handed to Flutter as an event: `{kind: "foreign", app, id, name,
- * type, host, port}`.
+ * This is only the list in the "Qanday ulanamiz?" sheet. Sending to these devices, receiving from them and
+ * LocalSend's register handshake run in the W3 adapters inside [CompatService] (`:compat` process, ADR-0066), opened
+ * from that list. Both bind UDP 53317 with address reuse, so they can run at the same time. Each device found is
+ * handed to Flutter as an event: `{kind: "foreign", app, id, name, type, host, port}`.
  */
 object ForeignDiscovery {
     @Volatile
