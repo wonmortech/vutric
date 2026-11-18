@@ -1,0 +1,12 @@
+{
+  "sourceLanguage" : "uz",
+  "version" : "1.0",
+  "strings" : {
+    "NSLocalNetworkUsageDescription" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Vutric telefoningiz va boshqa kompyuterlarni shu Wi-Fi tarmog'ida topib, fayllarni internetsiz to'g'ridan-to'g'ri oladi va yuboradi." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Vutric finds your phone and other computers on this Wi-Fi and sends and receives files directly, without the internet." } }
+      }
+    }
+  }
+}

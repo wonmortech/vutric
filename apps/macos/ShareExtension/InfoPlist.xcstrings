@@ -1,0 +1,12 @@
+{
+  "sourceLanguage" : "uz",
+  "version" : "1.0",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Vutric bilan yuborish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Send with Vutric" } }
+      }
+    }
+  }
+}

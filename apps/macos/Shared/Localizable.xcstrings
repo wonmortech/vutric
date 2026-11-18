@@ -1,0 +1,192 @@
+{
+  "sourceLanguage" : "uz",
+  "version" : "1.0",
+  "strings" : {
+    "daemon.error.lost" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "xizmat bilan aloqa uzildi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "lost the connection to the service" } }
+      }
+    },
+    "daemon.error.noanswer" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "xizmat javob bermayapti" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "the service does not answer" } }
+      }
+    },
+    "login.approve.body" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Tizim sozlamalari → Umumiy → Kirish elementlari bo'limida Vutric'ni yoqing." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Turn Vutric on in System Settings → General → Login Items." } }
+      }
+    },
+    "login.approve.title" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "macOS ruxsatingizni kutmoqda" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "macOS is waiting for your approval" } }
+      }
+    },
+    "menu.connect" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Telefonni ulash" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect a phone" } }
+      }
+    },
+    "menu.login" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Kompyuter yonganda ishga tushsin" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open at login" } }
+      }
+    },
+    "menu.pause" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "To'xtatib turish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pause" } }
+      }
+    },
+    "menu.quit" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Chiqish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quit" } }
+      }
+    },
+    "menu.resume" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Davom ettirish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Resume" } }
+      }
+    },
+    "menu.send" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Fayl yuborish…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Send files…" } }
+      }
+    },
+    "menu.settings" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Sozlamalar" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings" } }
+      }
+    },
+    "menu.settings.later" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Sozlamalar oynasi keyingi versiyada" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The settings window comes in a later version" } }
+      }
+    },
+    "notify.action.open" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Ochish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open" } }
+      }
+    },
+    "notify.action.reveal" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Papkada ko'rsatish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show in Finder" } }
+      }
+    },
+    "notify.failed.title" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Yuborib bo'lmadi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not send" } }
+      }
+    },
+    "notify.received.body" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "%lld ta fayl saqlandi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld file(s) saved" } }
+      }
+    },
+    "notify.received.body.from" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "%2$@ dan %1$lld ta fayl saqlandi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%1$lld file(s) from %2$@ saved" } }
+      }
+    },
+    "notify.received.title" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Tushdi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Received" } }
+      }
+    },
+    "send.confirm.button" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Yuborish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Send" } }
+      }
+    },
+    "send.confirm.cancel" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Bekor qilish" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancel" } }
+      }
+    },
+    "send.confirm.title" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "%lld ta faylni Vutric bilan yuborasizmi?" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Send %lld file(s) with Vutric?" } }
+      }
+    },
+    "share.collecting" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Fayllar yig'ilmoqda…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Collecting files…" } }
+      }
+    },
+    "share.handing" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "%lld ta fayl Vutric'ga berildi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld file(s) handed to Vutric" } }
+      }
+    },
+    "share.nothing" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Yuboriladigan fayl topilmadi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No files to send" } }
+      }
+    },
+    "status.failed" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Vutric: %@" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Vutric: %@" } }
+      }
+    },
+    "status.missing" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Qabul qilish xizmati bu versiyada yo'q" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This build has no receiving service" } }
+      }
+    },
+    "status.paused" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "To'xtatilgan" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Paused" } }
+      }
+    },
+    "status.ready.lan" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Tayyor · shu tarmoqda" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ready · on this network" } }
+      }
+    },
+    "status.ready.online" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Tayyor · internet orqali ham" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ready · over the internet too" } }
+      }
+    },
+    "status.starting" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Ishga tushmoqda…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Starting…" } }
+      }
+    },
+    "status.transfers" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "%lld ta uzatish ketmoqda" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld transfer(s) running" } }
+      }
+    }
+  }
+}

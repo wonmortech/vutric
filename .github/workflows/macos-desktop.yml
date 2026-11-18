@@ -1,0 +1,133 @@
+# SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Stream W5 (macOS, roadmap Phase 5): the NSPanel overlay host and its frame-pacing probe on the runner's real
+# WindowServer, the portable engine crates on macOS, and Vutric.app -> .dmg (signed and notarised once the Apple
+# secrets exist, ad-hoc and unsigned until then). Numbers from these virtual machines are evidence, not the
+# real-Mac measurement (docs/decisions/0110-macos-overlay-nspanel.md).
+
+name: macOS desktop
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - crates/vutric-host-mac/**
+      - crates/vutric-overlay/**
+      - crates/vutric-compat-localsend/**
+      - crates/vutric-compat-quickshare/**
+      - apps/macos/**
+      - packaging/macos/**
+      - Cargo.lock
+      - .github/workflows/macos-*.yml
+  push:
+    branches: [main]
+    paths:
+      - crates/vutric-host-mac/**
+      - apps/macos/**
+      - packaging/macos/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  MACOSX_DEPLOYMENT_TARGET: "13.0"
+
+jobs:
+  overlay:
+    name: overlay (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Intel: the arm64 queue timed out for the iOS build before (ios-spike.yml); it is the reliable one.
+          - runner: macos-15-intel
+            optional: false
+          # Apple silicon VM with a paravirtualised Metal GPU; kept optional so a stuck queue never blocks a PR.
+          - runner: macos-15
+            optional: true
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.optional }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: macos-${{ matrix.runner }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: macos-${{ matrix.runner }}-
+      - name: Format (own crate only)
+        run: cargo fmt -p vutric-host-mac --check
+      - name: Clippy
+        run: cargo clippy -p vutric-host-mac --all-targets --locked -- -D warnings
+      - name: Test (host-mac, overlay)
+        run: cargo test -p vutric-host-mac -p vutric-overlay --locked
+      - name: Test LocalSend and Quick Share engines on macOS (C1, C3)
+        run: cargo test -p vutric-compat-localsend -p vutric-compat-quickshare --locked
+      - name: Build the probe
+        run: cargo build --release --locked -p vutric-host-mac --bin vutric-mac-probe
+      - name: Measure on the runner's WindowServer
+        run: bash crates/vutric-host-mac/tools/measure.sh target/release/vutric-mac-probe "$RUNNER_TEMP/pacing"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: macos-pacing-${{ matrix.runner }}
+          path: ${{ runner.temp }}/pacing
+          retention-days: 30
+          if-no-files-found: warn
+
+  app:
+    name: Vutric.app and .dmg
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Swift checks
+        run: bash packaging/macos/build-app.sh --test
+      - name: Build Vutric.app (universal)
+        run: bash packaging/macos/build-app.sh
+      - name: Sign, package, notarise
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NOTARY_API_KEY_P8: ${{ secrets.NOTARY_API_KEY_P8 }}
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_API_ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          bash packaging/macos/sign-and-notarize.sh target/macos/Vutric.app "target/macos/Vutric-$version.dmg"
+      - name: Inspect the bundle
+        run: |
+          codesign --display --verbose=2 target/macos/Vutric.app 2>&1 | head -20
+          codesign --display --entitlements - target/macos/Vutric.app/Contents/PlugIns/VutricShare.appex 2>&1 | tail -8
+          find target/macos/Vutric.app -maxdepth 4 | sort
+          ls -la target/macos/*.dmg
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vutric-macos-dmg
+          path: target/macos/*.dmg
+          retention-days: 14
+          if-no-files-found: error

@@ -457,6 +457,7 @@ pub fn main() -> ExitCode {
         }
     };
     let json = args.json.clone();
+    watchdog(json.clone(), args.mode, args.max_seconds + 15.0);
     let report = run(args);
     let text = serde_json::to_string_pretty(&report).expect("report serialises");
     println!("{text}");
@@ -472,6 +473,30 @@ pub fn main() -> ExitCode {
     } else {
         ExitCode::from(1)
     }
+}
+
+/// A blocked drawable acquisition never returns to the event loop, so the in-loop timeout cannot fire. This thread
+/// writes an error report and ends the process instead, so CI always gets its JSON.
+fn watchdog(json: Option<std::path::PathBuf>, mode: Mode, after: f32) {
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs_f32(after));
+        let report = Report {
+            schema: 1,
+            tool: "vutric-mac-probe",
+            arch: std::env::consts::ARCH,
+            mode: Some(mode),
+            error: Some(format!(
+                "hung: no exit after {after} s (blocked in the event loop or the GPU)"
+            )),
+            ..Default::default()
+        };
+        let text = serde_json::to_string_pretty(&report).expect("report serialises");
+        println!("{text}");
+        if let Some(path) = json {
+            let _ = std::fs::write(path, text);
+        }
+        std::process::exit(2);
+    });
 }
 
 fn run(args: Args) -> Report {
