@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Developer ID build, not sandboxed (ADR-0111): the agent and its Rust helper read the files the user sends and
+	  write to the chosen save folder. Hardened runtime is on with no exceptions: no JIT, no unsigned memory, no
+	  library validation exemption.
+	-->
+</dict>
+</plist>
