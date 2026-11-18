@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# The phone app's Dart side (stream W1): static analysis and the theme tokens being in sync with the Claude Design
+# handoff. Cheap on purpose (Linux, no native build); the APK and IPA builds stay in their own workflows.
+
+name: Flutter
+
+on:
+  pull_request:
+    paths:
+      - apps/mobile-spike/**
+      - design/claude-design/**
+      - .github/workflows/flutter.yml
+  push:
+    branches: [main]
+    paths:
+      - apps/mobile-spike/**
+      - design/claude-design/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/mobile-spike
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Straight from the Flutter repo: the org allows only GitHub-owned and verified actions.
+      - name: Flutter 3.50.0
+        run: |
+          git clone --quiet --depth 1 --branch 3.50.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --disable-analytics
+
+      - name: Dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      # The 9 themes are generated from the handoff HTML (ADR-0011): a new design drop without a regenerate fails here.
+      - name: Theme tokens match the handoff
+        run: |
+          python3 tool/gen_themes.py
+          git diff --exit-code -- lib/design/themes.g.dart

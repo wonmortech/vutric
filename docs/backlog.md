@@ -122,7 +122,7 @@ Sources:
 | A6 | `LinkManager`: hotspot (1), Wi-Fi P2P and Aware (later) | [~] |
 | A7 | `Nearby`: NSD + MulticastLock (1), BLE (R4) | [~] |
 | A8 | `SafStore`: SAF folder and MediaStore move after verification | [x] |
-| A9 | Fling screen: velocity threshold, spring back, haptic | [ ] |
+| A9 | Fling screen: velocity threshold, spring back, haptic | [x] |
 | A10 | History with progress and resend | [x] |
 | A11 | Receive: Halqa in the app when open, otherwise a heads-up notification with a thumbnail; no `SYSTEM_ALERT_WINDOW` | [ ] |
 | A12 | `Companion` (notification mirroring) and `Clipboard`, opt-in | [ ] |
