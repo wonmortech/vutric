@@ -380,6 +380,20 @@ fn serve(args: &Args, socket: &str) -> Result<(), String> {
     let writer: Writer = Arc::new(Mutex::new(Some(
         stream.try_clone().map_err(|e| e.to_string())?,
     )));
+    {
+        // A panic must reach the daemon too: under GNOME our stderr goes wherever Mutter's launcher put it.
+        let w = Arc::clone(&writer);
+        let default = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            send(
+                &w,
+                &FromSurface::Error {
+                    message: format!("vutric-surface panicked: {info}"),
+                },
+            );
+            default(info);
+        }));
+    }
     let hits: Arc<Mutex<Vec<Hit>>> = Arc::default();
     let host = {
         let (w, hits) = (Arc::clone(&writer), Arc::clone(&hits));

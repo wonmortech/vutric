@@ -16,6 +16,7 @@ uuid=vutric@wonmor.io
 XDG_RUNTIME_DIR=$(mktemp -d)
 chmod 700 "$XDG_RUNTIME_DIR"
 export XDG_RUNTIME_DIR GSETTINGS_BACKEND=dconf
+export VUTRIC_SURFACE_LOG="$out/surface.log" RUST_BACKTRACE=1
 
 ext_dir="$HOME/.local/share/gnome-shell/extensions/$uuid"
 rm -rf "$ext_dir"
@@ -49,6 +50,11 @@ fi
 cat "$out/ping.txt"
 gnome-extensions info "$uuid" | tee "$out/extension-info.txt" || true
 
-"$bin/examples/surface_driver" --gnome --runs 3 --out "$out/driver.json"
+"$bin/examples/surface_driver" --gnome --runs 3 --out "$out/driver.json" || {
+    sleep 1
+    echo "--- surface stderr"; cat "$out/surface.log" 2>/dev/null || true
+    echo "--- shell log (tail)"; tail -n 40 "$out/gnome-shell.log"
+    exit 1
+}
 grep -F 'Vutric: surface window adopted' "$out/gnome-shell.log" | tee "$out/adopted.txt"
 echo "GNOME extension + surface: OK"

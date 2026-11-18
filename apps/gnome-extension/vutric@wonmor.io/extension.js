@@ -68,6 +68,10 @@ class Surface {
             throw new Error('vutric-surface is not installed');
         const argv = [exe, '--backend', 'gnome', '--socket', socket];
         const launcher = new Gio.SubprocessLauncher({flags: Gio.SubprocessFlags.NONE});
+        // Diagnostics only (CI, bug reports): send the surface's stderr to a file the user names.
+        const log = GLib.getenv('VUTRIC_SURFACE_LOG');
+        if (log)
+            launcher.set_stderr_file_path(log);
         if (this._api.spawn === 'new_subprocess') {
             this._client = Meta.WaylandClient.new_subprocess(global.context, launcher, argv);
             this._proc = this._client.get_subprocess();
