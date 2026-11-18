@@ -43,7 +43,8 @@ records how the phone uses the new API and what is still missing from W3.
 - `cargo clippy -p vutric-mobile --all-targets -- -D warnings`: clean. `cargo test -p vutric-mobile`: unit tests
   (routes, privacy, hotspot round trip, typed kind, visibility countdown) and `tests/catch.rs` (two nodes on
   loopback: trust by ticket, `trusted_only` refuses a stranger, device rules set, read, cleared, bad id refused).
-- Release APK built (size in the PR and the backlog N1 line).
+- `flutter build apk --release --target-platform android-arm64,android-x64`: passed, Kotlin compiled, 78.2 MB
+  (81 973 932 bytes); `aapt2 dump` shows `CompanionListener` and `ForeignParser` (`isolatedProcess=true`).
 
 ## Not verified (needs a real phone)
 
