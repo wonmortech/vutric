@@ -1,0 +1,64 @@
+{
+ "cards": [
+  {
+   "card": "offer",
+   "png": "card-offer.png",
+   "px": [
+    400,
+    176
+   ],
+   "raster_p50_ms": 1.823,
+   "raster_p99_ms": 2.483,
+   "show_p50_ms": 0.123,
+   "show_p99_ms": 0.852,
+   "total_p50_ms": 1.948,
+   "total_p99_ms": 4.042
+  },
+  {
+   "card": "progress",
+   "png": "card-progress.png",
+   "px": [
+    400,
+    124
+   ],
+   "raster_p50_ms": 1.298,
+   "raster_p99_ms": 1.627,
+   "show_p50_ms": 0.092,
+   "show_p99_ms": 1.592,
+   "total_p50_ms": 1.395,
+   "total_p99_ms": 2.907
+  },
+  {
+   "card": "landed",
+   "png": "card-landed.png",
+   "px": [
+    400,
+    124
+   ],
+   "raster_p50_ms": 1.135,
+   "raster_p99_ms": 1.502,
+   "show_p50_ms": 0.091,
+   "show_p99_ms": 4.622,
+   "total_p50_ms": 1.226,
+   "total_p99_ms": 5.749
+  },
+  {
+   "card": "pair",
+   "png": "card-pair.png",
+   "px": [
+    400,
+    398
+   ],
+   "raster_p50_ms": 3.761,
+   "raster_p99_ms": 5.758,
+   "show_p50_ms": 0.251,
+   "show_p99_ms": 11.219,
+   "total_p50_ms": 4.006,
+   "total_p99_ms": 14.974
+  }
+ ],
+ "focus_kept": true,
+ "fonts_load_ms": 1.0,
+ "runs": 200,
+ "scale": 1.0
+}

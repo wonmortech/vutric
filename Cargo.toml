@@ -13,6 +13,7 @@ members = [
     "crates/vutric-mobile",
     "apps/overlay-spike",
     "crates/vutric-compat-wormhole",
+    "crates/vutric-daemon",
 ]
 
 [workspace.package]
@@ -40,6 +41,9 @@ thiserror = "2.0.21"
 wgpu = "30.0.2"
 winit = "0.30.13"
 arbitrary = { version = "1.5.0", features = ["derive"] }
+tiny-skia = { version = "0.12.0", default-features = false, features = ["std", "simd"] }
+ab_glyph = "0.2.32"
+qrcode = { version = "0.14.1", default-features = false }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

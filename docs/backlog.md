@@ -101,8 +101,8 @@ Sources:
 
 | # | Item | Phase | Status |
 |---|---|---|---|
-| D1 | `vutric-daemon`:<br>• tray menu: Telefonni ulash, Sozlamalar, To'xtatib turish, Chiqish<br>• toast: Ochish / Papkada ko'rsatish<br>• IPC (named pipe)<br>• autostart<br>• ≤ 30 MB idle | 1 | [ ] |
-| D2 | Overlay cards ("Qabul qilasizmi?", progress ring, "tushdi") drawn in the overlay, ≤ 16 ms, clickable without focus; fallback is a small Flutter window | 1 | [ ] |
+| D1 | `vutric-daemon`:<br>• tray menu: Telefonni ulash, Sozlamalar, To'xtatib turish, Chiqish<br>• toast: Ochish / Papkada ko'rsatish<br>• IPC (named pipe)<br>• autostart<br>• ≤ 30 MB idle | 1 | [~] built; idle 6.4 MB private over 10 min ([ADR-0031](decisions/0031-desktop-daemon.md)). Left: owner clicks the tray menu and both toast buttons on Windows 10/11; pipe ACL to the user's SID; receive through W3's storage engine and trust gate (`pair_intent`) |
+| D2 | Overlay cards ("Qabul qilasizmi?", progress ring, "tushdi") drawn in the overlay, ≤ 16 ms, clickable without focus; fallback is a small Flutter window | 1 | [~] CPU-drawn no-activate window instead ([ADR-0032](decisions/0032-overlay-cards-without-focus.md)): p99 ≤ 5.8 ms, focus kept. Left: the synthetic-click run of `examples/cards.rs`, then the owner presses "Qabul qilish" while typing in another app |
 | D3 | QR pairing window | 1 | [ ] |
 | D4 | Flutter desktop windows (settings, history, devices, big send window), separate process, 0 MB when closed | 1 | [ ] |
 | D5 | Send from the desktop: drag onto the Send Zone; Explorer menu "Vutric bilan yuborish"; Share contract | 1 | [ ] |
@@ -186,7 +186,7 @@ Sources:
 
 | # | Measure | Source |
 |---|---|---|
-| M1 | Desktop UI spike: Flutter, Tauri and Slint, with LocalSend as the reference. Measure RAM (idle, open, after close), cold open ≤ 400 ms and fps | ADR-0009 |
+| M1 | Desktop UI spike: Flutter, Tauri and Slint, with LocalSend as the reference. Measure RAM (idle, open, after close), cold open ≤ 400 ms and fps. **Done (W2):** Slint software renderer 6.3 MB, 132 ms, 60.6 fps, [ADR-0030](decisions/0030-desktop-ui-toolkit.md) | ADR-0009 |
 | M2 | Share of direct versus relay connections (opt-in anonymous telemetry) | ADR-0007 §5 |
 | M3 | LocalOnlyHotspot on 2.4 GHz versus 5 GHz | ADR-0007 §5 |
 | M4 | iPhone ⇄ Windows and Android ⇄ Windows over LAN and hotspot | TM §4.5 |

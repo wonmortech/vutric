@@ -10,6 +10,9 @@
 //! `docs/decisions/0004-windows-overlay-composition.md`.
 
 #[cfg(windows)]
+pub mod card;
+
+#[cfg(windows)]
 mod imp {
     use core::ffi::c_void;
 
