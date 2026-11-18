@@ -1,6 +1,6 @@
-// Files of any type, many at once, both ways: the pickers, the progress sheet, and what happens to files that
-// arrived (photos and videos go to the gallery, everything else stays in Vutric's folder, which the iPhone
-// Files app shows under "On My iPhone").
+// Files of any type, many at once, both ways: the pickers, the progress sheet, sending with the session to itself,
+// and what happens to files that arrived (photos and videos go to the gallery, everything else stays in Vutric's
+// folder, which the iPhone Files app shows under "On My iPhone").
 
 import 'dart:async';
 import 'dart:convert';
@@ -8,10 +8,14 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:gal/gal.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
+import 'android.dart';
+import 'design/tokens.dart';
+import 'design/widgets.dart';
+import 'session.dart';
 import 'src/rust/api.dart' as vutric;
 import 'ui.dart';
 
@@ -21,12 +25,6 @@ class Picked {
   final List<String> paths;
   final List<String> names;
   bool get isEmpty => paths.isEmpty;
-}
-
-/// Photos and videos from the gallery, as many as the user selects.
-Future<Picked> pickMedia() async {
-  final files = await ImagePicker().pickMultipleMedia(requestFullMetadata: false);
-  return Picked([for (final f in files) f.path], [for (final f in files) f.name]);
 }
 
 /// Any files (documents, archives, audio…) from the Files app or the Android document picker.
@@ -70,6 +68,24 @@ String _ext(String path) {
   return dot < 0 ? '' : path.substring(dot + 1).toLowerCase();
 }
 
+String baseName(String path) =>
+    path.split(RegExp(r'[/\\]')).lastWhere((s) => s.isNotEmpty, orElse: () => 'fayl');
+
+IconData fileIcon(String name) => switch (_ext(name)) {
+  'jpg' || 'jpeg' || 'png' || 'heic' || 'heif' || 'webp' || 'gif' => Icons.image_outlined,
+  'mp4' || 'mov' || 'm4v' || 'webm' || 'mkv' || '3gp' => Icons.movie_outlined,
+  'mp3' || 'm4a' || 'wav' || 'flac' || 'ogg' => Icons.audiotrack_outlined,
+  'zip' || 'rar' || '7z' || 'gz' || 'tar' => Icons.folder_zip_outlined,
+  'pdf' => Icons.picture_as_pdf_outlined,
+  'doc' || 'docx' || 'txt' || 'md' || 'rtf' => Icons.description_outlined,
+  'xls' || 'xlsx' || 'csv' => Icons.table_chart_outlined,
+  '' => Icons.folder_outlined,
+  _ => Icons.insert_drive_file_outlined,
+};
+
+/// Hands files to the system share sheet (any app on the phone).
+Future<void> shareFiles(List<String> paths) => SharePlus.instance.share(ShareParams(files: [for (final p in paths) XFile(p)]));
+
 /// Today in the phone's calendar, `YYYY-MM-DD`, for a per-day save folder.
 String localDate() {
   final d = DateTime.now();
@@ -104,6 +120,35 @@ Future<int> saveMediaToGallery(List<String> saved) async {
   return n;
 }
 
+/// Sends [paths] to the connected device with the progress sheet, the session to itself, and a history entry.
+/// Returns the final progress, or null when it failed or was cancelled.
+Future<vutric.TransferProgress?> sendPaths(BuildContext context, List<String> paths, List<String> names) async {
+  final s = Session.instance;
+  final peer = s.peer?.peerName ?? 'qurilma';
+  final r = await s.exclusive(
+    () => runTransfer(context, title: '$peer’ga yuborilmoqda', stream: vutric.sendFiles(paths: paths, names: names)),
+  );
+  if (r == null) {
+    await s.stillConnected();
+    return null;
+  }
+  unawaited(
+    s.addHistory(
+      HistoryItem(
+        sent: true,
+        peer: peer,
+        files: r.filesTotal - r.failedNames.length,
+        bytes: r.bytesDone.toInt(),
+        seconds: r.seconds,
+        at: DateTime.now(),
+        names: names.take(20).toList(),
+        paths: paths.take(200).toList(),
+      ),
+    ),
+  );
+  return r;
+}
+
 /// Runs a transfer with a progress sheet the user can cancel. Returns the last event (done), or null when it
 /// failed or was cancelled (the error is shown in the sheet).
 Future<vutric.TransferProgress?> runTransfer(
@@ -115,7 +160,6 @@ Future<vutric.TransferProgress?> runTransfer(
     context: context,
     isDismissible: false,
     enableDrag: false,
-    backgroundColor: paper,
     builder: (_) => _TransferSheet(title: title, stream: stream),
   );
 }
@@ -135,13 +179,23 @@ class _TransferSheetState extends State<_TransferSheet> {
   String? _error;
   bool _cancelled = false;
 
+  final _bridge = AndroidBridge.instance;
+
   @override
   void initState() {
     super.initState();
+    // Android: a foreground service keeps the process alive if the user leaves the app mid-transfer (A4).
+    _bridge.transferUpdate(widget.title, 'Javob kutilmoqda…', force: true);
     _sub = widget.stream.listen(
       (p) {
         if (!mounted) return;
         setState(() => _p = p);
+        final total = p.bytesTotal.toDouble();
+        _bridge.transferUpdate(
+          widget.title,
+          '${p.filesDone} / ${p.filesTotal} fayl · ${sizeText(p.bytesDone.toDouble())} / ${sizeText(total)}',
+          fraction: total > 0 ? p.bytesDone.toDouble() / total : null,
+        );
         if (p.done) Navigator.of(context).pop(p);
       },
       onError: (Object e) {
@@ -158,12 +212,13 @@ class _TransferSheetState extends State<_TransferSheet> {
   @override
   void dispose() {
     _sub?.cancel();
+    _bridge.transferStop();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
+    final v = context.v;
     final p = _p;
     final total = p?.bytesTotal.toDouble() ?? 0;
     final done = p?.bytesDone.toDouble() ?? 0;
@@ -172,43 +227,68 @@ class _TransferSheetState extends State<_TransferSheet> {
     final left = speed > 0 ? (total - done) / speed : null;
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(widget.title, style: t.titleMedium?.copyWith(color: cobalt)),
-            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: Text(widget.title, style: v.heading)),
+                if (frac != null && _error == null)
+                  Text('${(frac * 100).floor()}%', style: v.text(17, FontWeight.w600, mono: true, color: v.accent)),
+              ],
+            ),
+            const SizedBox(height: 14),
             if (_error == null) ...[
-              LinearProgressIndicator(value: frac, color: signal, minHeight: 8, borderRadius: BorderRadius.circular(4)),
-              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(v.rPill.clamp(0, 5)),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: frac ?? 0),
+                  duration: VMotion.fast,
+                  builder: (_, value, _) => LinearProgressIndicator(
+                    value: frac == null ? null : value,
+                    minHeight: 10,
+                    color: v.accent,
+                    backgroundColor: v.bgAlt,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               Text(
                 p == null
                     ? 'Qabul qiluvchining javobi kutilmoqda…'
                     : '${p.filesDone} / ${p.filesTotal} fayl · ${sizeText(done)} / ${sizeText(total)}',
-                style: t.bodyMedium,
+                style: v.text(15, FontWeight.w500),
               ),
               if (p != null && speed > 0)
-                Text(
-                  '${sizeText(speed)}/s${left != null ? ' · ~${_duration(left)} qoldi' : ''}',
-                  style: t.bodySmall,
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    '${sizeText(speed)}/s${left != null ? ' · ~${_duration(left)} qoldi' : ''}',
+                    style: v.monoSmall,
+                  ),
                 ),
               if (p != null && p.current.isNotEmpty)
-                Text(p.current, style: t.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(p.current, style: v.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
               if (p != null && p.failed > 0)
-                Text('${p.failed} ta fayl oʻtmadi', style: t.bodySmall?.copyWith(color: err)),
-              const SizedBox(height: 12),
-              OutlinedButton(
+                Text('${p.failed} ta fayl oʻtmadi', style: v.text(13, FontWeight.w500, color: v.err)),
+              const SizedBox(height: 16),
+              VButton(
+                label: 'Bekor qilish',
+                kind: VButtonKind.secondary,
                 onPressed: () {
                   _cancelled = true;
                   disconnectNow();
                 },
-                child: const Text('Bekor qilish'),
               ),
             ] else ...[
-              Text(_error!, style: t.bodyMedium?.copyWith(color: err)),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Yopish')),
+              VNotice(title: 'Uzatish toʻxtadi', body: _error),
+              const SizedBox(height: 16),
+              VButton(label: 'Yopish', onPressed: () => Navigator.of(context).pop()),
             ],
           ],
         ),
@@ -222,12 +302,6 @@ String _duration(double seconds) {
   final m = seconds ~/ 60;
   if (m < 60) return '$m daq';
   return '${m ~/ 60} soat ${m % 60} daq';
-}
-
-/// "12 ta fayl, 340 MB: IMG_1.jpg, IMG_2.jpg…" for the accept question.
-String offerText(vutric.FilesOffer o) {
-  final more = o.files > o.names.length ? '…' : '';
-  return '${o.files} ta fayl, ${sizeText(o.bytes.toDouble())}\n${o.names.join(', ')}$more';
 }
 
 /// The line after a transfer ended.
