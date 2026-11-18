@@ -145,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             queued.append(r)
             return
         }
-        // Not in protocol v1 yet: W2 issue `needs-w2` "send_files IPC request".
+        // Not in protocol v1 yet: W2 #29.
         link.send(["op": "send_files", "paths": r.files.map(\.path)])
     }
 

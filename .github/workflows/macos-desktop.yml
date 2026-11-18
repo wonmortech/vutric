@@ -125,6 +125,15 @@ jobs:
           codesign --display --entitlements - target/macos/Vutric.app/Contents/PlugIns/VutricShare.appex 2>&1 | tail -8
           find target/macos/Vutric.app -maxdepth 4 | sort
           ls -la target/macos/*.dmg
+      - name: Smoke test (launch, Share extension registration, vutric://send question)
+        run: bash packaging/macos/smoke.sh target/macos/Vutric.app "$RUNNER_TEMP/smoke"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: vutric-macos-smoke
+          path: ${{ runner.temp }}/smoke
+          retention-days: 14
+          if-no-files-found: warn
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: vutric-macos-dmg

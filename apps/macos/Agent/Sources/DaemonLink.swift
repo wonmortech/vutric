@@ -26,7 +26,7 @@ final class DaemonLink {
     private var pending: [[String: Any]] = []
 
     /// `$VUTRIC_IPC`, else `~/Library/Application Support/Vutric/daemon.sock` (a per-user folder, mode 0700).
-    /// The daemon must listen on the same path: W2 issue `needs-w2` "daemon IPC socket path on macOS".
+    /// The daemon must listen on the same path: W2 #28.
     static var socketPath: String {
         if let p = ProcessInfo.processInfo.environment["VUTRIC_IPC"], !p.isEmpty { return p }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
