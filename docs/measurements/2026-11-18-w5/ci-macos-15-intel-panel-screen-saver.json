@@ -1,0 +1,114 @@
+{
+  "schema": 1,
+  "tool": "vutric-mac-probe",
+  "os": "Version 15.7.9 (Build 24G830)",
+  "arch": "x86_64",
+  "mode": "panel",
+  "frontmost_before": "TextEdit",
+  "screens": [
+    {
+      "name": "Built-in Display",
+      "points": [
+        1920.0,
+        1080.0
+      ],
+      "scale": 1.0,
+      "max_fps": 30
+    }
+  ],
+  "refresh_hz": 30.0,
+  "window": {
+    "requested_level": "screen-saver",
+    "level": 1000,
+    "style_mask": 128,
+    "collection_behavior": 262481,
+    "ignores_mouse_events": true,
+    "opaque": false,
+    "is_panel": true
+  },
+  "adapter": "Apple Paravirtual device (DiscreteGpu)",
+  "backend": "Metal",
+  "alpha_modes": [
+    "Opaque",
+    "PostMultiplied"
+  ],
+  "alpha_mode": "PostMultiplied",
+  "surface_px": [
+    1920,
+    1080
+  ],
+  "runs": [
+    {
+      "frames": 93,
+      "fps": 31.400713537595458,
+      "first_frame_ms": 5.003760000000001,
+      "p50_ms": 33.460682999999996,
+      "p95_ms": 35.522879,
+      "p99_ms": 40.024015000000006,
+      "max_ms": 41.649907,
+      "hitches": 0,
+      "missed_refreshes": 0,
+      "focus_kept": true,
+      "app_never_active": true,
+      "panel_never_key": true
+    },
+    {
+      "frames": 91,
+      "fps": 30.395265247127515,
+      "first_frame_ms": 0.592263,
+      "p50_ms": 33.826487,
+      "p95_ms": 35.931615,
+      "p99_ms": 36.584085,
+      "max_ms": 37.905365,
+      "hitches": 0,
+      "missed_refreshes": 0,
+      "focus_kept": true,
+      "app_never_active": true,
+      "panel_never_key": true
+    },
+    {
+      "frames": 91,
+      "fps": 30.510452584426027,
+      "first_frame_ms": 0.687854,
+      "p50_ms": 33.783638999999994,
+      "p95_ms": 35.529682,
+      "p99_ms": 36.729467,
+      "max_ms": 36.740029,
+      "hitches": 0,
+      "missed_refreshes": 0,
+      "focus_kept": true,
+      "app_never_active": true,
+      "panel_never_key": true
+    },
+    {
+      "frames": 91,
+      "fps": 30.495967053382454,
+      "first_frame_ms": 0.757604,
+      "p50_ms": 33.863275,
+      "p95_ms": 35.279289999999996,
+      "p99_ms": 35.916747,
+      "max_ms": 35.921237000000005,
+      "hitches": 0,
+      "missed_refreshes": 0,
+      "focus_kept": true,
+      "app_never_active": true,
+      "panel_never_key": true
+    },
+    {
+      "frames": 91,
+      "fps": 30.623733610364066,
+      "first_frame_ms": 0.646154,
+      "p50_ms": 33.584042000000004,
+      "p95_ms": 35.541757,
+      "p99_ms": 36.869098,
+      "max_ms": 36.959573000000006,
+      "hitches": 0,
+      "missed_refreshes": 0,
+      "focus_kept": true,
+      "app_never_active": true,
+      "panel_never_key": true
+    }
+  ],
+  "passed": true,
+  "error": null
+}

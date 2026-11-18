@@ -314,8 +314,10 @@ impl Probe {
             (None, Some(w)) => w.has_focus(),
             (None, None) => false,
         };
+        let front = vutric_host_mac::frontmost_pid();
         a.run.focus(
-            vutric_host_mac::frontmost_pid() == self.front_pid,
+            front == std::process::id().cast_signed(),
+            front == self.front_pid,
             vutric_host_mac::app_is_active(mtm),
             key,
         );

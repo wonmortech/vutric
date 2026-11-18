@@ -31,6 +31,9 @@ status=0
 for spec in "panel status" "winit status" "panel screen-saver"; do
   read -r mode level <<<"$spec"
   name="$mode-$level"
+  # A system prompt (UserNotificationCenter) can be frontmost on a fresh runner; give focus back to TextEdit.
+  osascript -e 'tell application "TextEdit" to activate' >/dev/null 2>&1 || true
+  sleep 1
   (
     sleep 1.2
     for i in 1 2 3 4 5 6; do
@@ -56,8 +59,8 @@ out = pathlib.Path(sys.argv[1])
 print("### macOS overlay probe\n")
 m = (out / "machine.txt").read_text(errors="replace").splitlines()
 print("```\n" + "\n".join(m[:8]) + "\n```\n")
-print("| run | os | refresh | adapter | alpha | level | fps | p50 | p99 | max | missed | first | focus kept | app inactive | never key | pass | error |")
-print("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+print("| run | os | refresh | adapter | alpha | level | fps | p50 | p99 | max | missed | first | frontmost before | focus kept | frontmost changed | app inactive | never key | pass | error |")
+print("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 for f in sorted(out.glob("*.json")):
     r = json.loads(f.read_text())
     runs = r.get("runs") or [{}]
@@ -69,7 +72,8 @@ for f in sorted(out.glob("*.json")):
         print(f"| {f.stem} #{i} | {r.get('os','')} | {r.get('refresh_hz','')} | {r.get('adapter') or '–'} | "
               f"{r.get('alpha_mode') or '–'} | {win.get('level','–')} | {v('fps')} | {v('p50_ms','{:.2f}')} | "
               f"{v('p99_ms','{:.2f}')} | {v('max_ms','{:.2f}')} | {v('missed_refreshes')} | "
-              f"{v('first_frame_ms','{:.2f}')} | {v('focus_kept')} | {v('app_never_active')} | "
+              f"{v('first_frame_ms','{:.2f}')} | {r.get('frontmost_before') or '–'} | {v('focus_kept')} | "
+              f"{v('frontmost_changed')} | {v('app_never_active')} | "
               f"{v('panel_never_key')} | {r.get('passed')} | {r.get('error') or ''} |")
 EOF
 cat "$OUT/summary.md"

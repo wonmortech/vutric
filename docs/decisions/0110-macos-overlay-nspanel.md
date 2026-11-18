@@ -109,7 +109,36 @@ panel/screen-saver), takes screenshots while the effect plays, and puts a table 
 ## CI results
 
 GitHub's macOS runners are virtual machines with a virtual display, so their numbers show that the code works on a
-real WindowServer, not how a real Mac performs. Filled from the first green run (see "CI-measured numbers" below).
+real WindowServer, not how a real Mac performs. Run 44325731135 (PR #25, 2026-11-18), 5 effects per row, raw JSON,
+machine notes and screenshots in [`../measurements/2026-11-18-w5/`](../measurements/2026-11-18-w5/).
+
+| Runner | Display (as reported) | GPU | Mode, level | fps (5 runs) | p99 ms | max ms | missed refreshes | first frame ms | our app ever frontmost / active / key |
+|---|---|---|---|---|---|---|---|---|---|
+| `macos-15` (Apple M1, virtual), macOS 15.8.2 | 1024×768 @ 60 Hz, 1x | Apple Paravirtual device | panel, status (25) | 59.2–60.5 | 19.3–34.2 | 19.9–72.9 | 0–7 | 0.56–3.98 | never |
+| | | | winit, status (25) | 59.5–60.5 | 19.2–21.7 | 19.9–60.6 | 0–3 | 0.27–1.94 | never |
+| | | | panel, screen-saver (1000) | 59.6–60.5 | 18.7–21.9 | 20.5–46.7 | 0–2 | 0.31–1.26 | never |
+| `macos-15-intel` (i7-8700B, virtual), macOS 15.7.9 | 1920×1080 @ 30 Hz, 1x | Apple Paravirtual device | panel, status (25) | 26.1–30.5 | 35.5–39.3 | 36.1–480.1 | 0–13 | 0.62–7.38 | never ¹ |
+| | | | winit, status (25) | 30.3–31.3 | 36.1–40.1 | 36.2–59.1 | 0–1 | 0.77–4.79 | never |
+| | | | panel, screen-saver (1000) | 30.4–31.4 | 35.9–40.0 | 35.9–41.7 | 0 | 0.59–5.00 | never |
+
+What this shows:
+
+- **It works on a real WindowServer.** Metal adapter found, `PostMultiplied` alpha, the panel reads back as
+  `NSPanel`, style mask `0x80` (non-activating), collection behaviour `0x40151`, `ignoresMouseEvents`, non-opaque, and
+  the requested level (25 or 1000, from `CGWindowLevelForKey`). The screenshots show the card and the ring drawn over
+  the desktop with TextEdit visible next to them and still frontmost in the menu bar: per-pixel transparency works.
+- **Focus:** in 30 runs `NSApp.isActive` stayed false at every frame (so our process was never frontmost) and the
+  panel (or winit window) was never key. ¹ On the Intel runner the first row started with the system's `UserNotificationCenter` prompt frontmost
+  instead of TextEdit, so the old check (frontmost unchanged) read false although nothing of ours took focus; the
+  probe now reports "frontmost is us" (the failure) separately from "frontmost changed" (information), as the Windows
+  spike does, and `measure.sh` gives focus back to TextEdit before each run.
+- **Pacing follows the display.** The probe holds the virtual display's own rate (60 Hz on Apple silicon, 30 Hz on
+  Intel) with p50 within 0.04 ms (Apple silicon) and 0.7 ms (Intel) of the refresh period. The 480 ms gap is the first run's cold start on Intel; the
+  other stalls are single frames, which these shared VMs show on Windows runners too. No real-Mac claim is made from
+  them.
+- **First frame** from a warm panel: 0.27–7.38 ms, inside the 16 ms target.
+- winit's `NSWindow` passed the same focus checks as the panel on both VMs, so the daemon may keep its winit window
+  for now (`make_overlay`); the panel stays the default until a real Mac confirms both.
 
 ## Consequences
 

@@ -8,17 +8,21 @@ use serde::Serialize;
 use crate::policy::hitch_limit_ms;
 
 /// One run: present-to-present intervals and the focus checks taken at every frame.
+// Each flag is an independent check that the JSON reports as is; an enum or bit set would hide them.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct Run {
     refresh_hz: f64,
     first_frame: Option<Duration>,
     intervals: Vec<Duration>,
     focus_kept: bool,
+    frontmost_changed: bool,
     app_never_active: bool,
     panel_never_key: bool,
 }
 
 /// What a run measured, written into the probe's JSON.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct RunReport {
     pub frames: usize,
@@ -32,8 +36,11 @@ pub struct RunReport {
     pub hitches: usize,
     /// Refreshes that passed without a new frame, summed over all hitches.
     pub missed_refreshes: u64,
-    /// The app that was frontmost before the run was still frontmost at every frame.
+    /// This process never became the frontmost app: the only real focus theft.
     pub focus_kept: bool,
+    /// The frontmost app changed during the run for another reason (the user or the system switched apps).
+    /// Informational, as `foreground_changed` in the Windows spike.
+    pub frontmost_changed: bool,
     /// `NSApp.isActive` stayed false at every frame.
     pub app_never_active: bool,
     /// The overlay window never became the key window.
@@ -48,6 +55,7 @@ impl Run {
             first_frame: None,
             intervals: Vec::with_capacity(512),
             focus_kept: true,
+            frontmost_changed: false,
             app_never_active: true,
             panel_never_key: true,
         }
@@ -61,8 +69,17 @@ impl Run {
         self.intervals.push(d);
     }
 
-    pub fn focus(&mut self, frontmost_unchanged: bool, app_active: bool, panel_key: bool) {
-        self.focus_kept &= frontmost_unchanged;
+    /// Records the checks taken after one frame.
+    #[allow(clippy::fn_params_excessive_bools)]
+    pub fn focus(
+        &mut self,
+        frontmost_is_us: bool,
+        frontmost_unchanged: bool,
+        app_active: bool,
+        panel_key: bool,
+    ) {
+        self.focus_kept &= !frontmost_is_us;
+        self.frontmost_changed |= !frontmost_unchanged;
         self.app_never_active &= !app_active;
         self.panel_never_key &= !panel_key;
     }
@@ -106,6 +123,7 @@ impl Run {
             hitches,
             missed_refreshes: missed,
             focus_kept: self.focus_kept,
+            frontmost_changed: self.frontmost_changed,
             app_never_active: self.app_never_active,
             panel_never_key: self.panel_never_key,
         }
@@ -174,12 +192,19 @@ mod tests {
         let mut r = Run::new(60.0);
         r.first_frame(Duration::from_millis(1));
         r.interval(Duration::from_micros(16_667));
-        r.focus(true, false, false);
-        assert!(passes(&r.report(), 60.0));
-        r.focus(true, true, false);
+        r.focus(false, false, false, false);
+        let rep = r.report();
+        assert!(rep.frontmost_changed, "another app switching is recorded");
+        assert!(passes(&rep, 60.0), "but is not our focus theft");
+        r.focus(false, true, true, false);
         let rep = r.report();
         assert!(!rep.app_never_active);
         assert!(!passes(&rep, 60.0));
+        let mut us = Run::new(60.0);
+        us.first_frame(Duration::from_millis(1));
+        us.interval(Duration::from_micros(16_667));
+        us.focus(true, false, false, false);
+        assert!(!passes(&us.report(), 60.0), "becoming frontmost fails");
     }
 
     #[test]
