@@ -328,17 +328,18 @@ class Session extends ChangeNotifier {
   /// Runs a connect job (scan link, find on this network, wait for a scan) and keeps the peer it returns. From
   /// then on the session listens for photos and files from the other side, whichever tab is open.
   ///
-  /// A peer that is not paired yet (found nearby, by address or by code: ADR-0050) goes through [verify] first,
-  /// which runs the six-digit comparison; nothing else touches the session until it says yes. A "no" closes the
-  /// session and ends in the cancelled error.
+  /// A peer that must compare the six digits (found nearby, by address or by code, or one that dialed this phone
+  /// that way: ADR-0050, ADR-0064) goes through [verify] first; nothing else touches the session until it says
+  /// yes. A "no", or no [verify] to ask with, closes the session and ends in [PairRefused]. A guest (connected
+  /// without proving anything) is kept untrusted: its offers are always asked about.
   Future<vutric.Connected> connect(
     Future<vutric.Connected> Function() job, {
     Future<bool> Function(vutric.Connected peer)? verify,
   }) async {
     final c = await afterDisconnect(job);
-    if (!c.trusted && verify != null && !await verify(c)) {
+    if (c.needsCheck && (verify == null || !await verify(c))) {
       await disconnectNow();
-      throw StateError('vutric: cancelled');
+      throw const PairRefused();
     }
     peer = c;
     lostPeer = null;
@@ -378,7 +379,7 @@ class Session extends ChangeNotifier {
     try {
       while (peer != null && !_pauseWanted) {
         final next = await vutric.nextIncoming(); // only an error here means the session is gone
-        if (next.photo == null && next.files == null) break; // paused for a send
+        if (isPaused(next)) break; // paused for a send
         try {
           await onIncoming?.call(next);
         } catch (e) {
@@ -395,8 +396,13 @@ class Session extends ChangeNotifier {
     }
   }
 
-  /// Runs [job] (a throw or a send) with the session to itself, then listens again.
+  int _exclusive = 0;
+
+  /// Runs [job] (a throw, a send, a mirrored notice) with the session to itself, then listens again. Jobs may
+  /// overlap (a notice during a send): the listener comes back only when the last one ends, so it never holds
+  /// the session while a job waits for it.
   Future<T> exclusive<T>(Future<T> Function() job) async {
+    _exclusive++;
     _pauseWanted = true;
     try {
       if (_listening) {
@@ -405,14 +411,17 @@ class Session extends ChangeNotifier {
       }
       return await job();
     } finally {
-      // Whatever failed above, the listener comes back; a resume error must not hide the job's own error.
-      _pauseWanted = false;
-      try {
-        await vutric.resumeIncoming();
-      } catch (e) {
-        debugPrint('vutric: resumeIncoming failed: $e');
+      _exclusive--;
+      if (_exclusive == 0) {
+        // Whatever failed above, the listener comes back; a resume error must not hide the job's own error.
+        _pauseWanted = false;
+        try {
+          await vutric.resumeIncoming();
+        } catch (e) {
+          debugPrint('vutric: resumeIncoming failed: $e');
+        }
+        if (peer != null) unawaited(_listen());
       }
-      if (peer != null) unawaited(_listen());
     }
   }
 
@@ -472,6 +481,19 @@ class Session extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+/// The six digits were refused on one of the two screens (or could not be asked): nothing was trusted. Reads as
+/// a cancelled call, so pages that only know [isCancelled] still go back quietly.
+class PairRefused implements Exception {
+  const PairRefused();
+
+  @override
+  String toString() => 'vutric: cancelled (pairing refused)';
+}
+
+/// An [vutric.Incoming] with nothing in it: [vutric.pauseIncoming] asked for the session.
+bool isPaused(vutric.Incoming next) =>
+    next.photo == null && next.files == null && next.notice == null && next.clipboard == null;
 
 /// Whether switching the route from [from] to [to] changes how far the node reaches (internet or not), which
 /// needs a restart (ADR-0060 `Reach::for_picker`).

@@ -12,7 +12,9 @@ import android.service.notification.StatusBarNotification
  * turns it on in Vutric, and Android asks for notification access on its own settings page. Off by default.
  *
  * The listener keeps no state of its own. The switch and the allowed apps live in a small preferences file the
- * Dart side writes; each notification that passes is handed to Flutter as an event while the app process runs.
+ * Dart side writes; only apps on that list are mirrored, and an empty list mirrors nothing. Each notification that
+ * passes is handed to Flutter as an event while the app process runs; Dart sends it to a paired device only
+ * (`Message::Notice`, ADR-0065).
  * Ongoing notifications (music, calls, our own progress), group summaries and Vutric's own are never mirrored,
  * and the text is cut short before it leaves this class.
  */
@@ -22,8 +24,8 @@ class CompanionListener : NotificationListenerService() {
         if (sbn.packageName == packageName || sbn.isOngoing) return
         val n = sbn.notification ?: return
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
-        val allowed = CompanionPrefs.apps(this)
-        if (allowed.isNotEmpty() && sbn.packageName !in allowed) return
+        // Only apps the user picked; an empty list mirrors nothing (the safer default, owner question 2026-11-18).
+        if (sbn.packageName !in CompanionPrefs.apps(this)) return
         val extras = n.extras ?: return
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty().take(MAX_TITLE)
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty().take(MAX_TEXT)

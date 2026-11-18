@@ -81,6 +81,12 @@
             android:exported="false"
             android:isolatedProcess="true"
             android:process=":foreign" />
+        <!-- C10 (ADR-0066): LocalSend, KDE Connect and magic-wormhole adapters in their own process, driven by the
+             app over a socket pair; not exported, so no other app can bind it. -->
+        <service
+            android:name=".CompatService"
+            android:exported="false"
+            android:process=":compat" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -93,6 +99,11 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- The Companion allowlist picker lists apps with a launcher icon (A12). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

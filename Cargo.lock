@@ -5500,6 +5500,7 @@ dependencies = [
  "image",
  "serde_json",
  "tokio",
+ "vutric-compat-localsend",
  "vutric-core",
  "vutric-net",
 ]

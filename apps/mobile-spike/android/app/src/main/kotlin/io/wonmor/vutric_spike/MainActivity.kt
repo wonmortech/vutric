@@ -164,8 +164,33 @@ class MainActivity : FlutterActivity() {
                 ForeignDiscovery.stop()
                 result.success(null)
             }
+            // C10 (ADR-0066): the adapters in the `:compat` process; Dart gets our end of the socket pair for Rust.
+            "compatOpen" -> CompatHost.open(applicationContext) { fd -> result.success(fd) }
+            "compatClose" -> {
+                CompatHost.close(applicationContext)
+                result.success(null)
+            }
+            // The Companion allowlist picker (A12): apps with a launcher icon, label and package.
+            "installedApps" -> io.execute {
+                val apps = runCatching { launcherApps() }.getOrDefault(emptyList())
+                runOnUiThread { result.success(apps) }
+            }
             else -> result.notImplemented()
         }
+    }
+
+    /** Every app with a launcher entry except Vutric, sorted by label: `[{package, label}]`. */
+    private fun launcherApps(): List<Map<String, String>> {
+        val pm = packageManager
+        val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        @Suppress("DEPRECATION") // the flags overload is 33+; 0 needs no flags
+        val found = pm.queryIntentActivities(main, 0)
+        return found
+            .map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
+            .filter { (pkg, _) -> pkg != packageName }
+            .distinctBy { it.first }
+            .sortedBy { it.second.lowercase() }
+            .map { (pkg, label) -> mapOf("package" to pkg, "label" to label.take(80)) }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -253,6 +278,7 @@ class MainActivity : FlutterActivity() {
         CompanionPrefs.sink = null
         ForeignDiscovery.sink = null
         ForeignDiscovery.stop()
+        if (isFinishing) CompatHost.close(applicationContext)
         lock?.release()
         lock = null
         // A rotation or a system-recreated activity is not "leaving": Dart's hotspotStop owns the hotspot then.

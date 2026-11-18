@@ -12,6 +12,7 @@ import 'package:gal/gal.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../android.dart';
+import '../companion.dart';
 import '../design/tokens.dart';
 import '../design/widgets.dart';
 import '../session.dart';
@@ -48,8 +49,13 @@ class Catches extends ChangeNotifier {
   void update() => notifyListeners();
 }
 
-/// Handles one photo or offer from the other side. [showReceive] brings the Qabul tab to the front for a photo.
+/// Handles one photo, offer, notice or clipboard text from the other side. [showReceive] brings the Qabul tab to
+/// the front for a photo. Notices and clipboard text come only from a paired device (Rust drops the rest).
 Future<void> handleIncoming(BuildContext context, vutric.Incoming next, VoidCallback showReceive) async {
+  final notice = next.notice;
+  if (notice != null) return showNotice(context, notice, front: _inFront);
+  final clip = next.clipboard;
+  if (clip != null) return offerClipboard(context, clip, front: _inFront);
   final files = next.files;
   if (files != null) return _offer(context, files);
   final p = next.photo;
@@ -178,9 +184,8 @@ Future<void> _offer(BuildContext context, vutric.FilesOffer offer) async {
   );
   if (context.mounted) {
     final where = inFolder > 0 ? ' · $inFolder tasi “${folder!.label}” papkasida' : '';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(doneText(r, sending: false, inGallery: inGallery) + where)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(doneText(r, sending: false, inGallery: inGallery) + where)));
   }
 }
 
@@ -433,7 +438,9 @@ class _ReceiveTabState extends State<ReceiveTab> with SingleTickerProviderStateM
                   color: v.raised,
                   borderRadius: BorderRadius.circular(math.max(0, v.rCard - 8)),
                 ),
-                child: Center(child: _Bob(child: Icon(Icons.arrow_downward_rounded, color: v.muted))),
+                child: Center(
+                  child: _Bob(child: Icon(Icons.arrow_downward_rounded, color: v.muted)),
+                ),
               ),
             ),
           ),
@@ -557,7 +564,9 @@ class _ReceiveTabState extends State<ReceiveTab> with SingleTickerProviderStateM
     }
     return Row(
       children: [
-        Expanded(child: VButton(label: 'Ulashish', kind: VButtonKind.secondary, onPressed: _share)),
+        Expanded(
+          child: VButton(label: 'Ulashish', kind: VButtonKind.secondary, onPressed: _share),
+        ),
         const SizedBox(width: 10),
         Expanded(
           child: VButton(
@@ -633,10 +642,8 @@ class _BobState extends State<_Bob> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _c,
-    builder: (_, child) => Transform.translate(
-      offset: Offset(0, 6 * Curves.easeInOut.transform(_c.value)),
-      child: child,
-    ),
+    builder: (_, child) =>
+        Transform.translate(offset: Offset(0, 6 * Curves.easeInOut.transform(_c.value)), child: child),
     child: widget.child,
   );
 }

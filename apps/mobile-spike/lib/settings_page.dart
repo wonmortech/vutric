@@ -15,8 +15,10 @@ import 'design/themes.g.dart';
 import 'design/tokens.dart';
 import 'design/widgets.dart';
 import 'i18n.dart';
+import 'screens/app_picker_page.dart';
 import 'screens/connect.dart' show PrivacyLine;
 import 'screens/device_page.dart';
+import 'screens/foreign_page.dart';
 import 'screens/measure_page.dart';
 import 'screens/route_picker.dart';
 import 'session.dart';
@@ -153,6 +155,14 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     await _session.setCompanion(notifications: on);
     await AndroidBridge.instance.companionMirror(on, _session.mirrorApps);
+  }
+
+  Future<void> _pickApps() async {
+    final apps = await pickMirrorApps(context, _session.mirrorApps);
+    if (apps == null) return;
+    await _session.setCompanion(apps: apps);
+    await AndroidBridge.instance.companionMirror(_session.mirrorNotifications, apps);
+    if (mounted) setState(() {});
   }
 
   Future<void> _rename() async {
@@ -335,6 +345,14 @@ class _SettingsPageState extends State<SettingsPage> {
                     value: _session.mirrorNotifications,
                     onChanged: _companionNotifications,
                   ),
+                  VRowCard(
+                    icon: Icons.apps_rounded,
+                    title: tr('companion.apps'),
+                    subtitle: _session.mirrorApps.isEmpty
+                        ? tr('companion.apps.none')
+                        : tr('companion.apps.some', {'n': '${_session.mirrorApps.length}'}),
+                    onTap: _pickApps,
+                  ),
                   _Switch(
                     label: tr('companion.clipboard'),
                     hint: tr('companion.clipboard.hint'),
@@ -342,6 +360,13 @@ class _SettingsPageState extends State<SettingsPage> {
                     onChanged: (x) => _session.setCompanion(clipboard: x),
                   ),
                 ],
+              ),
+              _Header(tr('foreign.page')),
+              VRowCard(
+                icon: Icons.devices_other_rounded,
+                title: tr('foreign.page'),
+                subtitle: tr('foreign.hint'),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ForeignPage())),
               ),
             ],
             const _Header('Texnik'),

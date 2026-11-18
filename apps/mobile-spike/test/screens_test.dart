@@ -38,6 +38,7 @@ const _peer = vutric.Connected(
   route: 'route.badge.direct_lan',
   peerId: '',
   peerCode: 'K7Q2-M4XD',
+  needsCheck: false,
   trusted: true,
 );
 

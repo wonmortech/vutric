@@ -70,9 +70,10 @@ class _HotspotPageState extends State<HotspotPage> {
         _net = n;
         _wifiQr = wifi;
       });
+      // The window first: its one-time secret then rides in the first QR shown (ADR-0064).
+      await vutric.setVisibility(mode: 'pairing');
       await _relink();
       _refresh = Timer.periodic(const Duration(seconds: 4), (_) => _relink());
-      await vutric.setVisibility(mode: 'pairing');
       unawaited(_wait());
     } on PlatformException catch (e) {
       if (!mounted) return;
@@ -96,7 +97,7 @@ class _HotspotPageState extends State<HotspotPage> {
   /// Waits for the other device on this phone's own session listener (same as "Kutish: QR kodimni").
   Future<void> _wait() async {
     try {
-      final c = await Session.instance.connect(vutric.acceptSession);
+      final c = await Session.instance.connect(vutric.acceptSession, verify: (_) => checkDigits(context));
       if (!mounted) return;
       HapticFeedback.mediumImpact();
       _paired = true;
@@ -105,7 +106,14 @@ class _HotspotPageState extends State<HotspotPage> {
       unawaited(vutric.setVisibility(mode: 'trusted_only'));
       Navigator.of(context).pop(c);
     } catch (e) {
-      if (!mounted || _closing || isCancelled(e)) return;
+      if (!mounted || _closing) return;
+      if (e is PairRefused) {
+        // "Farq qiladi" on either screen: nothing trusted, the QR stays up for the next try.
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('pair.refused'))));
+        unawaited(_wait());
+        return;
+      }
+      if (isCancelled(e)) return;
       setState(() => _error = errorText(e));
     }
   }

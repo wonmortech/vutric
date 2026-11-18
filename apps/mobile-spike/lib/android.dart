@@ -213,9 +213,39 @@ class AndroidBridge {
     }
   }
 
-  /// Turns mirroring on or off for the listener; an empty [apps] list means every app.
+  /// Turns mirroring on or off for the listener. Only the packages in [apps] are mirrored; an empty list mirrors
+  /// nothing (the safer default until the owner says otherwise, owner question 2026-11-18).
   Future<void> companionMirror(bool on, List<String> apps) async {
     if (Platform.isAndroid) await _ch.invokeMethod<void>('companionMirror', {'on': on, 'apps': apps});
+  }
+
+  /// Apps with a launcher icon (not Vutric), sorted by name, for the Companion allowlist picker.
+  Future<List<({String package, String label})>> installedApps() async {
+    if (!Platform.isAndroid) return const [];
+    try {
+      final raw = await _ch.invokeListMethod<Map<Object?, Object?>>('installedApps') ?? const [];
+      return [
+        for (final m in raw)
+          if ('${m['package'] ?? ''}'.isNotEmpty) (package: '${m['package']}', label: '${m['label'] ?? m['package']}'),
+      ];
+    } on PlatformException {
+      return const [];
+    }
+  }
+
+  /// Starts the `:compat` service (C10, ADR-0066) and returns this process's end of the socket pair for Rust's
+  /// `compatStart`, or null when the service could not start (then only discovery runs).
+  Future<int?> compatOpen() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      return await _ch.invokeMethod<int?>('compatOpen');
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  Future<void> compatClose() async {
+    if (Platform.isAndroid) await _ch.invokeMethod<void>('compatClose');
   }
 
   Future<void> foreignStart() async {
