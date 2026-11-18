@@ -84,7 +84,7 @@ can see stays complete.
    other half: the verdict follows the live path.
 3. A real cable between two computers. The `fe80::` test uses this machine's own interfaces: Wi-Fi, Hyper-V and
    WSL. The `169.254` half was not exercised on a live session; this host has no such address.
-4. Linux CI runners may have no link-local IPv6. The R5a test then prints `skipped` and passes.
+4. Linux. The R5a live test is ignored there. On the Ubuntu CI runner, dialing the host's own `fe80::` address reached `accept`, but the QUIC handshake stalled ("no answer within 8s"; CI run 44256461443). That is a self-dial through loopback, not a cable between two machines. Whether two Linux machines connect over a zone-less `fe80::` hint is still open, and is part of the real-cable check. The test runs on Windows (CI and local).
 
 ## Measured
 

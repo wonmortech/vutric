@@ -59,6 +59,10 @@ async fn lan_session_shows_the_lan_badge() {
 /// without its zone. Here the ticket keeps only its zone-less `fe80::` hints; the dialer expands them to its own
 /// interfaces and connects. Skipped (with a note) on a host with no link-local IPv6 address.
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "on Linux a host dialing its own fe80:: address stalls the QUIC handshake (CI 2026-11-18); ADR-0068"
+)]
 async fn zone_less_link_local_hint_connects() {
     let desktop = Peer::bind([33; 32], "Laptop A", Platform::Windows, Reach::Lan)
         .await
