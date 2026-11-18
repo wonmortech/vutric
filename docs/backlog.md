@@ -114,7 +114,7 @@ Sources:
 
 | # | Item | Status |
 |---|---|---|
-| A1 | Gallery-first home, multi-select, one send button | [~] |
+| A1 | Gallery-first home, multi-select, one send button | [x] |
 | A2 | Onboarding + permissions; QR scan with manual IP as fallback | [ ] |
 | A3 | `ShareEntry`: Share target and sharing shortcuts for paired devices | [ ] |
 | A4 | `TransferJob`: user-initiated data transfer job (14+), `dataSync` foreground service before that | [ ] |
@@ -123,11 +123,11 @@ Sources:
 | A7 | `Nearby`: NSD + MulticastLock (1), BLE (R4) | [ ] |
 | A8 | `SafStore`: SAF folder and MediaStore move after verification | [ ] |
 | A9 | Fling screen: velocity threshold, spring back, haptic | [ ] |
-| A10 | History with progress and resend | [ ] |
+| A10 | History with progress and resend | [x] |
 | A11 | Receive: Halqa in the app when open, otherwise a heads-up notification with a thumbnail; no `SYSTEM_ALERT_WINDOW` | [ ] |
 | A12 | `Companion` (notification mirroring) and `Clipboard`, opt-in | [ ] |
 | A13 | Kotlin `ForeignDiscovery` for LocalSend and KDE Connect | [ ] |
-| A14 | Apply the Claude Design UI (`design/claude-design/`) to every phone screen, improved where it falls short | [ ] |
+| A14 | Apply the Claude Design UI (`design/claude-design/`) to every phone screen, improved where it falls short | [x] |
 
 ## 7. iPhone (ADR-0009 §3, roadmap Phase 3)
 

@@ -7,7 +7,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `as_initiator`, `bump`, `cancellable`, `drop_session`, `epoch`, `finished`, `forget_on_error`, `keep`, `load_settings`, `ms`, `now_epoch`, `open`, `peer_slot`, `peer`, `pending_slot`, `progress_of`, `receiver_clock`, `report`, `reporter`, `retire`, `route_name`, `runtime`, `sent_of`, `session_slot`, `session`, `settings_path`, `take_offer`
+// These functions are ignored because they are not marked as `pub`: `as_initiator`, `bump`, `cancellable`, `drop_session`, `epoch`, `finished`, `forget_on_error`, `keep`, `load_settings`, `ms`, `now_epoch`, `open`, `pause_flag`, `pause_signal`, `peer_slot`, `peer`, `pending_slot`, `progress_of`, `receiver_clock`, `report`, `reporter`, `retire`, `route_name`, `runtime`, `sent_of`, `session_slot`, `session`, `settings_path`, `take_offer`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Sent`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
@@ -105,9 +105,18 @@ Future<String> getSettings() => RustLib.instance.api.crateApiGetSettings();
 Future<void> putSettings({required String json}) =>
     RustLib.instance.api.crateApiPutSettings(json: json);
 
+/// Makes a waiting [`next_incoming`] return an empty [`Incoming`] at once and let go of the session, so this side
+/// can throw or send on the same session; calls made while paused return empty at once too. Nothing is lost:
+/// whatever the other side sends meanwhile waits in the stream until [`resume_incoming`] and the next call.
+Future<void> pauseIncoming() => RustLib.instance.api.crateApiPauseIncoming();
+
+/// Lets [`next_incoming`] wait for the other side again after [`pause_incoming`].
+Future<void> resumeIncoming() => RustLib.instance.api.crateApiResumeIncoming();
+
 /// Waits for the next photo or file offer on the open session (either side may have opened it). Latency probes
 /// are answered here and never shown; a fling whose preview is not a sane JPEG is refused (`FlingFailed`), so its
-/// thrower learns at once. Cancelled by [`disconnect`].
+/// thrower learns at once. Returns an empty [`Incoming`] (neither photo nor files) when [`pause_incoming`] asks
+/// for the session. Cancelled by [`disconnect`].
 Future<Incoming> nextIncoming() => RustLib.instance.api.crateApiNextIncoming();
 
 /// Tells the thrower this phone could not show the photo after all (its round trip ends with a refusal, at

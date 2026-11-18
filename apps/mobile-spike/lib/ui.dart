@@ -1,8 +1,6 @@
-// Shared look and error handling for the spike screens.
+// Session plumbing and error text shared by the screens (the look itself is design/tokens.dart).
 
 import 'dart:io';
-
-import 'package:material_ui/material_ui.dart';
 
 import 'src/rust/api.dart' as vutric;
 
@@ -17,13 +15,6 @@ Future<T> afterDisconnect<T>(Future<T> Function() job) async {
   await _lastDisconnect;
   return job();
 }
-
-const cobalt = Color(0xFF062B8A);
-const signal = Color(0xFF2F6BFF);
-const sand = Color(0xFFE6DBC7);
-const paper = Color(0xFFF7F2E9);
-const ok = Color(0xFF1D7A4E);
-const err = Color(0xFFA8321F);
 
 /// iPhone cannot use mDNS without Apple's multicast entitlement (a free Apple ID has none): pair by QR there.
 final hasMdns = !Platform.isIOS;

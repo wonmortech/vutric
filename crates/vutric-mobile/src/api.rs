@@ -12,12 +12,13 @@
 //!   and the screen goes back to "connect".
 
 use std::future::Future;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context as _, Result, bail};
 use tokio::runtime::Runtime;
-use tokio::sync::{Mutex as AsyncMutex, watch};
+use tokio::sync::{Mutex as AsyncMutex, Notify, watch};
 use vutric_core::message::FailReason;
 use vutric_core::{FlingId, Message, PairingTicket, Platform};
 use vutric_net::{Peer, Reach, Route, Session, preview, probe, transfer};
@@ -541,15 +542,56 @@ fn pending_slot() -> &'static Mutex<Option<(Shared, transfer::IncomingOffer)>> {
     &PENDING
 }
 
+/// Set by [`pause_incoming`], cleared by [`resume_incoming`].
+fn pause_flag() -> &'static AtomicBool {
+    static PAUSED: AtomicBool = AtomicBool::new(false);
+    &PAUSED
+}
+
+fn pause_signal() -> &'static Notify {
+    static SIGNAL: OnceLock<Notify> = OnceLock::new();
+    SIGNAL.get_or_init(Notify::new)
+}
+
+/// Makes a waiting [`next_incoming`] return an empty [`Incoming`] at once and let go of the session, so this side
+/// can throw or send on the same session; calls made while paused return empty at once too. Nothing is lost:
+/// whatever the other side sends meanwhile waits in the stream until [`resume_incoming`] and the next call.
+pub fn pause_incoming() {
+    pause_flag().store(true, Ordering::SeqCst);
+    pause_signal().notify_waiters();
+}
+
+/// Lets [`next_incoming`] wait for the other side again after [`pause_incoming`].
+pub fn resume_incoming() {
+    pause_flag().store(false, Ordering::SeqCst);
+}
+
 /// Waits for the next photo or file offer on the open session (either side may have opened it). Latency probes
 /// are answered here and never shown; a fling whose preview is not a sane JPEG is refused (`FlingFailed`), so its
-/// thrower learns at once. Cancelled by [`disconnect`].
+/// thrower learns at once. Returns an empty [`Incoming`] (neither photo nor files) when [`pause_incoming`] asks
+/// for the session. Cancelled by [`disconnect`].
 pub fn next_incoming() -> Result<Incoming> {
+    let paused = || Incoming {
+        photo: None,
+        files: None,
+    };
     let (at, s) = session()?;
     let r = runtime().block_on(cancellable(at, async {
         let mut guard = s.lock().await;
         loop {
-            let msg = guard.recv().await?;
+            // Register for the pause signal before checking the flag, so a pause between the two is never missed.
+            // `recv` only buffers what it read (cancel-safe), so giving up the wait loses no message.
+            let signal = pause_signal().notified();
+            tokio::pin!(signal);
+            signal.as_mut().enable();
+            if pause_flag().load(Ordering::SeqCst) {
+                return Ok(paused());
+            }
+            let msg = tokio::select! {
+                biased;
+                () = &mut signal => return Ok(paused()),
+                msg = guard.recv() => msg?,
+            };
             if let Some(offer) = transfer::IncomingOffer::from_message(&msg) {
                 let (_, accept) = load_settings().rules_for(&guard.remote_id().to_string());
                 let files = FilesOffer {
