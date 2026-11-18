@@ -5,7 +5,9 @@ param(
     [Parameter(Mandatory)] [string] $Bin,
     [Parameter(Mandatory)] [string] $Out,
     [int] $Runs = 5,
-    [int] $Frames = 600
+    [int] $Frames = 600,
+    # Measure only these apps (names as in $apps), e.g. -Only slint-sw
+    [string[]] $Only = @()
 )
 $ErrorActionPreference = 'Stop'
 Start-Transcript -Path "$Out.log" -Force | Out-Null
@@ -21,6 +23,8 @@ public static class W {
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  // PW_RENDERFULLCONTENT (2): the window's own pixels, even when other windows cover it.
+  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
   public static IntPtr Find(int[] pids) {
     IntPtr hit = IntPtr.Zero;
     EnumWindows((h, l) => {
@@ -71,7 +75,8 @@ function Save-Shot([IntPtr]$h, [string]$path) {
     if ($w -le 0 -or $hh -le 0) { return }
     $bmp = New-Object System.Drawing.Bitmap $w, $hh
     $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.CopyFromScreen($r.L, $r.T, 0, 0, $bmp.Size)
+    # Never CopyFromScreen: it grabs whatever covers the window, which can be another app's private content.
+    $hdc = $g.GetHdc(); [void][W]::PrintWindow($h, $hdc, 2); $g.ReleaseHdc($hdc)
     $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png); $g.Dispose(); $bmp.Dispose()
 }
 
@@ -79,7 +84,7 @@ function Read-Log($path) { if (Test-Path $path) { Get-Content $path | Where-Obje
 
 $apps = @(
     @{ name = 'slint';     exe = Join-Path $Bin 'vutric-m1-slint.exe';                  probe = $true },
-    @{ name = 'slint-sw';  exe = Join-Path $Bin 'vutric-m1-slint.exe';                  probe = $false; backend = 'winit-software'; perf = $true },
+    @{ name = 'slint-sw';  exe = Join-Path $Bin 'vutric-m1-slint.exe';                  probe = $true; backend = 'winit-software'; perf = $true },
     @{ name = 'tauri';     exe = Join-Path $Bin 'vutric-m1-tauri.exe';                  probe = $true },
     @{ name = 'flutter';   exe = Join-Path $Bin 'flutter\vutric_m1_flutter.exe';        probe = $true },
     @{ name = 'localsend'; exe = Join-Path $Bin 'localsend\localsend_app.exe';          probe = $false }
@@ -87,6 +92,7 @@ $apps = @(
 
 $results = @()
 foreach ($app in $apps) {
+    if ($Only.Count -gt 0 -and $Only -notcontains $app.name) { continue }
     for ($run = 1; $run -le $Runs; $run++) {
         $log = Join-Path $env:TEMP "vutric-m1-$($app.name)-$run.jsonl"
         Remove-Item $log -ErrorAction SilentlyContinue
@@ -119,7 +125,15 @@ foreach ($app in $apps) {
         Start-Sleep -Seconds 3
         $tree = Get-Tree $proc.Id
         $open = Get-TreeMemory $tree
-        if ($run -eq 1 -and $win -ne [IntPtr]::Zero) { Save-Shot $win (Join-Path (Split-Path $Out) "m1-shot-$($app.name).png") }
+        # Two shots 400 ms apart: different pixels prove the Halqa preview is really being drawn, not just counted.
+        $animates = $null
+        if ($win -ne [IntPtr]::Zero) {
+            $a = Join-Path (Split-Path $Out) "m1-shot-$($app.name)-$run-a.png"
+            $b = Join-Path (Split-Path $Out) "m1-shot-$($app.name)-$run-b.png"
+            Save-Shot $win $a; Start-Sleep -Milliseconds 400; Save-Shot $win $b
+            if ((Test-Path $a) -and (Test-Path $b)) { $animates = (Get-FileHash $a).Hash -ne (Get-FileHash $b).Hash }
+            if ($run -gt 1) { Remove-Item $a, $b -ErrorAction SilentlyContinue }
+        }
         $cpu0 = Get-TreeCpu $tree; $cpuSw = [Diagnostics.Stopwatch]::StartNew()
         $stats = $null
         if ($app.probe) {
@@ -148,7 +162,7 @@ foreach ($app in $apps) {
             app = $app.name; run = $run
             window_ms = $windowMs; first_frame_ms = $firstFrameMs
             open = $open; after_10s = $late
-            frames = $stats; cpu_pct_of_one_core = $cpuPct
+            frames = $stats; animates = $animates; cpu_pct_of_one_core = $cpuPct
             perf_tail = if ($app.perf -and (Test-Path $stdout)) { (Get-Content $stdout -Tail 5) -join ' | ' } else { $null }
             exit_ms = $closeMs; left_after_close = $left
         }
