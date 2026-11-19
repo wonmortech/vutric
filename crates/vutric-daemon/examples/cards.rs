@@ -80,7 +80,9 @@ fn main() -> anyhow::Result<()> {
     let mut report = Vec::new();
     for (name, deck) in &decks {
         let c = deck.card(card::qr).expect("a card");
-        let (mut raster, mut show) = (Vec::with_capacity(runs), Vec::with_capacity(runs));
+        let mut raster = Vec::with_capacity(runs);
+        #[cfg_attr(not(windows), allow(unused_mut))]
+        let mut show: Vec<f64> = Vec::with_capacity(runs);
         let mut last = None;
         for _ in 0..runs.max(1) {
             let a = Instant::now();
