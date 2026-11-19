@@ -54,7 +54,7 @@ jobs:
           print(next(x["udid"] for k in ios for x in d[k] if x["name"].startswith("iPhone")))')
           echo "Simulator: $udid"
           set -o pipefail
-          xcodebuild test -scheme VutricKit -destination "id=$udid" -quiet 2>&1 | tail -n 80
+          xcodebuild test -scheme VutricKit -destination "id=$udid" -quiet 2>&1 | grep -vE "IDETestOperationsObserverDebug" | tail -n 200
 
       # Straight from the Flutter repo: the org allows only GitHub-owned and verified actions.
       - name: Flutter 3.50.0

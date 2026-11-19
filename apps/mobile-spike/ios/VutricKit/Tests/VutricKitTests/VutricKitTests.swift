@@ -220,6 +220,8 @@ final class HeicTests: XCTestCase {
     XCTAssertFalse(HeicConverter.isHeic("a.jpg"))
     XCTAssertEqual(HeicConverter.jpegName(for: "IMG_0001.HEIC"), "IMG_0001.jpg")
     XCTAssertEqual(HeicConverter.jpegName(for: ".HEIC"), "photo.jpg")
+    XCTAssertEqual(HeicConverter.jpegName(for: "a.b.heif"), "a.b.jpg")
+    XCTAssertEqual(HeicConverter.jpegName(for: "noext"), "noext.jpg")
   }
 
   func testAPngBecomesAJpegOfTheSameSize() throws {

@@ -18,7 +18,9 @@ public enum HeicConverter {
 
   /// `IMG_0001.HEIC` → `IMG_0001.jpg`.
   public static func jpegName(for name: String) -> String {
-    let base = (name as NSString).deletingPathExtension
+    // Same rule as Dart's `heicAsJpegName`: cut at the last dot, so ".HEIC" (no name) becomes "photo.jpg"; NSString
+    // would treat it as a hidden file with no extension.
+    let base = name.lastIndex(of: ".").map { String(name[..<$0]) } ?? name
     return (base.isEmpty ? "photo" : base) + ".jpg"
   }
 
