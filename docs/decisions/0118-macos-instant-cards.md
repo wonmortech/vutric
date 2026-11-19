@@ -67,7 +67,14 @@ at 16.44 ms (raster 15.05 ms); the three other cards meet it.
   falls back to the embedded Geist subset, which is Latin only, so a device name in another script would not
   render. The patch for W2 (add `/System/Library/Fonts/SFNS.ttf` and a CJK/Cyrillic fallback) is on #30; this ADR
   does not change W2's crate.
-- **Scale 2.** Retina rendering is wired up, but the CI screens are scale 1, so it has not been measured.
+- **Scale 2.** The CI screens are scale 1. `examples/cards.rs --scale 2` forces the Retina path there:
+  - a 2x raster (800 px wide cards);
+  - `contentsScale` 2 on the layer, so the panel is 400 pt wide;
+  - the posted click mapped back through the scale.
+
+  `tools/cards.sh` runs it as a second pass (`cards-mac-2x.json`, `card-mac-*@2x.png`). This measures the raster
+  cost at 2x and checks the click mapping. It is not a substitute for a real Retina screen: the window server
+  downsamples the 2x image to the 1x screen.
 - **Slide-in motion.** None, as on Windows (ADR-0032 Consequences).
 
 ## Real-Mac checklist (owner)

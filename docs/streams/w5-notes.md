@@ -74,3 +74,11 @@ The stack is an overlay layer: it is blended over the main layer once per pixel,
 rectangles, and hidden where the top card covers it.
 
 Host API: `Fling::new(effect, setup).with_files(n)`. One file adds nothing.
+
+## macOS items
+
+### Retina scale-2 card path
+
+`crates/vutric-host-mac/examples/cards.rs --scale 2` forces the 2x path on the 1x CI screens, and
+`tools/cards.sh` now runs it as a second pass. ADR-0118's Known gaps section is updated. No numbers yet: the
+next CI run produces `cards-mac-2x.json`.

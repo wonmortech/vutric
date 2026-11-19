@@ -46,12 +46,21 @@ mod mac {
     pub fn main() -> anyhow::Result<()> {
         let mut args = std::env::args().skip(1);
         let (mut out, mut runs, mut hold) = (PathBuf::from("cards-mac.json"), 200usize, 300u64);
+        let mut forced_scale: Option<f64> = None;
         while let Some(a) = args.next() {
             match a.as_str() {
                 "--out" => out = args.next().map_or(out, PathBuf::from),
                 "--runs" => runs = args.next().and_then(|r| r.parse().ok()).unwrap_or(runs),
                 // How long each card stays up after its runs (CI takes screenshots meanwhile).
                 "--hold-ms" => hold = args.next().and_then(|r| r.parse().ok()).unwrap_or(hold),
+                // Render at this backing scale whatever the screen says: CI screens are 1x, so `--scale 2` runs the
+                // Retina path (2x raster, layer contentsScale 2, clicks mapped back through the scale).
+                "--scale" => {
+                    forced_scale = args
+                        .next()
+                        .and_then(|r| r.parse::<f64>().ok())
+                        .filter(|s| s.is_finite() && (1.0..=4.0).contains(s));
+                }
                 _ => {}
             }
         }
@@ -68,7 +77,8 @@ mod mac {
         let fonts = Fonts::system();
         let fonts_ms = t0.elapsed().as_secs_f64() * 1000.0;
         let palette = Palette::vutric();
-        let scale = mac_card::target_scale(mtm);
+        let screen_scale = mac_card::target_scale(mtm);
+        let scale = forced_scale.unwrap_or(screen_scale);
 
         let now = Instant::now();
         let device = "Pixel 9 Pro (Aziza)";
@@ -131,7 +141,10 @@ mod mac {
             for p in rgba.chunks_exact_mut(4) {
                 p.swap(0, 2);
             }
-            let png = out.with_file_name(format!("card-mac-{name}.png"));
+            let png = out.with_file_name(format!(
+                "card-mac-{name}{}.png",
+                if scale > 1.5 { "@2x" } else { "" }
+            ));
             image::RgbaImage::from_raw(r.width, r.height, rgba)
                 .context("size matches")?
                 .save(&png)?;
@@ -183,6 +196,8 @@ mod mac {
             "arch": std::env::consts::ARCH,
             "runs": runs,
             "scale": scale,
+            "screen_scale": screen_scale,
+            "scale_forced": forced_scale.is_some(),
             "fonts_load_ms": (fonts_ms * 1000.0).round() / 1000.0,
             "first_show_ms": first_show_ms,
             "frontmost_before": front_name,

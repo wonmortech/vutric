@@ -34,17 +34,26 @@ if [[ ! -s $OUT/cards-mac.json ]]; then
   tail -n 40 "$OUT/cards.log"
   exit 1
 fi
-python3 - "$OUT/cards-mac.json" <<'PY' | tee "$OUT/summary.md"
-import json, sys
-r = json.load(open(sys.argv[1]))
+# The Retina path on a 1x runner: 2x raster, layer contentsScale 2, the click mapped back through the scale.
+"$BIN" --out "$OUT/cards-mac-2x.json" --runs 100 --hold-ms 300 --scale 2 >"$OUT/cards-2x.log" 2>&1
+echo "cards --scale 2 exit=$?"
+python3 - "$OUT/cards-mac.json" "$OUT/cards-mac-2x.json" <<'PY' | tee "$OUT/summary.md"
+import json, os, sys
 print("### macOS cards (ADR-0118)\n")
-print(f"os {r['os']} · scale {r['scale']} · fonts {r['fonts_load_ms']} ms · first show {r['first_show_ms']:.2f} ms · "
-      f"frontmost before {r['frontmost_before']} · focus kept {r['focus_kept']} · click {json.dumps(r['click'])}\n")
-print("| card | px | raster p50/p99 | show p50/p99 | total p50/p99 |")
-print("|---|---|---|---|---|")
-for c in r["cards"]:
-    print(f"| {c['card']} | {c['px'][0]}×{c['px'][1]} | {c['raster_p50_ms']:.2f} / {c['raster_p99_ms']:.2f} | "
-          f"{c['show_p50_ms']:.2f} / {c['show_p99_ms']:.2f} | {c['total_p50_ms']:.2f} / {c['total_p99_ms']:.2f} |")
+for path in sys.argv[1:]:
+    if not os.path.exists(path) or os.path.getsize(path) == 0:
+        print(f"{os.path.basename(path)}: missing\n")
+        continue
+    r = json.load(open(path))
+    forced = f" (forced, screen {r.get('screen_scale')})" if r.get("scale_forced") else ""
+    print(f"os {r['os']} · scale {r['scale']}{forced} · fonts {r['fonts_load_ms']} ms · first show {r['first_show_ms']:.2f} ms · "
+          f"frontmost before {r['frontmost_before']} · focus kept {r['focus_kept']} · click {json.dumps(r['click'])}\n")
+    print("| card | px | raster p50/p99 | show p50/p99 | total p50/p99 |")
+    print("|---|---|---|---|---|")
+    for c in r["cards"]:
+        print(f"| {c['card']} | {c['px'][0]}×{c['px'][1]} | {c['raster_p50_ms']:.2f} / {c['raster_p99_ms']:.2f} | "
+              f"{c['show_p50_ms']:.2f} / {c['show_p99_ms']:.2f} | {c['total_p50_ms']:.2f} / {c['total_p99_ms']:.2f} |")
+    print()
 PY
 [[ -n ${GITHUB_STEP_SUMMARY:-} ]] && cat "$OUT/summary.md" >>"$GITHUB_STEP_SUMMARY"
 exit 0
