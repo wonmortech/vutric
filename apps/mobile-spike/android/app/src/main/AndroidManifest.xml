@@ -16,6 +16,21 @@
         android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="32" />
+    <!-- W6 (ADR-0130..0134). F7: the Android 14 user-initiated transfer job. F14: ring loud and full screen.
+         R4: BLE finding (scan never used for location); legacy Bluetooth only up to Android 11. -->
+    <uses-permission android:name="android.permission.RUN_USER_INITIATED_JOBS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi.aware" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi.direct" android:required="false" />
     <application
         android:requestLegacyExternalStorage="true"
         android:label="Vutric"
@@ -38,6 +53,11 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- W6, F2 (ADR-0130): paired devices as direct Share targets; Android 7-9 through the chooser bridge. -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/w6_share_targets" />
+            <meta-data
+                android:name="android.service.chooser.chooser_target_service"
+                android:value="androidx.sharetarget.ChooserTargetServiceCompat" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -87,6 +107,23 @@
             android:name=".CompatService"
             android:exported="false"
             android:process=":compat" />
+        <!-- W6: F7 transfer job (Android 14+), F14 ring screen and its "Topdim" action (ADR-0130, ADR-0133). -->
+        <service
+            android:name=".w6.UserTransferJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <activity
+            android:name=".w6.RingActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:turnScreenOn="true" />
+        <receiver
+            android:name=".w6.RingStopReceiver"
+            android:exported="false" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

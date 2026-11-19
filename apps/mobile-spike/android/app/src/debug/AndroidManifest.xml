@@ -4,4 +4,11 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- W6, M3 (ADR-0134): the hotspot band probe, debug builds only; adb starts it, so it is exported here. -->
+    <application>
+        <activity
+            android:name=".w6.M3ProbeActivity"
+            android:exported="true"
+            android:label="Vutric M3" />
+    </application>
 </manifest>

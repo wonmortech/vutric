@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="w6_share_long_label">Send to %1$s</string>
+    <string name="w6_transfer_channel">Transfers</string>
+    <string name="w6_transfer_channel_desc">Sending and receiving files</string>
+    <string name="w6_ring_channel">Find my phone</string>
+    <string name="w6_ring_channel_desc">When a paired device rings this phone</string>
+    <string name="w6_ring_title">Vutric: looking for this phone</string>
+    <string name="w6_ring_text">%1$s is looking for this phone</string>
+    <string name="w6_ring_text_unknown">A paired device is looking for this phone</string>
+    <string name="w6_ring_found">Found it</string>
+    <string name="w6_m3_title">M3: hotspot band measurement (2.4 and 5 GHz)</string>
+    <string name="w6_m3_no_permission">Permission denied: the hotspot cannot open</string>
+    <string name="w6_m3_failed">The measurement could not be written</string>
+    <string name="w6_m3_saved">Result saved: %1$s</string>
+</resources>

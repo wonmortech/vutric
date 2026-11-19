@@ -24,6 +24,7 @@ done. An open question for the owner never blocks a stream. It goes into
 | **W2 · Desktop** | Rust daemon (tray, toast, IPC, autostart), overlay cards, Halqa and the other effects, Explorer menu, installer; desktop settings UI after the M1 spike; Linux hosts later | `crates/vutric-overlay/**`, `crates/vutric-host-*/**`, new `crates/vutric-daemon/**`, `apps/overlay-spike/**`, new `apps/desktop/**`, new `packaging/**` | D1–D11, E1–E5, M1, T8 |
 | **W3 · Network and interop** | routes R1–R10, our own relay, trust store and security, storage engine, every adapter of ADR-0010, fuzzing, interop tests | `crates/vutric-core/**`, `crates/vutric-net/**`, new `crates/vutric-compat-*/**`, new `crates/vutric-relay/**`, `apps/net-spike/**`, new `fuzz/**`, `docs/protocol.md` | R*, C*, S*, T2/T4–T7 engine, M2–M5 |
 | **W5 · macOS** (from 2026-11-18) | Roadmap Phase 5: the `NSPanel` overlay host, the menu-bar agent (the daemon role on macOS: login item, notifications), the Swift Share extension and Finder Quick Action, the signed and notarised `.dmg`, macOS CI, and the macOS host side of LocalSend and Quick Share. Carved out of W2's `crates/vutric-host-*/**` and `packaging/**` for macOS only | new `crates/vutric-host-mac/**`, new `apps/macos/**` (Swift), new `packaging/macos/**`, new `.github/workflows/macos-*.yml`; inside W2's `apps/desktop/**` only a new `apps/desktop/macos/` runner directory | D11, macOS parts of C1, C3 and F1 |
+| **W6 · Android native extras** (from 2026-11-18) | the Android Kotlin modules W1 has not built yet, in new files W1 only wires: sharing shortcuts, the Android 14 transfer job, Wi-Fi Aware and Wi-Fi Direct links, BLE plumbing, the ringer, the hotspot band probe | new Kotlin files in package `io.wonmor.vutric_spike.w6` (`apps/mobile-spike/android/app/src/main/kotlin/io/wonmor/vutric_spike/w6/**`), their tests (`app/src/test/**/w6/**`), new resources prefixed `w6_`, ADRs 0130–0149 | F2, F7, F14 (Android side), R4 (Android BLE plumbing; the frame codec stays W3), R6, R7 (Android links; the transport hook stays W3), M3 (Android probe; the numbers are W3's row) |
 
 **Shared files.** These have rules instead of a single owner:
 
@@ -37,6 +38,11 @@ done. An open question for the owner never blocks a stream. It goes into
 | `.github/workflows/**` | Add new workflow files, or add a new job. Never rewrite another stream's job. |
 | ADR numbers | W1 uses 0011–0029, W2 0030–0049, W3 0050–0069, so numbers never collide. |
 | ADR numbers (W5) | W5 uses 0110–0129. |
+
+**W6 and W1.** W6 never rewrites a W1 file. Where a W6 module has to be registered in one (the manifest, the
+`vutric/android` MethodChannel dispatch in `MainActivity.kt`, `TransferService.kt`, `build.gradle.kts`), the edit is
+limited to registration lines and listed in the PR under "W1 files touched". W6 adds no Dart except new files W1
+may ignore; W1 builds the screens and wires the calls. W6 ADR numbers are 0130–0149.
 
 ## The interface between streams
 

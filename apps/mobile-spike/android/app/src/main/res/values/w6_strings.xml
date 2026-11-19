@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- W6 (ADR-0130..0134). Default locale = Uzbek (Latin), as the rest of the phone UI; English in values-en. -->
+<resources>
+    <string name="w6_share_long_label">%1$s qurilmasiga yuborish</string>
+    <string name="w6_transfer_channel">Uzatishlar</string>
+    <string name="w6_transfer_channel_desc">Fayl yuborish va qabul qilish jarayoni</string>
+    <string name="w6_ring_channel">Telefonni qidirish</string>
+    <string name="w6_ring_channel_desc">Juftlangan qurilma bu telefonni jiringlatganda</string>
+    <string name="w6_ring_title">Vutric: telefon qidirilmoqda</string>
+    <string name="w6_ring_text">%1$s bu telefonni qidiryapti</string>
+    <string name="w6_ring_text_unknown">Juftlangan qurilma bu telefonni qidiryapti</string>
+    <string name="w6_ring_found">Topdim</string>
+    <string name="w6_m3_title">M3: hotspot diapazoni oʻlchovi (2,4 va 5 GGs)</string>
+    <string name="w6_m3_no_permission">Ruxsat berilmadi: hotspot ochilmaydi</string>
+    <string name="w6_m3_failed">Oʻlchov faylga yozilmadi</string>
+    <string name="w6_m3_saved">Natija saqlandi: %1$s</string>
+</resources>

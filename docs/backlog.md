@@ -53,6 +53,9 @@ Sources:
 | Rb | Big files: consider `iroh-blobs` for verified streaming; never push 10–100 GB through the relay | TM §2.6 | [~] ADR-0068: `route::Bulk` (ask above 2 GiB, refuse above 10 GiB on a relayed path), `transfer::send` refuses with `TooBigForRelay` after waiting 10 s for a direct path, `Session::bulk`/`is_relayed`/`wait_direct`; iroh-blobs not adopted (reasons in ADR-0068); tests `route::tests::bulk_limits_only_apply_to_relayed_paths`, `transfer::tests::relay_guard_waits_for_a_direct_path_then_refuses`, `relay_path.rs::bulk_verdict_follows_the_live_path`; the ask dialog is W1/W2; a relay-only real network is left · phone (W1): `bulk_verdict` before every send, ask above 2 GiB, refuse above 10 GiB, `bulk.too_big` from the engine guard (ADR-0014 #10; `companion_compat_test` dialogs); device step: checklist 38 |
 | R11 | (W3) Connect without the QR: typed IPv4 address or 8-character short code, resolved through the beacon, always confirmed with the 6-digit code (#9) | 1 | [~] ADR-0059, `vutric_core::code`, `vutric_net::find`, tests `find_typed.rs`, `code.rs`; the code over multicast on a real LAN is left (multicast does not loop back on one host) · phone (W1): "Kod yoki manzil" page, short code under our QR, six-digit check (ADR-0013 #2, #3; `catch.rs`); phone-to-phone by code works since #13 (ADR-0014 #3, `catch.rs` scenario 5); device step: checklist 17–19, 29 |
 | Rn | Not built, on purpose: Bluetooth Classic, NFC P2P, LoRa, bulk data over ultrasound | ADR-0007 | — |
+| R4a | (W6) R4 on Android: BLE advertiser (service UUID + 13-byte rotating scan response), filtered scanner, GATT server and client (`rx`/`tx`, `mtu − 3` chunks, one write at a time) behind `BleCodec` | ADR-0132 | [~] `w6/BleNearby.kt`; tests `BleRulesTest`; frame codec waits for W3 #24 (`TempBleCodec` meanwhile); device steps: ADR-0132 checklist 1–5 |
+| R6a | (W6) R6 on Android 10+: Wi-Fi Aware publish/subscribe, data path with optional PSK, connected socket handed to Rust | ADR-0131 | [~] `w6/AwareLink.kt`, `w6/LinkSockets.kt`; tests `LinkRulesTest`; session over the socket waits for W3 #23 (TEMP sink closes it, `needs_w3`); device steps: ADR-0131 checklist 1, 2, 5, 6 |
+| R7a | (W6) R7 on Android 10+: Wi-Fi Direct group with our own name and passphrase (no system dialog, hotspot-shaped QR, a PC joins as a legacy client), joiner, socket to Rust | ADR-0131 | [~] `w6/DirectLink.kt`; tests `LinkRulesTest`; waits for W3 #23; device steps: ADR-0131 checklist 3, 4, 6 |
 
 ## 2. Other apps' protocols (ADR-0010)
 
@@ -173,6 +176,9 @@ Sources:
 | F19 | Simple first screen with no setup (LocalSend lesson) | A1, A2 | [~] |
 | F20 | (W3) Wire for F12/F13: `Message::Notice` and `Message::Clipboard`, caps, trusted-only, rate limit, kept across transfers (#12) | ADR-0065 | [x] engine: `vutric_core::companion`, `Session::send_notice`/`send_clipboard`; tests `message.rs::companion_bounds`, `companion.rs`, `tests/pair_intent.rs` (2), fuzz `companion`. Phone/desktop screens: W1/W2 · phone (W1): [~] both ways, trusted only, caps and rate limit applied on receive (ADR-0014 #4; `catch.rs` scenario 7); device steps: checklist 31–33 |
 | W5-F1 | (W5) Send from the macOS Share menu, Finder Services, the Finder Quick Action and `vutric://send`, always confirmed by the agent; the Share menu also takes text and links (`Clipboard` to a paired device, `.txt` otherwise) | ADR-0112, ADR-0115, W2 #29 | [~] · built and unit-checked in CI; real-Mac step: ADR-0112 and ADR-0115 checklists |
+| F2a | (W6) F2 on Android: a sharing shortcut per paired device from the trust list (Android 10+ natively, 7–9 through `ChooserTargetServiceCompat`); the share event names the device | ADR-0130 | [~] `w6/ShareShortcuts.kt`, `res/xml/w6_share_targets.xml`; tests `ShareShortcutsTest` (Robolectric); W1 wires `w6.shortcutsPublish`; device steps: ADR-0130 checklist 1–3 |
+| F7a | (W6) F7 on Android 14+: user-initiated data transfer job when the network is validated, W1's `dataSync` service otherwise; the user's Stop is final | ADR-0130 | [~] `w6/UserTransferJob.kt`, three lines in `TransferService.kt`; tests `KeepAliveTest`; device steps: ADR-0130 checklist 4–7 |
+| F14a | (W6) F14 on Android: alarm-stream sound and vibration (silent mode, not past DND), "Topdim" notification, full-screen page only while Android 14+ grants it, ends `found`/`timeout` to Dart | ADR-0133 | [~] `w6/Ringer.kt`, `w6/RingActivity.kt`; tests `RingPlanTest`, `RingerTest` (Robolectric); W1 wires `Incoming.ring` (#18); device steps: ADR-0133 checklist 1–6 |
 
 ## 9. Effects (effects.md)
 
@@ -193,6 +199,7 @@ Sources:
 | M3 | LocalOnlyHotspot on 2.4 GHz versus 5 GHz | ADR-0007 §5 |
 | M4 | iPhone ⇄ Windows and Android ⇄ Windows over LAN and hotspot | TM §4.5 |
 | M5 | Each adapter against the real app it speaks to (C8) | ADR-0010 |
+| M3a | (W6) Android probe for M3: LocalOnlyHotspot band request (Android 16+ only, API 36), sink/source throughput ports, one JSON per run; debug builds, started by adb | ADR-0134 |
 
 ## 11. Later (owner decides)
 
