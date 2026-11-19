@@ -1,4 +1,4 @@
-//! The effects next to Halqa (docs/effects.md, "Planned"): Oddiy, plus the selection a host plays.
+//! The effects next to Halqa (docs/effects.md, "Planned"): Kometa, Oddiy, plus the selection a host plays.
 //!
 //! Each effect is a pure timeline that turns a time into a [`Scene`] (unit-tested, no GPU) and one WGSL fragment
 //! shader appended to the shared prelude `common.wgsl`. Halqa keeps W2's [`crate::Renderer`]; [`Effects`] owns
@@ -8,10 +8,12 @@
 //! GPU budget (ADR-0004: 60 fps, at most 2 ms of GPU time per frame on an integrated GPU): one full-screen triangle
 //! per lit rectangle, scissored, analytic shading only, one texture sample per pixel, no offscreen passes.
 
+pub mod kometa;
 mod math;
 pub mod oddiy;
 pub mod scene;
 
+pub use kometa::Kometa;
 pub use oddiy::Oddiy;
 pub use scene::{FX_LEN, Kind, Scene, SceneRenderer};
 
@@ -98,6 +100,7 @@ impl Sample {
 #[derive(Clone, Debug)]
 enum Motion {
     Halqa(Halqa, HalqaConfig),
+    Kometa(Kometa),
     Oddiy(Oddiy),
 }
 
@@ -114,8 +117,9 @@ impl Fling {
     pub fn new(effect: EffectId, setup: Setup) -> Self {
         let motion = match effect {
             EffectId::Oddiy => Motion::Oddiy(Oddiy::new(&setup, false)),
-            // Kometa and Pufak play Halqa until their timelines exist.
-            EffectId::Halqa | EffectId::Kometa | EffectId::Pufak => Motion::Halqa(
+            EffectId::Kometa => Motion::Kometa(Kometa::new(&setup)),
+            // Pufak plays Halqa until its timeline exists.
+            EffectId::Halqa | EffectId::Pufak => Motion::Halqa(
                 Halqa::new(
                     setup.cfg,
                     setup.screen,
@@ -148,6 +152,7 @@ impl Fling {
     pub fn duration(&self) -> f32 {
         match &self.motion {
             Motion::Halqa(h, _) => h.duration(),
+            Motion::Kometa(k) => k.duration(),
             Motion::Oddiy(o) => o.duration(),
         }
     }
@@ -163,6 +168,7 @@ impl Fling {
         match &self.motion {
             // Halqa's fly phase ends at 62 % of `travel` (timeline.rs).
             Motion::Halqa(_, cfg) => 0.62 * cfg.travel,
+            Motion::Kometa(k) => k.landed_at(),
             Motion::Oddiy(o) => o.landed_at(),
         }
     }
@@ -172,6 +178,7 @@ impl Fling {
         let t = t.clamp(0.0, self.duration());
         let layer = match &self.motion {
             Motion::Halqa(h, _) => Layer::Halqa(h.sample(t)),
+            Motion::Kometa(k) => Layer::Scene(k.sample(t)),
             Motion::Oddiy(o) => Layer::Scene(o.sample(t)),
         };
         Sample {

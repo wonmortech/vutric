@@ -44,3 +44,12 @@ let played = if reduce { Fling::still(setup) } else { Fling::new(self.prefs.effe
 
 `prefs.effect_for(reduce)` already picks Oddiy when the OS asks for reduced motion. `Fling::still` goes further:
 the card does not even slide.
+
+### E2 Kometa (`effects/kometa.rs`, `kometa.wgsl`)
+
+The card is the head of a comet. It enters from off-screen along the throw, with a quartic ease-out so it brakes
+into place, followed by a tapered streak and up to 28 sparks drawn in the shader, then a 0.35 s bloom when it
+lands. Rest and dock work as in Halqa.
+
+GPU cost: two scissored rectangles (card and tail). Inside the tail, 4 segment distances plus a spark loop with
+early outs per pixel. Not measured on a GPU yet.
