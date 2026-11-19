@@ -1,4 +1,4 @@
-//! The effects next to Halqa (docs/effects.md, "Planned"): Kometa, Oddiy, plus the selection a host plays.
+//! The effects next to Halqa (docs/effects.md, "Planned"): Kometa, Pufak, Oddiy, plus the selection a host plays.
 //!
 //! Each effect is a pure timeline that turns a time into a [`Scene`] (unit-tested, no GPU) and one WGSL fragment
 //! shader appended to the shared prelude `common.wgsl`. Halqa keeps W2's [`crate::Renderer`]; [`Effects`] owns
@@ -11,10 +11,12 @@
 pub mod kometa;
 mod math;
 pub mod oddiy;
+pub mod pufak;
 pub mod scene;
 
 pub use kometa::Kometa;
 pub use oddiy::Oddiy;
+pub use pufak::Pufak;
 pub use scene::{FX_LEN, Kind, Scene, SceneRenderer};
 
 use vutric_core::{EffectId, Gesture, SendZone};
@@ -102,6 +104,7 @@ enum Motion {
     Halqa(Halqa, HalqaConfig),
     Kometa(Kometa),
     Oddiy(Oddiy),
+    Pufak(Pufak),
 }
 
 /// One fling with the effect chosen for it. Construct once per fling, then [`Self::sample`] every frame.
@@ -118,8 +121,8 @@ impl Fling {
         let motion = match effect {
             EffectId::Oddiy => Motion::Oddiy(Oddiy::new(&setup, false)),
             EffectId::Kometa => Motion::Kometa(Kometa::new(&setup)),
-            // Pufak plays Halqa until its timeline exists.
-            EffectId::Halqa | EffectId::Pufak => Motion::Halqa(
+            EffectId::Pufak => Motion::Pufak(Pufak::new(&setup)),
+            EffectId::Halqa => Motion::Halqa(
                 Halqa::new(
                     setup.cfg,
                     setup.screen,
@@ -153,6 +156,7 @@ impl Fling {
         match &self.motion {
             Motion::Halqa(h, _) => h.duration(),
             Motion::Kometa(k) => k.duration(),
+            Motion::Pufak(p) => p.duration(),
             Motion::Oddiy(o) => o.duration(),
         }
     }
@@ -169,6 +173,7 @@ impl Fling {
             // Halqa's fly phase ends at 62 % of `travel` (timeline.rs).
             Motion::Halqa(_, cfg) => 0.62 * cfg.travel,
             Motion::Kometa(k) => k.landed_at(),
+            Motion::Pufak(p) => p.landed_at(),
             Motion::Oddiy(o) => o.landed_at(),
         }
     }
@@ -179,6 +184,7 @@ impl Fling {
         let layer = match &self.motion {
             Motion::Halqa(h, _) => Layer::Halqa(h.sample(t)),
             Motion::Kometa(k) => Layer::Scene(k.sample(t)),
+            Motion::Pufak(p) => Layer::Scene(p.sample(t)),
             Motion::Oddiy(o) => Layer::Scene(o.sample(t)),
         };
         Sample {

@@ -23,11 +23,12 @@ pub const COMMON_WGSL: &str = include_str!("common.wgsl");
 pub enum Kind {
     Oddiy,
     Kometa,
+    Pufak,
 }
 
 impl Kind {
     /// Every kind, in pipeline order (`kind as usize` indexes it).
-    pub const ALL: [Self; 2] = [Self::Oddiy, Self::Kometa];
+    pub const ALL: [Self; 3] = [Self::Oddiy, Self::Kometa, Self::Pufak];
 
     /// The effect's own WGSL (without the prelude).
     #[must_use]
@@ -35,6 +36,7 @@ impl Kind {
         match self {
             Self::Oddiy => include_str!("oddiy.wgsl"),
             Self::Kometa => include_str!("kometa.wgsl"),
+            Self::Pufak => include_str!("pufak.wgsl"),
         }
     }
 
@@ -48,6 +50,7 @@ impl Kind {
         match self {
             Self::Oddiy => "vutric.oddiy",
             Self::Kometa => "vutric.kometa",
+            Self::Pufak => "vutric.pufak",
         }
     }
 }

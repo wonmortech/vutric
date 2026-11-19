@@ -53,3 +53,12 @@ lands. Rest and dock work as in Halqa.
 
 GPU cost: two scissored rectangles (card and tail). Inside the tail, 4 segment distances plus a spark loop with
 early outs per pixel. Not measured on a GPU yet.
+
+### E3 Pufak (`effects/pufak.rs`, `pufak.wgsl`)
+
+The card rides at 58 % size inside a bubble that floats out of the edge with a wobble. The bubble works as a
+lens: the card's sample point is pulled towards the centre near the rim, so the card looks magnified. It has a
+thin-film rim (Signal to Glow), two highlights and a faint night-blue body. On landing the bubble pops over 14 %
+of `travel`: the skin becomes an expanding ring, 12 droplets fall away, and the card springs to full size.
+
+GPU cost: still one texture sample per pixel; the refraction only moves the coordinate.
