@@ -180,6 +180,9 @@ pub enum Message {
     BleKey {
         key: crate::ble::BleKey,
     },
+    /// Phone as mouse and keyboard (ADR-0075, backlog F15): one input event for the desktop. Taken only from a
+    /// paired device while the desktop user allows it, rate-limited (`crate::pointer`).
+    Pointer(crate::pointer::Pointer),
 }
 
 /// Most characters of [`Notice::app`] and [`Notice::title`].
@@ -226,6 +229,7 @@ impl Message {
             Self::Clipboard { .. } => "Clipboard",
             Self::Ring(_) => "Ring",
             Self::BleKey { .. } => "BleKey",
+            Self::Pointer(_) => "Pointer",
         }
     }
 }
@@ -314,6 +318,7 @@ impl Message {
                 Err(Error::Malformed("clipboard length".into()))
             }
             Self::Ring(r) if !r.is_valid() => Err(Error::Malformed("ring seconds".into())),
+            Self::Pointer(p) if !p.is_valid() => Err(Error::Malformed("pointer input".into())),
             _ => Ok(()),
         }
     }
@@ -470,6 +475,17 @@ mod tests {
         })
         .unwrap();
         assert_eq!(wire[4], 16);
+        let wire =
+            crate::frame::encode(&Message::Pointer(crate::pointer::Pointer::ReleaseAll)).unwrap();
+        assert_eq!(wire[4], 17);
+        assert!(
+            Message::Pointer(crate::pointer::Pointer::Key {
+                usage: 0x01,
+                down: true
+            })
+            .validate()
+            .is_err()
+        );
     }
 
     #[test]

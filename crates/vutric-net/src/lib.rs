@@ -760,6 +760,7 @@ impl Session {
                 | Message::Clipboard { .. }
                 | Message::Ring(_)
                 | Message::BleKey { .. }
+                | Message::Pointer(_)
         ) {
             if self.pending.len() >= MAX_PENDING {
                 self.pending.pop_front();
@@ -1040,6 +1041,12 @@ impl Session {
     pub async fn stop_ring(&mut self) -> Result<()> {
         self.send(&Message::Ring(vutric_core::ring::Ring::Stop))
             .await
+    }
+
+    /// Sends one input event to the desktop (phone as mouse and keyboard, ADR-0075). The desktop drops it unless
+    /// this device is trusted and its user allowed it; moves should be coalesced by the caller at about 120 Hz.
+    pub async fn pointer(&mut self, p: vutric_core::pointer::Pointer) -> Result<()> {
+        self.send(&Message::Pointer(p)).await
     }
 
     /// After pairing, to a trusted device only: hands over this device's BLE key (ADR-0071), derived from our

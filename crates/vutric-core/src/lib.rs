@@ -18,6 +18,7 @@ pub mod hotspot;
 pub mod id;
 pub mod message;
 pub mod pairing;
+pub mod pointer;
 pub mod qrstream;
 pub mod ring;
 pub mod route;
