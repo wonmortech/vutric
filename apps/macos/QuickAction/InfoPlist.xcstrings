@@ -2,18 +2,6 @@
   "sourceLanguage" : "uz",
   "version" : "1.0",
   "strings" : {
-    "NSExtensionServiceFinderPreviewLabel" : {
-      "localizations" : {
-        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Vutric bilan yuborish" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Send with Vutric" } }
-      }
-    },
-    "NSExtensionServiceTouchBarLabel" : {
-      "localizations" : {
-        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Vutric" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Vutric" } }
-      }
-    },
     "CFBundleDisplayName" : {
       "localizations" : {
         "uz" : { "stringUnit" : { "state" : "translated", "value" : "Vutric bilan yuborish" } },

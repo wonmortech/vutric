@@ -36,7 +36,10 @@
 				<key>NSExtensionActivationSupportsFileWithMaxCount</key>
 				<integer>1000</integer>
 			</dict>
-			<!-- Finder: Quick Actions in the context menu, the preview pane and the Touch Bar. -->
+			<!-- Finder: Quick Actions in the context menu, the preview pane and the Touch Bar. The menu title is the
+			     top-level CFBundleDisplayName, translated through InfoPlist.strings (uz, en). The two short labels
+			     below live in this nested dictionary, which InfoPlist.strings is not documented to reach, so they
+			     are the brand name and need no translation (ADR-0115). -->
 			<key>NSExtensionServiceAllowsFinderPreviewItem</key>
 			<true/>
 			<key>NSExtensionServiceAllowsTouchBarItem</key>

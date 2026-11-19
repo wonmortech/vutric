@@ -62,9 +62,17 @@ Safari or Notes, and Finder's Quick Actions menu (no UI automation on the runner
 - [ ] Finder → right-click a file → Quick Actions → "Vutric bilan yuborish" (enable it once in System Settings →
       Privacy & Security → Extensions → Finder if it is not listed); the same from the preview pane.
 - [ ] With the daemon (W2 #29): text to a paired phone arrives as the copy prompt; to LocalSend as the `.txt`.
-- [ ] Check whether the label in the Finder preview pane is localised (the `NSExtensionServiceFinderPreviewLabel`
-      key is translated in `QuickAction/InfoPlist.xcstrings`; whether Finder reads a nested key from
-      `InfoPlist.strings` is not verified).
+- [ ] With the Mac in English, Finder's Quick Actions menu shows "Send with Vutric". With Uzbek first for Finder
+      (Language & Region → Applications), or with a language Vutric has no translation for, it shows "Vutric
+      bilan yuborish". The preview pane and Touch Bar label is "Vutric" in every language.
+
+Update 2026-11-19 (round 3):
+- The Quick Action's nested labels (`NSExtensionServiceFinderPreviewLabel`, `…TouchBarLabel`) are now the brand
+  name "Vutric" and are no longer translated: `InfoPlist.strings` is not documented to reach nested keys. The
+  translated title is the top-level `CFBundleDisplayName`.
+- `packaging/macos/xcstrings.py` refuses an InfoPlist catalog key that is not a top-level key of the sibling
+  `Info.plist`.
+- `smoke.sh` reads the built `uz` / `en` titles of both extensions with `plutil`.
 
 ## Consequences
 

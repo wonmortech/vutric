@@ -82,3 +82,10 @@ Host API: `Fling::new(effect, setup).with_files(n)`. One file adds nothing.
 `crates/vutric-host-mac/examples/cards.rs --scale 2` forces the 2x path on the 1x CI screens, and
 `tools/cards.sh` now runs it as a second pass. ADR-0118's Known gaps section is updated. No numbers yet: the
 next CI run produces `cards-mac-2x.json`.
+
+### Quick Action label i18n
+
+The Quick Action's translated title is the top-level `CFBundleDisplayName` ("Vutric bilan yuborish" / "Send with
+Vutric"). The nested preview-pane and Touch Bar labels are now just "Vutric" and are not translated, because
+`InfoPlist.strings` is not documented to reach nested keys. `xcstrings.py` enforces top-level-only keys, and the
+smoke test checks the built titles. Finder's menu itself still needs a look on a real Mac (ADR-0115 checklist).

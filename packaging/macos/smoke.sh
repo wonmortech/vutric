@@ -57,6 +57,24 @@ else
   fail=1
 fi
 
+# The titles Finder and the Share sheet show come from each bundle's <lang>.lproj/InfoPlist.strings.
+for pair in "VutricShare.appex:Vutric bilan yuborish:Send with Vutric" \
+  "VutricQuickAction.appex:Vutric bilan yuborish:Send with Vutric"; do
+  IFS=: read -r bundle uz en <<<"$pair"
+  for lang in uz en; do
+    want=$uz
+    [[ $lang == en ]] && want=$en
+    f=$dest/Contents/PlugIns/$bundle/Contents/Resources/$lang.lproj/InfoPlist.strings
+    got=$(plutil -extract CFBundleDisplayName raw -o - "$f" 2>/dev/null || echo "")
+    if [[ $got == "$want" ]]; then
+      say "$bundle title [$lang]: $got"
+    else
+      say "$bundle title [$lang]: NO (got '$got', want '$want')"
+      fail=1
+    fi
+  done
+done
+
 /System/Library/CoreServices/pbs -update 2>/dev/null || true
 if /System/Library/CoreServices/pbs -dump_pboard 2>/dev/null | grep -q "Vutric bilan yuborish"; then
   say "services entry known to pbs: yes"

@@ -7,11 +7,14 @@
     xcstrings.py --check CATALOG.xcstrings [...]
 
 Every key must have a translated value in every language the catalog uses; a missing one fails the build, so no
-key ever shows up raw in the UI. `--check` validates without writing.
+key ever shows up raw in the UI. An InfoPlist catalog may only translate top-level keys of the Info.plist next to
+it: InfoPlist.strings is not documented to reach nested dictionaries (ADR-0115). `--check` validates without
+writing.
 """
 
 import json
 import pathlib
+import plistlib
 import sys
 
 
@@ -38,6 +41,18 @@ def load(path: pathlib.Path) -> tuple[str, dict[str, dict[str, str]]]:
     return source, table
 
 
+def check_info_plist_keys(catalog: pathlib.Path, table: dict[str, dict[str, str]]) -> None:
+    """InfoPlist.xcstrings keys must be top-level keys of the sibling Info.plist."""
+    plist = catalog.with_name("Info.plist")
+    if catalog.name != "InfoPlist.xcstrings" or not plist.exists():
+        return
+    top = set(plistlib.loads(plist.read_bytes()))
+    keys = {k for strings in table.values() for k in strings}
+    stray = sorted(keys - top)
+    if stray:
+        raise SystemExit(f"{catalog}: not top-level keys of {plist.name}: {', '.join(stray)}")
+
+
 def main(argv: list[str]) -> int:
     check = argv[:1] == ["--check"]
     if check:
@@ -51,6 +66,7 @@ def main(argv: list[str]) -> int:
         catalogs = argv[1:]
     for c in map(pathlib.Path, catalogs):
         _, table = load(c)
+        check_info_plist_keys(c, table)
         for lang, strings in table.items():
             if out is None:
                 continue
