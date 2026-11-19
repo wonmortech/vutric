@@ -22,6 +22,7 @@ pub mod qrstream;
 pub mod ring;
 pub mod route;
 pub mod sas;
+pub mod sound;
 pub mod storage;
 pub mod trust;
 

@@ -268,6 +268,23 @@ pub fn qr_stream(data: &[u8]) {
     assert!(solved <= total);
 }
 
+/// A microphone recording is whatever the room plays (R9a, ADR-0074): decoding never panics and never returns
+/// more than the payload cap. The first two bytes pick the sample rate, the rest are 16-bit samples.
+pub fn sound_code(data: &[u8]) {
+    use vutric_core::sound::{MAX_PAYLOAD_BYTES, decode};
+    let Some((head, rest)) = data.split_first_chunk::<2>() else {
+        return;
+    };
+    let rate = 8000 + u32::from(u16::from_le_bytes(*head)) % 40_001;
+    let samples: Vec<f32> = rest
+        .chunks_exact(2)
+        .map(|c| f32::from(i16::from_le_bytes([c[0], c[1]])) / 32_768.0)
+        .collect();
+    if let Some(p) = decode(&samples, rate) {
+        assert!(!p.is_empty() && p.len() <= MAX_PAYLOAD_BYTES);
+    }
+}
+
 /// BLE from any device in radio range (R4, ADR-0071): advertisement service data, the Wi-Fi Aware / GATT hello,
 /// GATT payloads and a stream of chunks. Decoders never panic, what they accept re-encodes to the same value, the
 /// reassembler never yields more than the cap.
@@ -831,6 +848,30 @@ mod smoke {
         }
         qr_stream(&wire);
         qr_stream(&enc.frame(3).encode());
+    }
+
+    #[test]
+    fn sound_code_structured() {
+        run(sound_code, 8192, 53);
+        let pcm = vutric_core::sound::encode(b"123456", 8000).unwrap();
+        let mut wire = 0u16.to_le_bytes().to_vec();
+        for x in pcm {
+            #[allow(clippy::cast_possible_truncation)]
+            let s = (x * 32_000.0) as i16;
+            wire.extend_from_slice(&s.to_le_bytes());
+        }
+        sound_code(&wire);
+        assert_eq!(
+            vutric_core::sound::decode(
+                &wire[2..]
+                    .chunks_exact(2)
+                    .map(|c| f32::from(i16::from_le_bytes([c[0], c[1]])) / 32_768.0)
+                    .collect::<Vec<_>>(),
+                8000
+            )
+            .as_deref(),
+            Some(&b"123456"[..])
+        );
     }
 
     #[test]
