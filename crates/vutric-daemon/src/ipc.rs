@@ -43,6 +43,58 @@ pub enum Request {
     /// Brings the pairing card up (sent by a second launch before it exits).
     Show,
     Quit,
+    /// Paired devices and who is connected now.
+    Devices,
+    /// Unpairs a device (64-hex endpoint id).
+    Forget {
+        id: String,
+    },
+    /// "Telefonni topish": rings one connected device, or every connected paired one when `device` is `None`.
+    Ring {
+        #[serde(default)]
+        device: Option<String>,
+        #[serde(default = "default_ring_secs")]
+        secs: u16,
+    },
+    StopRing {
+        #[serde(default)]
+        device: Option<String>,
+    },
+    /// Sends files to a connected device (Explorer "Vutric bilan yuborish", the Send Zone, the macOS Share menu
+    /// and Services). `device` `None`: the only connected paired device, or the most recent one.
+    SendFiles {
+        paths: Vec<String>,
+        #[serde(default)]
+        device: Option<String>,
+    },
+    /// Sends text to a connected device's clipboard prompt (ADR-0065).
+    SendText {
+        text: String,
+        #[serde(default)]
+        device: Option<String>,
+    },
+    /// "Everyone nearby" for 10 minutes (S3): unknown devices may offer files, each offer asked about.
+    OpenEveryone,
+}
+
+fn default_ring_secs() -> u16 {
+    vutric_core::ring::DEFAULT_RING_SECS
+}
+
+/// One device for the desktop window's device list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Device {
+    /// Endpoint id, 64 hex.
+    pub id: String,
+    pub name: String,
+    /// `Android`, `Ios`, `Windows`, `Linux`, `MacOs`, or empty when unknown.
+    pub platform: String,
+    pub trusted: bool,
+    pub connected: bool,
+    /// `ticket`, `code`, `pinned`; empty for a guest.
+    pub method: String,
+    /// Unix seconds.
+    pub last_seen: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -60,6 +112,9 @@ pub enum Reply {
     Pairing {
         link: String,
     },
+    Devices {
+        devices: Vec<Device>,
+    },
     Ok,
     Error {
         message: String,
@@ -76,6 +131,9 @@ pub struct Status {
     /// True once a relay is reachable (the pairing link then also works from another network).
     pub online: bool,
     pub transfers: u32,
+    /// `off`, `trusted_only`, `everyone` or `pairing` (ADR-0050).
+    #[serde(default)]
+    pub visibility: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +161,8 @@ pub enum Event {
         id: String,
         reason: String,
     },
+    /// The device list changed: paired, forgotten, connected or gone.
+    Devices,
     Paused {
         paused: bool,
     },
@@ -205,6 +265,24 @@ mod tests {
             Request::Subscribe,
             Request::Show,
             Request::Quit,
+            Request::Devices,
+            Request::Forget { id: "ab".into() },
+            Request::Ring {
+                device: None,
+                secs: 30,
+            },
+            Request::StopRing {
+                device: Some("ab".into()),
+            },
+            Request::SendFiles {
+                paths: vec![r"C:\a.jpg".into()],
+                device: None,
+            },
+            Request::SendText {
+                text: "salom".into(),
+                device: None,
+            },
+            Request::OpenEveryone,
         ];
         for r in all {
             let line = encode(&r);
@@ -212,6 +290,18 @@ mod tests {
             let back: Request = decode(&line[..line.len() - 1]).unwrap();
             assert_eq!(back, r);
         }
+    }
+
+    #[test]
+    fn ring_defaults_to_thirty_seconds_and_every_phone() {
+        let r: Request = decode(br#"{"op":"ring"}"#).unwrap();
+        assert_eq!(
+            r,
+            Request::Ring {
+                device: None,
+                secs: vutric_core::ring::DEFAULT_RING_SECS
+            }
+        );
     }
 
     #[test]

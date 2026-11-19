@@ -11,6 +11,8 @@
 
 #[cfg(windows)]
 pub mod card;
+#[cfg(windows)]
+pub mod desk;
 
 #[cfg(windows)]
 mod imp {

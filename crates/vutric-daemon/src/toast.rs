@@ -185,7 +185,9 @@ mod tests {
         assert!(xml.contains("Ali&apos;s &lt;Pixel&gt; dan"));
         assert!(xml.contains(r#"<image placement="hero" src="file:///C:/D/photo.JPG"/>"#));
         assert!(xml.contains(r#"content="Ochish""#));
-        assert!(xml.contains(r#"content="Papkada ko&apos;rsatish" activationType="protocol" arguments="file:///C:/D""#));
+        assert!(xml.contains(
+            r#"content="Papkada koʻrsatish" activationType="protocol" arguments="file:///C:/D""#
+        ));
         assert_eq!(xml.matches("<action ").count(), 2);
     }
 

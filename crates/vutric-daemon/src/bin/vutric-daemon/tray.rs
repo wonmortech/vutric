@@ -1,4 +1,5 @@
-//! The notification-area icon and its menu: Telefonni ulash, Sozlamalar, To'xtatib turish, Chiqish.
+//! The notification-area icon and its menu: Telefonni ulash, Telefonni topish, Hammaga ochish, Sozlamalar,
+//! Toʻxtatib turish, Chiqish.
 
 use anyhow::Result;
 pub use tray_icon::menu::MenuId;
@@ -12,6 +13,8 @@ use crate::UiEvent;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     Pair,
+    FindPhone,
+    Everyone,
     Settings,
     TogglePause,
     Quit,
@@ -20,7 +23,7 @@ pub enum Action {
 pub struct Tray {
     icon: TrayIcon,
     pause: MenuItem,
-    ids: [(MenuId, Action); 4],
+    ids: [(MenuId, Action); 6],
     lang: Lang,
 }
 
@@ -56,12 +59,16 @@ fn glyph(size: u32, paused: bool) -> Icon {
 impl Tray {
     pub fn new(lang: Lang, proxy: &EventLoopProxy<UiEvent>) -> Result<Self> {
         let pair = MenuItem::new(t(lang, "tray.pair"), true, None);
+        let find = MenuItem::new(t(lang, "tray.find"), true, None);
+        let everyone = MenuItem::new(t(lang, "tray.everyone"), true, None);
         let settings = MenuItem::new(t(lang, "tray.settings"), true, None);
         let pause = MenuItem::new(t(lang, "tray.pause"), true, None);
         let quit = MenuItem::new(t(lang, "tray.quit"), true, None);
         let menu = Menu::new();
         menu.append_items(&[
             &pair,
+            &find,
+            &everyone,
             &settings,
             &pause,
             &PredefinedMenuItem::separator(),
@@ -69,6 +76,8 @@ impl Tray {
         ])?;
         let ids = [
             (pair.id().clone(), Action::Pair),
+            (find.id().clone(), Action::FindPhone),
+            (everyone.id().clone(), Action::Everyone),
             (settings.id().clone(), Action::Settings),
             (pause.id().clone(), Action::TogglePause),
             (quit.id().clone(), Action::Quit),

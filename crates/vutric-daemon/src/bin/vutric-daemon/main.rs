@@ -10,6 +10,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod cardwin;
+mod desk;
 mod gpu;
 mod net;
 #[cfg(windows)]
@@ -26,8 +27,8 @@ use std::time::{Duration, Instant};
 use anyhow::{Context as _, Result};
 use tokio::sync::{broadcast, oneshot};
 use vutric_core::Gesture;
-use vutric_daemon::cards::{self, Deck};
-use vutric_daemon::i18n::Lang;
+use vutric_daemon::cards::{self, Deck, Question};
+use vutric_daemon::i18n::{Lang, t, tf};
 use vutric_daemon::ipc::{self, Event, Reply, Request, Status};
 use vutric_daemon::prefs::{self, DesktopPrefs};
 use vutric_daemon::{autostart, server};
@@ -38,7 +39,7 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::WindowId;
 
-use crate::net::{Incoming, Shared};
+use crate::net::{Cmd, Incoming, Shared};
 use crate::tray::MenuId;
 
 #[derive(Debug)]
@@ -70,6 +71,44 @@ pub enum UiEvent {
     Paused(bool),
     /// A phone connected (`true`) or went away.
     Peer(bool),
+    /// A yes/no question for the card; the network side waits on `answer`.
+    Ask {
+        q: Question,
+        device: String,
+        body: String,
+        answer: oneshot::Sender<bool>,
+    },
+    /// A device was paired (QR or six digits).
+    Paired {
+        device: String,
+    },
+    /// A notice mirrored from a trusted phone, already cleaned (ADR-0065).
+    Notice {
+        device: String,
+        app: String,
+        title: String,
+        text: String,
+    },
+    /// Text a trusted phone sent for this computer's clipboard, cleaned; copied only when the user says so.
+    Clipboard {
+        device: String,
+        text: String,
+    },
+    /// A trusted phone rings this computer for `length` (ADR-0069).
+    Ring {
+        device: String,
+        id: String,
+        length: Duration,
+    },
+    /// The phone we rang was found (its `Ring::Stop`), or the phone that rang us gave up.
+    Found {
+        device: String,
+    },
+    /// "Telefonni topish" from the tray or the IPC: ring `device` (or every connected paired phone).
+    FindPhone {
+        device: Option<String>,
+        secs: u16,
+    },
     Quit,
 }
 
@@ -201,6 +240,7 @@ impl server::Handler for Daemon {
                 name: self.shared.name.clone(),
                 online: self.shared.online.load(Ordering::Relaxed),
                 transfers: self.shared.transfers.load(Ordering::Relaxed),
+                visibility: self.shared.visibility_name().to_owned(),
             }),
             Request::GetSettings => match config_dir() {
                 Ok(dir) => Reply::Settings {
@@ -230,12 +270,50 @@ impl server::Handler for Daemon {
                 let _ = self.proxy.send_event(UiEvent::Paused(paused));
                 Reply::Ok
             }
-            Request::Pairing => match self.shared.link.get() {
-                Some(link) => Reply::Pairing { link: link.clone() },
+            Request::Pairing => match self.shared.open_pairing() {
+                Some(link) => Reply::Pairing { link },
                 None => Reply::Error {
                     message: "network is still starting".into(),
                 },
             },
+            Request::Devices => Reply::Devices {
+                devices: self.shared.devices(),
+            },
+            Request::Forget { id } => match self.shared.forget(&id) {
+                Ok(true) => {
+                    let _ = self.shared.events.send(Event::Devices);
+                    Reply::Ok
+                }
+                Ok(false) => Reply::Error {
+                    message: "no such paired device".into(),
+                },
+                Err(e) => Reply::Error {
+                    message: format!("{e:#}"),
+                },
+            },
+            Request::Ring { device, secs } => self.forward(UiEvent::FindPhone { device, secs }),
+            Request::StopRing { device } => {
+                let sent = match device {
+                    Some(id) => usize::from(self.shared.to_device(&id, Cmd::StopRing)),
+                    None => self.shared.to_trusted(&Cmd::StopRing),
+                };
+                sent_or_none(sent)
+            }
+            Request::SendText { text, device } => {
+                let text = net::clip_bytes(&text, vutric_core::message::MAX_CLIPBOARD_BYTES);
+                let sent = match device {
+                    Some(id) => usize::from(self.shared.to_device(&id, Cmd::Clipboard(text))),
+                    None => self.shared.to_trusted(&Cmd::Clipboard(text)),
+                };
+                sent_or_none(sent)
+            }
+            Request::SendFiles { .. } => Reply::Error {
+                message: "sending files from the desktop is not wired yet".into(),
+            },
+            Request::OpenEveryone => {
+                self.shared.open_everyone();
+                Reply::Ok
+            }
             Request::PreviewEffect => self.forward(UiEvent::Preview),
             Request::Show => self.forward(UiEvent::ShowPairing),
             Request::Quit => self.forward(UiEvent::Quit),
@@ -245,6 +323,17 @@ impl server::Handler for Daemon {
 
     fn events(&self) -> broadcast::Receiver<Event> {
         self.shared.events.subscribe()
+    }
+}
+
+/// `Ok` when at least one device got the command.
+fn sent_or_none(sent: usize) -> Reply {
+    if sent > 0 {
+        Reply::Ok
+    } else {
+        Reply::Error {
+            message: "no connected paired device".into(),
+        }
     }
 }
 
@@ -289,6 +378,14 @@ struct App {
     /// Created with the first card; `None` until then or when the platform has no card window.
     cards: Option<cardwin::CardWin>,
     offer: Option<oneshot::Sender<bool>>,
+    /// The network side waiting for the six-digit check.
+    check: Option<oneshot::Sender<bool>>,
+    /// The phone ringing us (endpoint id), told "found" when the user presses Topdim.
+    ringing: Option<String>,
+    /// Clipboard text waiting for the user's "Nusxalash".
+    clip: Option<String>,
+    /// When the ring sound stops by itself.
+    ring_until: Option<Instant>,
 }
 
 impl App {
@@ -421,11 +518,53 @@ impl App {
     }
 
     fn answer(&mut self, a: cards::Answer) {
-        if let cards::Answer::Offer(yes) = a
-            && let Some(tx) = self.offer.take()
-        {
-            let _ = tx.send(yes);
+        match a {
+            cards::Answer::None => {}
+            cards::Answer::Offer(yes) => {
+                if let Some(tx) = self.offer.take() {
+                    let _ = tx.send(yes);
+                }
+            }
+            cards::Answer::PairClosed => self.shared.close_pairing(),
+            cards::Answer::Ask(Question::Check, yes) => {
+                if let Some(tx) = self.check.take() {
+                    let _ = tx.send(yes);
+                }
+            }
+            cards::Answer::Ask(Question::Ringing, yes) => {
+                desk::ring(false);
+                if let Some(id) = self.ringing.take()
+                    && yes
+                {
+                    let _ = self.shared.to_device(&id, Cmd::StopRing);
+                }
+            }
+            cards::Answer::Ask(Question::FindPhone, yes) => {
+                if yes {
+                    let _ = self.shared.to_trusted(&Cmd::StopRing);
+                }
+            }
+            cards::Answer::Ask(Question::Clipboard, yes) => {
+                if let Some(text) = self.clip.take()
+                    && yes
+                {
+                    if desk::copy(&text) {
+                        self.deck
+                            .note(t(self.lang, "card.clip.copied"), "", Instant::now());
+                    } else {
+                        vutric_net::say("clipboard: could not copy".into());
+                    }
+                }
+            }
         }
+    }
+
+    /// Puts `q` on the card; an older question or offer it replaces is answered "no".
+    fn ask(&mut self, q: Question, device: &str, body: &str) {
+        if let Some(old) = self.deck.ask(q, device, body, Instant::now()) {
+            self.answer(old);
+        }
+        self.sync_card();
     }
 
     fn preview(&mut self, event_loop: &ActiveEventLoop) {
@@ -534,6 +673,14 @@ impl ApplicationHandler<UiEvent> for App {
             }
             UiEvent::Menu(id) => match self.tray.as_ref().and_then(|t| t.action(&id)) {
                 Some(tray::Action::Pair) => self.user_event(event_loop, UiEvent::ShowPairing),
+                Some(tray::Action::FindPhone) => self.user_event(
+                    event_loop,
+                    UiEvent::FindPhone {
+                        device: None,
+                        secs: vutric_core::ring::DEFAULT_RING_SECS,
+                    },
+                ),
+                Some(tray::Action::Everyone) => self.shared.open_everyone(),
                 Some(tray::Action::Settings) => Self::open_settings(),
                 Some(tray::Action::TogglePause) => {
                     let p = !self.shared.paused.load(Ordering::Relaxed);
@@ -544,9 +691,87 @@ impl ApplicationHandler<UiEvent> for App {
             },
             UiEvent::TrayOpen => Self::open_settings(),
             UiEvent::ShowPairing => {
-                if let Some(link) = self.shared.link.get().cloned() {
+                if let Some(link) = self.shared.open_pairing() {
                     self.deck.pair(&link);
                     self.sync_card();
+                }
+            }
+            UiEvent::Ask {
+                q,
+                device,
+                body,
+                answer,
+            } => {
+                if q == Question::Check
+                    && let Some(old) = self.check.replace(answer)
+                {
+                    let _ = old.send(false);
+                }
+                self.ask(q, &device, &body);
+            }
+            UiEvent::Paired { device } => {
+                let _ = self.shared.events.send(Event::Devices);
+                self.deck
+                    .note(t(self.lang, "card.paired.title"), &device, Instant::now());
+                self.sync_card();
+            }
+            UiEvent::Notice {
+                device,
+                app,
+                title,
+                text,
+            } => {
+                let head = if app.is_empty() { device } else { app };
+                let line = if title.is_empty() {
+                    head
+                } else {
+                    format!("{head} · {title}")
+                };
+                self.deck.note(&line, &text, Instant::now());
+                self.sync_card();
+            }
+            UiEvent::Clipboard { device, text } => {
+                let preview: String = text.chars().take(80).collect();
+                self.clip = Some(text);
+                self.ask(Question::Clipboard, &device, &preview);
+            }
+            UiEvent::Ring { device, id, length } => {
+                if self.shared.paused.load(Ordering::Relaxed) {
+                    return;
+                }
+                desk::ring(true);
+                self.ringing = Some(id);
+                self.ask(Question::Ringing, &device, "");
+                self.ring_until = Some(Instant::now() + length);
+            }
+            UiEvent::Found { device } => {
+                if self.ringing.take().is_some() {
+                    desk::ring(false);
+                    self.deck.dismiss(Question::Ringing);
+                } else {
+                    self.deck.dismiss(Question::FindPhone);
+                }
+                self.deck
+                    .note(t(self.lang, "card.found.title"), &device, Instant::now());
+                self.sync_card();
+            }
+            UiEvent::FindPhone { device, secs } => {
+                let cmd = Cmd::Ring(secs.clamp(1, vutric_core::ring::MAX_RING_SECS));
+                let sent = match &device {
+                    Some(id) => usize::from(self.shared.to_device(id, cmd)),
+                    None => self.shared.to_trusted(&cmd),
+                };
+                if sent == 0 {
+                    self.deck
+                        .note(t(self.lang, "card.find.none"), "", Instant::now());
+                    self.sync_card();
+                } else {
+                    let body = if sent > 1 {
+                        tf(self.lang, "card.find.many", &[("count", &sent.to_string())])
+                    } else {
+                        String::new()
+                    };
+                    self.ask(Question::FindPhone, "", &body);
                 }
             }
             UiEvent::Preview => self.preview(event_loop),
@@ -579,6 +804,10 @@ impl ApplicationHandler<UiEvent> for App {
             }
         }
         let now = Instant::now();
+        if self.ring_until.is_some_and(|at| now >= at) {
+            self.ring_until = None;
+            desk::ring(false);
+        }
         if let Some(a) = self.deck.tick(now) {
             self.answer(a);
             self.sync_card();
@@ -588,7 +817,7 @@ impl ApplicationHandler<UiEvent> for App {
             self.gpu_idle_since = None;
             trace("gpu released");
         }
-        let next = [self.deck.deadline(), self.gpu_release_at()]
+        let next = [self.deck.deadline(), self.gpu_release_at(), self.ring_until]
             .into_iter()
             .flatten()
             .min();
@@ -648,15 +877,7 @@ fn main() -> Result<()> {
     let event_loop = EventLoop::<UiEvent>::with_user_event().build()?;
     let proxy = event_loop.create_proxy();
     let (events, _) = broadcast::channel(64);
-    let shared = Arc::new(Shared {
-        paused: false.into(),
-        online: false.into(),
-        transfers: 0.into(),
-        events,
-        id: OnceLock::new(),
-        link: OnceLock::new(),
-        name: args.name.clone(),
-    });
+    let shared = Arc::new(Shared::new(args.name.clone(), events));
     let rt = net::spawn(Arc::clone(&shared), args.lan_only, proxy.clone())?;
     let daemon = Arc::new(Daemon {
         shared: Arc::clone(&shared),
@@ -686,6 +907,10 @@ fn main() -> Result<()> {
         deck: Deck::new(lang),
         cards: None,
         offer: None,
+        check: None,
+        ringing: None,
+        clip: None,
+        ring_until: None,
     };
     event_loop.run_app(&mut app)?;
     Ok(())

@@ -19,6 +19,8 @@ pub struct MenuId(pub String);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     Pair,
+    FindPhone,
+    Everyone,
     Settings,
     TogglePause,
     Quit,

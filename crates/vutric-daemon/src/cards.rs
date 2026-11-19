@@ -8,6 +8,8 @@
 //!   │                  └────failed────────────────────────▶ hidden
 //!   └──decline / 60 s──────────────────────────────────────▶ hidden
 //! pair ──close──▶ hidden            (an offer replaces the pair card; it comes back after)
+//! ask  ──yes / no / timeout──▶ hidden   (six digits, a ring, clipboard text, our own ring)
+//! note ──3 s──▶ hidden                 (a mirrored notice, "paired", "found")
 //! ```
 
 use std::time::{Duration, Instant};
@@ -20,6 +22,44 @@ use crate::i18n::{Lang, size, t, tf};
 pub const LANDED_FOR: Duration = Duration::from_secs(3);
 /// An unanswered offer disappears when the network side stops waiting for it.
 pub const OFFER_FOR: Duration = Duration::from_secs(60);
+/// How long a mirrored notice or a short note stays.
+pub const NOTE_FOR: Duration = Duration::from_secs(5);
+
+/// A yes/no question on the card. The answer goes back with [`Answer::Ask`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Question {
+    /// "Raqamlar bir xilmi?": the six digits of a pairing without the QR (ADR-0050). Body: the digits.
+    Check,
+    /// A trusted phone rings this computer (ADR-0069). Yes = "Topdim".
+    Ringing,
+    /// We ring the phone ("Telefonni topish"). Yes = stop it.
+    FindPhone,
+    /// Text the phone sent for this computer's clipboard (ADR-0065). Yes = copy it.
+    Clipboard,
+}
+
+impl Question {
+    /// How long the question waits for the user before it counts as "no".
+    #[must_use]
+    pub fn wait(self) -> Duration {
+        match self {
+            Self::Check => Duration::from_secs(120),
+            Self::Ringing | Self::FindPhone => {
+                Duration::from_secs(u64::from(vutric_core::ring::MAX_RING_SECS))
+            }
+            Self::Clipboard => Duration::from_secs(30),
+        }
+    }
+
+    fn keys(self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            Self::Check => ("card.check.title", "card.check.yes", "card.check.no"),
+            Self::Ringing => ("card.ringing.title", "card.ringing.yes", "card.close"),
+            Self::FindPhone => ("card.find.title", "card.find.yes", "card.close"),
+            Self::Clipboard => ("card.clip.title", "card.clip.yes", "card.close"),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 enum Showing {
@@ -40,6 +80,15 @@ enum Showing {
     Pair {
         link: String,
     },
+    Ask {
+        q: Question,
+        device: String,
+        body: String,
+    },
+    Note {
+        title: String,
+        body: String,
+    },
 }
 
 /// What the bin must do after an event.
@@ -49,6 +98,10 @@ pub enum Answer {
     None,
     /// Answer the pending offer.
     Offer(bool),
+    /// Answer a [`Question`].
+    Ask(Question, bool),
+    /// The user closed the pairing card: close the pairing window too.
+    PairClosed,
 }
 
 #[derive(Debug)]
@@ -142,6 +195,56 @@ impl Deck {
         }
     }
 
+    /// Asks `q` about `device`. An unanswered question or offer on screen counts as "no"; that answer is returned
+    /// so the bin can pass it on.
+    pub fn ask(&mut self, q: Question, device: &str, body: &str, now: Instant) -> Option<Answer> {
+        let replaced = match self.showing {
+            Showing::Ask { q: old, .. } => Some(Answer::Ask(old, false)),
+            Showing::Offer { .. } => Some(Answer::Offer(false)),
+            _ => None,
+        };
+        self.park_pair();
+        self.showing = Showing::Ask {
+            q,
+            device: device.to_owned(),
+            body: body.to_owned(),
+        };
+        self.deadline = Some(now + q.wait());
+        replaced
+    }
+
+    /// A short note with no buttons: a mirrored notice, "paired", "found".
+    pub fn note(&mut self, title: &str, body: &str, now: Instant) {
+        if matches!(
+            self.showing,
+            Showing::Offer { .. } | Showing::Progress { .. } | Showing::Ask { .. }
+        ) {
+            return;
+        }
+        self.park_pair();
+        self.showing = Showing::Note {
+            title: title.to_owned(),
+            body: body.to_owned(),
+        };
+        self.deadline = Some(now + NOTE_FOR);
+    }
+
+    /// The question on screen, if any.
+    #[must_use]
+    pub fn asking(&self) -> Option<Question> {
+        match self.showing {
+            Showing::Ask { q, .. } => Some(q),
+            _ => None,
+        }
+    }
+
+    /// Takes a question off the screen without an answer (the other side answered it first).
+    pub fn dismiss(&mut self, q: Question) {
+        if self.asking() == Some(q) {
+            self.finish();
+        }
+    }
+
     pub fn pair(&mut self, link: &str) {
         match self.showing {
             Showing::None | Showing::Pair { .. } => {
@@ -172,7 +275,12 @@ impl Deck {
             (Showing::Pair { .. }, Button::Close) => {
                 self.paused_pair = None;
                 self.finish();
-                Answer::None
+                Answer::PairClosed
+            }
+            (Showing::Ask { q, .. }, Button::Accept | Button::Decline) => {
+                let a = Answer::Ask(*q, b == Button::Accept);
+                self.finish();
+                a
             }
             _ => Answer::None,
         }
@@ -183,13 +291,13 @@ impl Deck {
     pub fn tick(&mut self, now: Instant) -> Option<Answer> {
         match self.deadline {
             Some(d) if now >= d => {
-                let was_offer = matches!(self.showing, Showing::Offer { .. });
+                let answer = match self.showing {
+                    Showing::Offer { .. } => Answer::Offer(false),
+                    Showing::Ask { q, .. } => Answer::Ask(q, false),
+                    _ => Answer::None,
+                };
                 self.finish();
-                Some(if was_offer {
-                    Answer::Offer(false)
-                } else {
-                    Answer::None
-                })
+                Some(answer)
             }
             _ => None,
         }
@@ -244,6 +352,23 @@ impl Deck {
                         tf(l, "toast.from", &[("device", device)])
                     )
                 },
+            },
+            Showing::Ask { q, device, body } => {
+                let (title, yes, no) = q.keys();
+                Card::Offer {
+                    title: t(l, title).into(),
+                    body: if body.is_empty() {
+                        device.clone()
+                    } else {
+                        format!("{device}: {body}")
+                    },
+                    accept: t(l, yes).into(),
+                    decline: t(l, no).into(),
+                }
+            }
+            Showing::Note { title, body } => Card::Landed {
+                title: title.clone(),
+                body: body.clone(),
             },
             Showing::Pair { link } => {
                 let (modules, width) = qr(link).unwrap_or_default();
@@ -348,6 +473,57 @@ mod tests {
         );
         d.failed();
         assert!(matches!(d.card(qr), Some(Card::Pair { .. })));
+    }
+
+    #[test]
+    fn questions_answer_yes_no_or_time_out() {
+        let now = Instant::now();
+        let mut d = Deck::new(Lang::Uz);
+        assert_eq!(d.ask(Question::Check, "Pixel", "123 456", now), None);
+        let Some(Card::Offer {
+            title,
+            body,
+            accept,
+            ..
+        }) = d.card(qr)
+        else {
+            panic!()
+        };
+        assert_eq!(title, t(Lang::Uz, "card.check.title"));
+        assert_eq!(body, "Pixel: 123 456");
+        assert_eq!(accept, t(Lang::Uz, "card.check.yes"));
+        assert_eq!(d.press(Button::Accept), Answer::Ask(Question::Check, true));
+        assert!(!d.is_visible());
+
+        d.ask(Question::Clipboard, "Pixel", "salom", now);
+        assert_eq!(
+            d.tick(now + Question::Clipboard.wait()),
+            Some(Answer::Ask(Question::Clipboard, false))
+        );
+
+        d.ask(Question::FindPhone, "Pixel", "", now);
+        assert_eq!(
+            d.ask(Question::Ringing, "Pixel", "", now),
+            Some(Answer::Ask(Question::FindPhone, false)),
+            "a newer question answers the older one with no"
+        );
+        d.dismiss(Question::Ringing);
+        assert!(!d.is_visible());
+    }
+
+    #[test]
+    fn notes_never_hide_a_question_and_closing_the_qr_is_reported() {
+        let now = Instant::now();
+        let mut d = Deck::new(Lang::Uz);
+        d.offer("A", 1, 10, now);
+        d.note("Telegram", "salom", now);
+        assert!(matches!(d.card(qr), Some(Card::Offer { .. })));
+        d.press(Button::Decline);
+        d.note("Telegram", "salom", now);
+        assert!(matches!(d.card(qr), Some(Card::Landed { .. })));
+        assert_eq!(d.tick(now + NOTE_FOR), Some(Answer::None));
+        d.pair("vutric://pair?x");
+        assert_eq!(d.press(Button::Close), Answer::PairClosed);
     }
 
     #[test]
