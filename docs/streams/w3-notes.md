@@ -7,6 +7,7 @@ From 2026-11-19, W3 does not edit the shared docs (`backlog.md`, `workstreams.md
 
 | Item | State | Evidence |
 |---|---|---|
+| #24 BLE codec for Android (from W6) | [x] | R4 format (ADR-0071) already fits: 10-byte service data ≤ 13; added `ble::advert_now` (advert + ms until rotation), `pairing_advert`, `resolve_heard` (against `TrustStore`), `MAX_ANDROID_SERVICE_DATA`; test `ble::tests::android_helpers_fit_and_resolve`. W6 must use the UUIDs of ADR-0071, not its own (comment on #24) |
 | #26 iOS Files folder setting (from W1) | [x] | `SaveRules.ios_folder: Option<IosFolder { bookmark, label }>` (base64 + size check, label cleaned in `migrate`, optional so old files read as `None`); test `storage::tests::ios_folder_is_kept_and_checked` |
 | R2 own relay | [~] | Deploy kit `crates/vutric-relay/deploy/` (config template + `render-config.sh`, `install.sh` for systemd, hardened unit, Dockerfile + compose with ACME cache volume), documented in `docs/relay.md`; test `tests/deploy_config.rs`; waits for the owner's domain and server, not run on a server |
 | M2 direct vs relay share | [~] | ADR-0077: `vutric_core::telemetry` (off by default, `Tally` per UTC day by last badge, bucketed counts, report = `{v, day, platform, tally}` only), `Settings.telemetry`, `vutric_net::telemetry::send` + `jitter`; tests `telemetry::tests`, `tests/telemetry_off.rs`; no collector yet (owner question) |
