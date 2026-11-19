@@ -134,11 +134,16 @@ detected from the header, before any allocation. Every decoded message is valida
 | `PairProof { proof }` | dialer | it read the listener's pairing link (above) |
 | `Notice { app, title, text, at_ms }` | phone | a mirrored notification: app and title ≤ 80 characters, text ≤ 400, `app` not empty; shown, never acted on |
 | `Clipboard { text }` | either | text for the other device's "copy" prompt, 1 byte to 64 KiB; sent only on a user action, never written to the clipboard without the user |
+| `Ring(Start { secs })` / `Ring(Stop)` | either | "ring my phone": ring loudly for 1–60 s; `Stop` ends it, and the ringing device sends `Stop` back when its user found it |
+| `BleKey { key }` | both, after pairing | the sender's 16-byte key for BLE rotating ids ([ADR-0071](decisions/0071-ble-for-finding-and-handshake.md)); taken only from a trusted device |
 
 `Notice` and `Clipboard` are taken only from a trusted (paired) device and shown only after control and bidi
 characters are removed (`vutric_core::companion`); notices are limited to a burst of 10, then one per 500 ms
 ([ADR-0065](decisions/0065-companion-messages.md)). One that arrives during a file transfer is kept for the host,
 not dropped.
+
+`Ring` is taken only from a trusted device, at most a burst of 3 starts and then one per 20 s per peer; a `Stop`
+always passes. The ringing device stops by itself after `secs` ([ADR-0069](decisions/0069-ring-my-phone-and-the-command-line.md)).
 
 `gesture` = `{ speed (px/s ≥ 0), angle (rad, 0 = up, + = clockwise), exit_x (0..=1) }`. `preview` ≤ 96 KiB,
 longest side ≤ 512 px, JPEG/WebP/PNG.
@@ -181,3 +186,12 @@ and `crates/vutric-net/src/transfer.rs`.
 | Desktop: decode preview + upload texture | 10 ms |
 | Desktop: first frame from warm overlay | ≤ 16 ms (measured 0.5–10.7 ms) |
 | **Total** | **< 100 ms** |
+
+## Bluetooth LE ([ADR-0071](decisions/0071-ble-for-finding-and-handshake.md))
+
+Finding and the handshake only; files never go over BLE. Service UUID `fc1be29b-cb87-4116-a6ba-5a8e1c9d918b`.
+Advertisement service data: `[1][flags][rotating id 8]` (flags: bit 0 phone, bit 1 pairing, bit 2 wake); the id is
+`BLAKE3-keyed` over the 15-minute epoch with the device's `BleKey`. GATT inbox `0f34b527-843f-43b5-8ceb-856be921f7b5`
+(write) and outbox `2fffdfd4-abf9-4d7a-a6aa-377958c9f563` (read) carry a postcard `BlePayload` (`Link { uri }` or
+`Wake`, ≤ 64 KiB) in chunks `[index u16][count u16][bytes]`. Wi-Fi Aware/Direct discovery carries `LinkHello`:
+`[1][flags][port u16][endpoint id 32]`. Everything is unauthenticated until QUIC checks the key.

@@ -131,8 +131,9 @@ pub fn pairing_ticket(data: &[u8]) {
     assert_eq!(PairingTicket::parse(&uri).expect("own link parses"), t);
 }
 
-/// Companion messages from a paired phone (ADR-0064, issue #12): a notice or clipboard text. What validation
-/// accepts must round-trip and stay inside the caps; what `companion::shown` returns must be safe to print.
+/// Companion messages from a paired phone (ADR-0064, issue #12; ring: ADR-0069): a notice, clipboard text or a
+/// ring. What validation accepts must round-trip and stay inside the caps; what `companion::shown` returns must be
+/// safe to print; a ring is never taken from a guest.
 pub fn companion(data: &[u8]) {
     use vutric_core::companion::shown;
     use vutric_core::message::{MAX_CLIPBOARD_BYTES, MAX_NOTICE_LINE_CHARS, MAX_NOTICE_TEXT_CHARS};
@@ -140,7 +141,12 @@ pub fn companion(data: &[u8]) {
         return;
     };
     let mut u = Unstructured::new(rest);
-    let msg = if pick & 1 == 0 {
+    let msg = if pick % 3 == 2 {
+        let Ok(r) = vutric_core::ring::Ring::arbitrary(&mut u) else {
+            return;
+        };
+        Message::Ring(r)
+    } else if pick & 1 == 0 {
         let Ok(n) = vutric_core::Notice::arbitrary(&mut u) else {
             return;
         };
@@ -184,7 +190,66 @@ pub fn companion(data: &[u8]) {
             let preview = shown(&text, 200, true);
             assert!(preview.chars().count() <= 200 && !bad(&preview));
         }
+        Message::Ring(r) => {
+            assert!(r.is_valid());
+            assert!(
+                r.duration()
+                    .is_none_or(|d| d.as_secs() <= u64::from(vutric_core::ring::MAX_RING_SECS))
+            );
+            assert!(!vutric_core::ring::accepts(
+                &Message::Ring(r),
+                vutric_core::trust::Admission::Unknown
+            ));
+        }
         other => panic!("decoded into {}", other.kind()),
+    }
+}
+
+/// `adb devices -l` output from another program (R5, ADR-0070): bounded, and every serial it yields is a token
+/// that is safe to pass back to `adb -s`.
+pub fn adb_devices(data: &[u8]) {
+    use vutric_core::adb::{MAX_DEVICES, parse_devices, token_ok};
+    let devices = parse_devices(data);
+    assert!(devices.len() <= MAX_DEVICES);
+    for d in &devices {
+        assert!(token_ok(&d.serial), "serial {:?}", d.serial);
+        if let Some(m) = &d.model {
+            assert!(!m.is_empty() && m.len() <= 64 && !m.chars().any(char::is_control));
+        }
+    }
+}
+
+/// BLE from any device in radio range (R4, ADR-0071): advertisement service data, the Wi-Fi Aware / GATT hello,
+/// GATT payloads and a stream of chunks. Decoders never panic, what they accept re-encodes to the same value, the
+/// reassembler never yields more than the cap.
+pub fn ble_frames(data: &[u8]) {
+    use vutric_core::ble::{Advert, BlePayload, LinkHello, MAX_PAYLOAD_BYTES, Reassembler};
+    if let Some(a) = Advert::decode(data) {
+        assert_eq!(Advert::decode(&a.encode()), Some(a));
+    }
+    if let Some(h) = LinkHello::decode(data) {
+        assert_eq!(LinkHello::decode(&h.encode()), Some(h));
+    }
+    if let Ok(p) = BlePayload::decode(data) {
+        assert_eq!(
+            BlePayload::decode(&p.encode().expect("accepted payload re-encodes")).unwrap(),
+            p
+        );
+    }
+    let Some((&step, rest)) = data.split_first() else {
+        return;
+    };
+    let step = usize::from(step).max(4);
+    let mut r = Reassembler::default();
+    for chunk in rest.chunks(step) {
+        match r.push(chunk) {
+            Ok(Some(p)) => {
+                assert!(p.len() <= MAX_PAYLOAD_BYTES);
+                break;
+            }
+            Ok(None) => {}
+            Err(_) => break,
+        }
     }
 }
 
@@ -673,10 +738,37 @@ mod smoke {
     }
 
     #[test]
+    fn adb_devices_structured() {
+        run(adb_devices, 512, 37);
+        adb_devices(
+            b"List of devices attached\nR5CT device usb:1-1 model:SM_G991B\n0A unauthorized\n",
+        );
+        adb_devices(b"\xff device model:\x01\n x\tdevice\n");
+    }
+
+    #[test]
+    fn ble_frames_structured() {
+        run(ble_frames, 1024, 41);
+        let payload = vutric_core::ble::BlePayload::Link {
+            uri: "vutric://pair?v=2&id=ab".into(),
+        }
+        .encode()
+        .unwrap();
+        let mut wire = vec![24u8];
+        for c in vutric_core::ble::chunks(&payload, 27).unwrap() {
+            wire.extend_from_slice(&c);
+        }
+        ble_frames(&wire);
+        ble_frames(&[1, 5, 1, 2, 3, 4, 5, 6, 7, 8]);
+    }
+
+    #[test]
     fn companion_structured() {
         run(companion, 1024, 23);
         companion(b"\x00\x08Telegram\x03Ali\x05salom\x2a");
         companion(b"\x01\x04\xe2\x80\xaeab");
+        companion(b"\x02\x00\x1e");
+        companion(b"\x02\x01");
     }
 
     #[test]

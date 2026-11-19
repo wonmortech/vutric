@@ -17,6 +17,8 @@
 //! stall a caller for seconds, never forever.
 
 pub mod beacon;
+#[cfg(feature = "ble")]
+pub mod ble;
 pub mod captive;
 pub mod disk;
 pub mod find;
@@ -26,6 +28,7 @@ pub mod probe;
 pub mod settings;
 pub mod transfer;
 pub mod trust;
+pub mod usb;
 
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
@@ -442,6 +445,46 @@ impl Peer {
         Ok(s)
     }
 
+    /// What this device says in a Wi-Fi Aware / Wi-Fi Direct discovery message or a BLE GATT read (W6, ADR-0071):
+    /// our id and the QUIC port on that link (the IPv6 socket's, as Aware links are IPv6 link-local).
+    #[must_use]
+    pub fn link_hello(&self, phone: bool) -> vutric_core::ble::LinkHello {
+        let sockets = self.bound_sockets();
+        let port = sockets
+            .iter()
+            .find(|a| a.is_ipv6())
+            .or(sockets.first())
+            .map_or(0, SocketAddr::port);
+        vutric_core::ble::LinkHello {
+            id: self.id(),
+            port,
+            flags: if phone {
+                vutric_core::ble::flag::PHONE
+            } else {
+                0
+            },
+        }
+    }
+
+    /// The W6 transport hook (ADR-0071): dials the device of `hello` at `ip` on a link the platform set up itself
+    /// (Wi-Fi Aware data path, Wi-Fi Direct group). `scope` is that interface's index for a link-local IPv6
+    /// address (0 otherwise). On Android, bind the process to the link's `Network` first, as for the hotspot.
+    /// QUIC authenticates `hello.id`; the session is like any other.
+    pub async fn connect_on_link(
+        &self,
+        hello: &vutric_core::ble::LinkHello,
+        ip: std::net::IpAddr,
+        scope: u32,
+    ) -> Result<Session> {
+        let addr = match ip {
+            std::net::IpAddr::V6(v6) => {
+                SocketAddr::V6(std::net::SocketAddrV6::new(v6, hello.port, 0, scope))
+            }
+            v4 @ std::net::IpAddr::V4(_) => SocketAddr::new(v4, hello.port),
+        };
+        self.dial(hello.id, &[addr], None).await
+    }
+
     /// Opens a session from a pairing link: its LAN hints first, its relay (and, with [`Reach::Anywhere`], the
     /// lookup server) when the device is on another network.
     pub async fn connect_ticket(&self, t: &PairingTicket) -> Result<Session> {
@@ -628,6 +671,19 @@ fn refused(conn: &Connection) -> bool {
     )
 }
 
+/// A relay URL on `127.0.0.1`, `[::1]` or `localhost`: the loopback relay of a USB cable (ADR-0070).
+fn is_loopback_relay(u: &RelayUrl) -> bool {
+    let Some(host) = u.host_str() else {
+        return false;
+    };
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
 fn short_id(id: &EndpointId) -> String {
     id.to_string()[..8].to_owned()
 }
@@ -694,10 +750,16 @@ impl Session {
         self.recv_wire().await
     }
 
-    /// Inside a transfer: keeps a companion message for the host's next [`Session::recv`] (past [`MAX_PENDING`]
+    /// Inside a transfer: keeps a companion message (or a ring) for the host's next [`Session::recv`] (past [`MAX_PENDING`]
     /// the oldest goes) and drops anything else the transfer does not want.
     pub(crate) fn keep_companion(&mut self, msg: Message) {
-        if matches!(msg, Message::Notice(_) | Message::Clipboard { .. }) {
+        if matches!(
+            msg,
+            Message::Notice(_)
+                | Message::Clipboard { .. }
+                | Message::Ring(_)
+                | Message::BleKey { .. }
+        ) {
             if self.pending.len() >= MAX_PENDING {
                 self.pending.pop_front();
             }
@@ -746,6 +808,9 @@ impl Session {
         };
         let remote = match p.remote_addr() {
             iroh::TransportAddr::Ip(a) => Some(a.ip()),
+            iroh::TransportAddr::Relay(u) if is_loopback_relay(u) => {
+                return vutric_core::route::Badge::Cable;
+            }
             _ => None,
         };
         lan::badge(Some(p.is_relay()), remote, locals)
@@ -782,14 +847,19 @@ impl Session {
         }
     }
 
-    /// Whether the selected path goes through a relay right now (`false` while no path is chosen).
+    /// Whether the selected path goes through a relay right now (`false` while no path is chosen). A relay on
+    /// this machine's loopback is the USB cable of ADR-0070 (`adb reverse`), not a server on the internet, so it
+    /// does not count: no big-file limit, badge "Kabel".
     #[must_use]
     pub fn is_relayed(&self) -> bool {
         self.conn
             .paths()
             .iter()
             .find(iroh::endpoint::Path::is_selected)
-            .is_some_and(|p| p.is_relay())
+            .is_some_and(|p| {
+                p.is_relay()
+                    && !matches!(p.remote_addr(), iroh::TransportAddr::Relay(u) if is_loopback_relay(u))
+            })
     }
 
     /// Waits up to `wait` for a direct path (a relayed start often turns direct after hole punching). `true`
@@ -954,6 +1024,28 @@ impl Session {
     /// is empty or over [`vutric_core::message::MAX_CLIPBOARD_BYTES`] (the UI says it is too long).
     pub async fn send_clipboard(&mut self, text: &str) -> Result<()> {
         self.send(&Message::Clipboard { text: text.into() }).await
+    }
+
+    /// "Ring my phone" (ADR-0069): asks the other device to ring for `secs` seconds (clamped to
+    /// 1 ..= [`vutric_core::ring::MAX_RING_SECS`]). It rings only if it trusts us, and at most as often as
+    /// [`vutric_core::ring::RingLimit`] allows; when its user stops it, a [`vutric_core::ring::Ring::Stop`] comes
+    /// back on [`Self::recv`].
+    pub async fn ring(&mut self, secs: u16) -> Result<()> {
+        self.send(&Message::Ring(vutric_core::ring::Ring::start(secs)))
+            .await
+    }
+
+    /// Stops a ring started with [`Self::ring`] (or, on the ringing device, tells the other side it was found).
+    pub async fn stop_ring(&mut self) -> Result<()> {
+        self.send(&Message::Ring(vutric_core::ring::Ring::Stop))
+            .await
+    }
+
+    /// After pairing, to a trusted device only: hands over this device's BLE key (ADR-0071), derived from our
+    /// identity, so the other side can recognise our rotating BLE id. The receiver keeps it with
+    /// `TrustStore::set_ble_key` when `vutric_core::ble::accepts_key` says so.
+    pub async fn send_ble_key(&mut self, key: vutric_core::ble::BleKey) -> Result<()> {
+        self.send(&Message::BleKey { key }).await
     }
 
     async fn recv_step(&mut self) -> Result<Message> {

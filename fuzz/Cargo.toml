@@ -163,3 +163,19 @@ test = false
 doc = false
 bench = false
 required-features = ["libfuzzer"]
+
+[[bin]]
+name = "adb_devices"
+path = "fuzz_targets/adb_devices.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "ble_frames"
+path = "fuzz_targets/ble_frames.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]

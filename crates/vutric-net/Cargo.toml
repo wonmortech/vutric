@@ -20,6 +20,12 @@ n0-future = "0.3.2"
 serde_json = "1"
 netdev = "0.46.3"
 socket2 = "0.6.5"
+btleplug = { version = "0.13.5", optional = true }
+uuid = { version = "1", optional = true }
+
+[features]
+# Desktop BLE central for R4 (ADR-0071). Off by default: on Linux it needs libdbus-1-dev to build.
+ble = ["dep:btleplug", "dep:uuid"]
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.191"

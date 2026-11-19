@@ -172,6 +172,14 @@ pub enum Message {
     Clipboard {
         text: String,
     },
+    /// "Ring my phone" (ADR-0069, backlog F14): start or stop a loud sound on the other device. Taken only from a
+    /// paired device and rate-limited (`crate::ring`).
+    Ring(crate::ring::Ring),
+    /// To a paired device only, after pairing: this device's key for BLE rotating ids (ADR-0071), so the other
+    /// side can recognise it nearby. Taken only from a trusted device (`crate::ble::accepts_key`).
+    BleKey {
+        key: crate::ble::BleKey,
+    },
 }
 
 /// Most characters of [`Notice::app`] and [`Notice::title`].
@@ -216,6 +224,8 @@ impl Message {
             Self::PairProof { .. } => "PairProof",
             Self::Notice(_) => "Notice",
             Self::Clipboard { .. } => "Clipboard",
+            Self::Ring(_) => "Ring",
+            Self::BleKey { .. } => "BleKey",
         }
     }
 }
@@ -303,6 +313,7 @@ impl Message {
             Self::Clipboard { text } if text.is_empty() || text.len() > MAX_CLIPBOARD_BYTES => {
                 Err(Error::Malformed("clipboard length".into()))
             }
+            Self::Ring(r) if !r.is_valid() => Err(Error::Malformed("ring seconds".into())),
             _ => Ok(()),
         }
     }
@@ -452,6 +463,32 @@ mod tests {
         assert_eq!(wire[4], 12);
         let wire = crate::frame::encode(&Message::Clipboard { text: "a".into() }).unwrap();
         assert_eq!(wire[4], 14);
+        let wire = crate::frame::encode(&Message::Ring(crate::ring::Ring::Stop)).unwrap();
+        assert_eq!(wire[4], 15);
+        let wire = crate::frame::encode(&Message::BleKey {
+            key: crate::ble::BleKey([0; 16]),
+        })
+        .unwrap();
+        assert_eq!(wire[4], 16);
+    }
+
+    #[test]
+    fn ring_bounds() {
+        use crate::ring::{MAX_RING_SECS, Ring};
+        Message::Ring(Ring::Stop).validate().unwrap();
+        Message::Ring(Ring::Start {
+            secs: MAX_RING_SECS,
+        })
+        .validate()
+        .unwrap();
+        assert!(Message::Ring(Ring::Start { secs: 0 }).validate().is_err());
+        assert!(
+            Message::Ring(Ring::Start {
+                secs: MAX_RING_SECS + 1
+            })
+            .validate()
+            .is_err()
+        );
     }
 
     #[test]

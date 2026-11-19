@@ -52,6 +52,9 @@ pub struct TrustedDevice {
     pub paired_at: u64,
     /// Unix seconds of the last session, for "seen 3 days ago" and for forgetting the oldest.
     pub last_seen: u64,
+    /// Its key for BLE rotating ids, once it sent one (ADR-0071); lets us recognise it nearby.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ble_key: Option<crate::ble::BleKey>,
 }
 
 /// The trusted devices of this device, keyed by endpoint id (64 hex).
@@ -150,6 +153,7 @@ impl TrustStore {
                 method,
                 paired_at: now,
                 last_seen: now,
+                ble_key: None,
             },
         );
     }
@@ -164,6 +168,22 @@ impl TrustStore {
             }
             d.last_seen = d.last_seen.max(now);
         }
+    }
+
+    /// Keeps the BLE key a trusted device sent (`Message::BleKey`, ADR-0071). Unknown ids are ignored. Returns
+    /// whether it was stored.
+    pub fn set_ble_key(&mut self, id: &EndpointId, key: crate::ble::BleKey) -> bool {
+        self.devices
+            .get_mut(&id.to_string())
+            .map(|d| d.ble_key = Some(key))
+            .is_some()
+    }
+
+    /// The BLE keys of the trusted devices, for `ble::resolve`.
+    pub fn ble_keys(&self) -> impl Iterator<Item = (EndpointId, &crate::ble::BleKey)> {
+        self.devices
+            .iter()
+            .filter_map(|(k, d)| Some((k.parse().ok()?, d.ble_key.as_ref()?)))
     }
 
     /// Forgets a device; it then needs pairing again. Returns whether it was trusted.
@@ -385,6 +405,7 @@ mod tests {
             method: PairMethod::Ticket,
             paired_at: 0,
             last_seen: 0,
+            ble_key: None,
         };
         s.devices.insert("nothex".into(), bad.clone());
         s.devices.insert("AB".repeat(32), bad);
@@ -393,5 +414,26 @@ mod tests {
         assert_eq!(s.len(), 1);
         assert_eq!(s.version, TRUST_VERSION);
         assert_eq!(s.iter().count(), 1);
+    }
+
+    #[test]
+    fn ble_keys_only_for_trusted_devices_and_kept_in_json() {
+        let mut s = TrustStore::default();
+        let key = crate::ble::BleKey([4; 16]);
+        assert!(
+            !s.set_ble_key(&id(1), key),
+            "seeing a key never makes a device trusted"
+        );
+        s.trust(id(1), "Pixel", None, PairMethod::Ticket, T);
+        s.trust(id(2), "Ofis", None, PairMethod::Code, T);
+        assert!(s.set_ble_key(&id(1), key));
+        assert_eq!(s.ble_keys().collect::<Vec<_>>(), vec![(id(1), &key)]);
+        let json = serde_json::to_string(&s).unwrap();
+        assert!(json.contains(&"04".repeat(16)), "{json}");
+        assert!(
+            !json.contains("\"ble_key\":null"),
+            "absent keys are not written"
+        );
+        assert_eq!(serde_json::from_str::<TrustStore>(&json).unwrap(), s);
     }
 }
