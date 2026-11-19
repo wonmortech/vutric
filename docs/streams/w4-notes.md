@@ -334,3 +334,9 @@ Ubuntu and Fedora desktop), and checklist rows 30-36. `Start` on Linux: `alias =
 `docs/checklists/linux-ios.md` (Phase 4 cross-check). Top of the list: GNOME frame callbacks after the dock retype
 (row 5b), focus and click-through on all three, the tray on Ubuntu's AppIndicator, Quick Share from an Android phone
 with Avahi running.
+
+## 5. Owner questions from W4 (not copied into owner-questions.md, per the 2026-11-19 rule)
+
+From ADR-0093: (1) Plasma: Vutric's KDE Connect mode off by default when `kdeconnectd` runs? (2) Should the `.deb`
+turn on the firewalld service itself? W4: no. (3) Where the compat identity lives on Linux:
+`$XDG_DATA_HOME/vutric/compat` or the same layout W3 uses on Windows?
