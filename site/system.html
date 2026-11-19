@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en" data-page="system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vutric design system</title>
+<meta name="description" content="Colours, type, components, the Halqa effect and the Android, Windows and Ubuntu screens of Vutric, the app that flicks photos from a phone onto a desktop.">
+<meta name="theme-color" content="#040c29">
+<meta property="og:title" content="Vutric design system">
+<meta property="og:description" content="Colours, type, components, the Halqa effect and every first-release screen of Vutric.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://vutric.wonmor.io/">
+<link rel="canonical" href="https://vutric.wonmor.io/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/vutric.css">
+<script src="assets/boot.js"></script>
+<script src="assets/vutric.js" defer></script>
+<script src="assets/halqa3d.js" defer></script>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap nav__row">
+    <a class="skip" href="#main">Skip to content</a>
+    <a class="brand" href="#top" aria-label="Vutric design system, top">
+      <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>
+      <span>Vutric</span>
+    </a>
+    <nav class="nav__links" aria-label="Sections">
+      <a href="#what">Capabilities</a>
+      <a href="#routes">Routes</a>
+      <a href="#colour">Colour</a>
+      <a href="#type">Type</a>
+      <a href="#components">Components</a>
+      <a href="#effect">Effect</a>
+      <a href="#screens">Screens</a>
+    </nav>
+    <div class="nav__end">
+      <div class="theme" role="radiogroup" aria-label="Colour theme">
+        <button type="button" role="radio" data-theme-set="auto" aria-checked="true" title="Follow the system">Auto</button>
+        <button type="button" role="radio" data-theme-set="light" aria-checked="false">Light</button>
+        <button type="button" role="radio" data-theme-set="dark" aria-checked="false">Dark</button>
+      </div>
+      <a class="btn btn--primary btn--nav" href="https://github.com/wonmortech/vutric">Read the source</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- Hero: the Halqa effect itself, drawn live by assets/vutric.js from the same timeline the desktop overlay uses. -->
+<section class="hero" id="top" data-grade="night">
+  <canvas class="hero__canvas" data-halqa="hero" aria-hidden="true"></canvas>
+  <div class="hero__still" aria-hidden="true"></div>
+  <div class="wrap hero__inner">
+    <p class="pill">Design system v0.1 · Phase 0 · 17 November 2026</p>
+    <h1>Vutric design system for phone-to-desktop transfer</h1>
+    <p class="lead">Colours, type, controls and every first-release screen of Vutric: flick a photo off your Android phone and it flies onto your Windows or Ubuntu desktop.</p>
+    <div class="btn-row">
+      <a class="btn btn--primary" href="#screens">See the screens</a>
+      <a class="btn btn--secondary" href="#effect">Watch the effect</a>
+    </div>
+  </div>
+  <button class="hero__pause" type="button" data-halqa-toggle="hero" aria-pressed="false">Pause animation</button>
+</section>
+
+<!-- ============ Capability tour (ADR-0016): every capability and every case, built or not ============ -->
+
+<section class="sec" id="what">
+  <div class="wrap">
+    <h2>What Vutric does. <span class="muted">Everything it can do today, and everything on the way — honestly labelled.</span></h2>
+    <div class="caps">
+      <article class="cap">
+        <span class="cap__k" aria-hidden="true">01</span>
+        <h3>Offline. No cloud, no account.</h3>
+        <p>Files travel inside your own Wi-Fi, encrypted end to end. Nothing needs the internet; nothing is uploaded to anyone.</p>
+      </article>
+      <article class="cap">
+        <span class="cap__k" aria-hidden="true">02</span>
+        <h3>You throw it.</h3>
+        <p>Flick a photo off the top edge of the phone and it flies through a glowing portal onto the computer — the gesture is the product.</p>
+      </article>
+      <article class="cap">
+        <span class="cap__k" aria-hidden="true">03</span>
+        <h3>Any device, any file.</h3>
+        <p>Phone→desktop, phone→phone, desktop→desktop. Photos, videos, documents, folders, clipboard — many at once, resumed if the link drops.</p>
+      </article>
+    </div>
+
+    <div class="legend" role="note" aria-label="Status legend">
+      <span class="lg__title">Status:</span>
+      <span class="st st--built">Built</span>
+      <span class="st st--verify">Verifying on devices</span>
+      <span class="st st--soon">Soon · P1–P5</span>
+      <span class="st st--optin">Opt-in</span>
+      <span class="st st--watch">Watched</span>
+      <span class="st st--no">Not possible</span>
+    </div>
+    <p class="honest">One honest line: no real-world Wi-Fi transfer speed is published yet — every speed figure so far is a loopback test. The only live, production-representative number is the overlay effect’s <b>60 FPS</b>. Anything marked <i>Verifying on devices</i> is built and tested in code, not yet run on a real phone, relay or hotel Wi-Fi.</p>
+  </div>
+</section>
+
+<section class="sec sec--alt" id="routes" data-grade="night">
+  <div class="wrap">
+    <h2>How it connects. <span class="muted">One protocol, many ways to reach it. Vutric tries them in order, automatically.</span></h2>
+
+    <ol class="flow" aria-label="Automatic connection order">
+      <li><span class="flow__n mono">1</span>Same Wi-Fi <span class="flow__d">mDNS, then the addresses in the QR</span></li>
+      <li><span class="flow__n mono">2</span>Direct over the internet <span class="flow__d">hole-punching</span></li>
+      <li><span class="flow__n mono">3</span>Our own relay <span class="flow__d">when the network blocks direct</span></li>
+      <li><span class="flow__n mono">4</span>Offer a hotspot, Wi-Fi Aware or a cable <span class="flow__d">when there is no shared network</span></li>
+    </ol>
+
+    <div class="routes">
+      <article class="route"><span class="route__b mono">R0</span><div><h3>Same network &amp; internet</h3><p>Same Wi-Fi, or two different networks (direct or via a relay).</p></div><span class="st st--built">Built</span></article>
+      <article class="route"><span class="route__b mono">R1</span><div><h3>Stronger LAN finding</h3><p>Every address in the QR, a unicast probe, an opt-in subnet scan, multicast, and detection of AP-isolation or an iOS permission block.</p></div><span class="st st--verify">Verifying</span></article>
+      <article class="route"><span class="route__b mono">R1a</span><div><h3>Hotel &amp; guest Wi-Fi</h3><p>Spots a captive-portal login wall, shows the sign-in link, then offers the relay or a hotspot.</p></div><span class="st st--verify">Verifying</span></article>
+      <article class="route"><span class="route__b mono">R2</span><div><h3>Our own relay</h3><p>A Vutric relay with a live route badge and speed, for strict or carrier NAT. The operator never sees your files or names.</p></div><span class="st st--verify">Verifying</span></article>
+      <article class="route"><span class="route__b mono">R3</span><div><h3>Hotspot</h3><p>The phone opens a hotspot (the QR carries its password); the computer joins. No shared network needed.</p></div><span class="st st--verify">Verifying</span></article>
+      <article class="route"><span class="route__b mono">R4</span><div><h3>Bluetooth LE</h3><p>Finds and handshakes over BLE when there is no network and no QR to scan.</p></div><span class="st st--soon">Soon · P1+</span></article>
+      <article class="route"><span class="route__b mono">R5</span><div><h3>USB cable</h3><p>Phone-to-computer over the cable — no radio, for very large files.</p></div><span class="st st--soon">Soon</span></article>
+      <article class="route"><span class="route__b mono">R5a</span><div><h3>Cable between two computers</h3><p>Ethernet, Thunderbolt or USB4 link-local — a “Cable” badge.</p></div><span class="st st--verify">Verifying</span></article>
+      <article class="route"><span class="route__b mono">R6</span><div><h3>Wi-Fi Aware</h3><p>Nearby, no network, within one platform (Android; iOS later).</p></div><span class="st st--soon">Soon · after P3</span></article>
+      <article class="route"><span class="route__b mono">R7</span><div><h3>Wi-Fi Direct</h3><p>Android↔Android and Android↔Windows, nearby, no network.</p></div><span class="st st--soon">Soon · after P3</span></article>
+      <article class="route"><span class="route__b mono">R8</span><div><h3>Encrypted cloud handoff</h3><p>When the other device is offline now: the file waits, encrypted, with the key only in the link.</p></div><span class="st st--optin">Opt-in</span></article>
+      <article class="route"><span class="route__b mono">R9</span><div><h3>Animated QR</h3><p>For air-gapped rooms: the file rides a moving QR on the screen.</p></div><span class="st st--optin">Opt-in</span></article>
+      <article class="route"><span class="route__b mono">R10</span><div><h3>iPhone ↔ Android, nearby</h3><p>Cross-platform Wi-Fi Aware. Blocked by the platforms today; re-checked every quarter.</p></div><span class="st st--watch">Watched</span></article>
+    </div>
+    <p class="honest">Vutric always shows the route it actually used and the live speed — never a promised one.</p>
+  </div>
+</section>
+
+<section class="sec" id="platforms">
+  <div class="wrap">
+    <h2>Platforms. <span class="muted">Windows and Android first, then Ubuntu, then iPhone, then macOS.</span></h2>
+    <div class="plats">
+      <article class="plat"><h3>Windows 10 / 11</h3><span class="st st--built">Overlay built</span><p>A click-through, never-stealing-focus overlay draws the Halqa where you look. Daemon, tray, toast, Explorer menu and winget are next.</p><p class="plat__ph mono">Phase 1</p></article>
+      <article class="plat"><h3>Android</h3><span class="st st--verify">Verifying</span><p>The full app: gallery-first sending, the throw, receiving, history, a Quick-Settings tile and a Share-sheet target.</p><p class="plat__ph mono">Phase 1</p></article>
+      <article class="plat"><h3>Ubuntu</h3><span class="st st--soon">Soon · P2</span><p>KDE Plasma, wlroots and COSMIC via layer-shell; GNOME via a small shell extension. Nautilus/Dolphin menus, <span class="mono">.deb</span> + PPA.</p><p class="plat__ph mono">Phase 2</p></article>
+      <article class="plat"><h3>iPhone</h3><span class="st st--soon">Soon · P3</span><p>Share Extension, a Live Activity and widget, App Intents, PhotoKit with HEIC→JPEG. TestFlight.</p><p class="plat__ph mono">Phase 3</p></article>
+      <article class="plat"><h3>macOS</h3><span class="st st--soon">Soon · P5</span><p>A borderless top-level panel over everything, drawn with Metal. Works with both Android and iPhone. Notarised <span class="mono">.dmg</span>.</p><p class="plat__ph mono">Phase 5</p></article>
+    </div>
+  </div>
+</section>
+
+<section class="sec sec--alt" id="security">
+  <div class="wrap">
+    <h2>Private by design. <span class="muted">Encrypted, device-to-device, and careful about who may send to you.</span></h2>
+    <div class="caps caps--2">
+      <article class="cap"><h3>Trusted devices only <span class="st st--built">Built</span></h3><p>After the first QR, both devices remember each other’s key. Who may reach you is <i>off</i>, <i>trusted only</i> (default), <i>everyone for 10 minutes</i>, or <i>while pairing</i>.</p></article>
+      <article class="cap"><h3>Six-digit check <span class="st st--built">Built</span></h3><p>Pairing shows the same six digits on both screens, derived from the encrypted session — it cannot be faked by a device in the middle.</p></article>
+      <article class="cap"><h3>Nothing rich before you’re trusted <span class="st st--built">Built</span></h3><p>Before a device is admitted, only tiny fixed messages are read — no filenames, no previews, nothing that could be exploited.</p></article>
+      <article class="cap"><h3>Every parser is fuzzed <span class="st st--built">Built</span></h3><p>Seventeen fuzz targets hammer every format Vutric reads. The first run already found and fixed three real bugs.</p></article>
+      <article class="cap"><h3>The relay is blind <span class="st st--verify">Verifying</span></h3><p>When a relay is used, its operator sees only keys, addresses and byte-counts — never your names, files or content.</p></article>
+      <article class="cap"><h3>Your device name stays private <span class="st st--built">Built</span></h3><p>The name travels only inside the encrypted session. The lookup that finds you carries a key, not a name.</p></article>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="interop">
+  <div class="wrap">
+    <h2>Works with other apps. <span class="muted">Send to and receive from the tools people already use — a received file gets the same Halqa, folders and history.</span></h2>
+    <div class="routes">
+      <article class="route"><span class="route__b">C1</span><div><h3>LocalSend</h3><p>Send and receive with any LocalSend app.</p></div><span class="st st--verify">Verifying</span></article>
+      <article class="route"><span class="route__b">C2</span><div><h3>Browser page</h3><p>The other side needs no app at all — just open a page in any browser.</p></div><span class="st st--verify">Verifying</span></article>
+      <article class="route"><span class="route__b">C3</span><div><h3>Quick Share (LAN)</h3><p>Receive from, then send to, Android Quick Share over the network.</p></div><span class="st st--soon">Experimental</span></article>
+      <article class="route"><span class="route__b">C4</span><div><h3>KDE Connect</h3><p>Share files with the KDE Connect app on desktop and Android.</p></div><span class="st st--soon">Soon · P2</span></article>
+      <article class="route"><span class="route__b">C7</span><div><h3>magic-wormhole</h3><p>Send and receive with the wormhole code tool.</p></div><span class="st st--soon">Soon · P2</span></article>
+      <article class="route"><span class="route__b">C5/6</span><div><h3>Warpinator · croc</h3><p>Under review — both lack a written protocol, so they are being weighed against our clean-room rule.</p></div><span class="st st--soon">Under review</span></article>
+    </div>
+    <h3 class="notposs__h">Honest about what can’t be done</h3>
+    <ul class="notposs">
+      <li><b>AirDrop</b> is closed to other apps — but an iPhone can send through our <a class="link" href="#interop">browser page</a>, or install Vutric. <span class="st st--no">Not possible</span></li>
+      <li><b>Apple Continuity / Universal Clipboard</b> is closed. <span class="st st--no">Not possible</span></li>
+      <li><b>Samsung / Huawei / Mi Share</b> are brand-only. Their Wi-Fi Direct idea is our R7. <span class="st st--no">Not possible</span></li>
+      <li><b>Xender / SHAREit / Zapya</b> use closed protocols. Their “phone opens a hotspot” idea is our R3. <span class="st st--no">Not possible</span></li>
+      <li><b>Phone Link / Windows Nearby Sharing</b> are closed — the Vutric desktop app plays that role. <span class="st st--no">Not possible</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec sec--alt" id="storage">
+  <div class="wrap">
+    <h2>Where files land, and how. <span class="muted">One set of rules, the same on every device, every one overridable.</span></h2>
+    <div class="caps caps--2">
+      <article class="cap"><h3>Your folder, your way</h3><p>Pick the save folder; split by type into sub-folders; keep or flatten the sender’s folders; add a copy to the gallery.</p></article>
+      <article class="cap"><h3>When a name clashes</h3><p>Keep both, replace, skip — or be asked each time.</p></article>
+      <article class="cap"><h3>Accept automatically</h3><p>Ask every time, auto-accept from trusted devices, or auto-accept under a size you choose.</p></article>
+      <article class="cap"><h3>Safe with your disk</h3><p>Refuses a transfer that would leave under 1 GB free, on both the target and the app’s own storage.</p></article>
+      <article class="cap"><h3>History &amp; resend</h3><p>A history of what went where, with progress and a one-tap resend.</p></article>
+      <article class="cap"><h3>Big files, handled</h3><p>Many files in one go, up to four at a time; a dropped link resumes from where it stopped; every file is hash-checked before it is kept.</p></article>
+    </div>
+    <p class="honest">Settings have one owner inside the app, with a versioned format that migrates cleanly — so a new version never loses your choices. <span class="st st--built">Built</span> &nbsp; The on-screen settings for desktop are <span class="st st--soon">Soon · P1</span>.</p>
+  </div>
+</section>
+
+<section class="sec" id="cases">
+  <div class="wrap">
+    <h2>When things go wrong. <span class="muted">Every failure has a clear answer — that is part of the product, not an afterthought.</span></h2>
+    <ul class="cases">
+      <li><b>Connection lost</b><span>“Reconnect”, and nothing half-saved is kept.</span></li>
+      <li><b>They said no</b><span>A clear “rejected”, with how to pair or ask them to open up for 10 minutes.</span></li>
+      <li><b>No answer</b><span>A timeout, not a hang.</span></li>
+      <li><b>The Wi-Fi keeps devices apart</b><span>Detected, with the relay or a hotspot offered.</span></li>
+      <li><b>Hotel login wall</b><span>Named, with the sign-in link and a cable hint.</span></li>
+      <li><b>iPhone blocks the local network</b><span>A screen that explains the permission.</span></li>
+      <li><b>Low disk space</b><span>Refused before it starts, not half-way.</span></li>
+      <li><b>A corrupt transfer</b><span>Caught by the hash check and retried.</span></li>
+      <li><b>An old pairing QR</b><span>Rejected — “scan the QR again”.</span></li>
+      <li><b>A stranger during pairing</b><span>Treated as a guest: every file is asked about.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec sec--alt" id="companion">
+  <div class="wrap">
+    <h2>A little more, if you want it. <span class="muted">Opt-in extras, off by default.</span></h2>
+    <div class="caps caps--3">
+      <article class="cap"><h3>Phone notifications on the PC <span class="st st--verify">Verifying</span></h3><p>Mirror chosen apps’ notifications to the computer — off until you turn it on, and only between trusted devices.</p></article>
+      <article class="cap"><h3>Shared clipboard <span class="st st--verify">Verifying</span></h3><p>Copy on one device, paste on the other, both ways.</p></article>
+      <article class="cap"><h3>Ring my phone · phone as a touchpad <span class="st st--soon">Soon</span></h3><p>The small conveniences other tools have — planned, not yet scheduled.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Design-system reference (kept beneath the capability tour) ============ -->
+
+<section class="sec" id="colour">
+  <div class="wrap">
+    <h2>Colour: cobalt and sand. <span class="muted">Neutral interface, colour only for action and the effect.</span></h2>
+    <div class="swatches">
+      <article class="swatch">
+        <div class="swatch__chip chip--cobalt"><span>Aa</span></div>
+        <h3>Cobalt 900</h3>
+        <p class="mono">#062B8A</p>
+        <p>Ink, primary buttons and focus in the light theme. 8.9:1 on Sand 200.</p>
+      </article>
+      <article class="swatch">
+        <div class="swatch__chip chip--signal"><span>Aa</span></div>
+        <h3>Signal 500</h3>
+        <p class="mono">#2F6BFF</p>
+        <p>The outer rim of the portal, links on night, the live connection dot.</p>
+      </article>
+      <article class="swatch">
+        <div class="swatch__chip chip--glow"><span>Aa</span></div>
+        <h3>Glow 200</h3>
+        <p class="mono">#F4D9A6</p>
+        <p>The inner rim and hot core of the portal; primary action in the dark theme.</p>
+      </article>
+      <article class="swatch">
+        <div class="swatch__chip chip--sand"><span>Aa</span></div>
+        <h3>Sand 200</h3>
+        <p class="mono">#E6DBC7</p>
+        <p>Ground of the light theme, phone and desktop alike.</p>
+      </article>
+      <article class="swatch">
+        <div class="swatch__chip chip--paper"><span>Aa</span></div>
+        <h3>Sand 50</h3>
+        <p class="mono">#F7F2E9</p>
+        <p>Raised surfaces: cards, sheets, windows on Sand 200.</p>
+      </article>
+      <article class="swatch">
+        <div class="swatch__chip chip--night"><span>Aa</span></div>
+        <h3>Night 950</h3>
+        <p class="mono">#040C29</p>
+        <p>Ground of the dark theme and the inside of the portal lens.</p>
+      </article>
+    </div>
+    <div class="ramp" aria-hidden="true"><span class="ramp__bar"></span></div>
+    <p class="ramp__note">The portal rim runs Signal 500 → Glow 200 over Night 950. No violet, no rainbow: our effect is a single cobalt halo.</p>
+  </div>
+</section>
+
+<section class="sec sec--alt" id="type">
+  <div class="wrap">
+    <h2>Type: Geist and Geist Mono. <span class="muted">One family, weights 400 and 500.</span></h2>
+    <div class="type">
+      <div class="type__row">
+        <p class="type__meta mono">Display · 64/1.02 · 500 · −4.5%</p>
+        <p class="t-display">Rasm yuborildi</p>
+      </div>
+      <div class="type__row">
+        <p class="type__meta mono">Title · 32/1.15 · 500 · −3%</p>
+        <p class="t-title">Telefonni ulash</p>
+      </div>
+      <div class="type__row">
+        <p class="type__meta mono">Heading · 20/1.3 · 500</p>
+        <p class="t-head">Pixel 8 dan rasm keldi</p>
+      </div>
+      <div class="type__row">
+        <p class="type__meta mono">Body · 16/1.6 · 400</p>
+        <p class="t-body">Kompyuterdagi QR kodni skanerlang. Fayllar faqat mahalliy tarmoq orqali, shifrlangan holda uzatiladi; bulut va akkaunt kerak emas.</p>
+      </div>
+      <div class="type__row">
+        <p class="type__meta mono">Label · 13/1.4 · 500</p>
+        <p class="t-label">Yuborish zonasi · Oʻng chekka</p>
+      </div>
+      <div class="type__row">
+        <p class="type__meta mono">Mono · 14/1.5 · 400</p>
+        <p class="t-mono">vutric://pair?v=1&amp;n=Studio%20PC · IMG_2041.jpg · 4,2 MB</p>
+      </div>
+    </div>
+    <p class="type__note">Uzbek copy uses the modifier letter <span class="mono">ʻ</span> (U+02BB) in oʻ and gʻ, which the Geist Latin subset carries. Sentence case everywhere; numbers keep their unit.</p>
+  </div>
+</section>
+
+<section class="sec" id="foundations">
+  <div class="wrap">
+    <h2>Space, radius and motion tokens</h2>
+    <div class="found">
+      <article class="found__col">
+        <h3>Spacing</h3>
+        <ul class="space" aria-label="Spacing scale">
+          <li><span class="space__bar s-1"></span><span class="mono">4</span></li>
+          <li><span class="space__bar s-2"></span><span class="mono">8</span></li>
+          <li><span class="space__bar s-3"></span><span class="mono">12</span></li>
+          <li><span class="space__bar s-4"></span><span class="mono">16</span></li>
+          <li><span class="space__bar s-5"></span><span class="mono">24</span></li>
+          <li><span class="space__bar s-6"></span><span class="mono">32</span></li>
+          <li><span class="space__bar s-7"></span><span class="mono">48</span></li>
+          <li><span class="space__bar s-8"></span><span class="mono">64</span></li>
+        </ul>
+        <p>Touch targets are 48 px on the phone and 44 px on the desktop.</p>
+      </article>
+      <article class="found__col">
+        <h3>Radius</h3>
+        <div class="radii">
+          <div class="radius r-sm"><span class="mono">8</span><span>Controls</span></div>
+          <div class="radius r-md"><span class="mono">14</span><span>Cards, toasts</span></div>
+          <div class="radius r-lg"><span class="mono">22</span><span>Sheets, windows</span></div>
+          <div class="radius r-full"><span class="mono">999</span><span>Chips, toggles</span></div>
+        </div>
+      </article>
+      <article class="found__col">
+        <h3>Motion</h3>
+        <ul class="ease" aria-label="Motion tokens">
+          <li class="ease__row"><span class="ease__track"><span class="ease__dot ease--out"></span></span><span><b>Out</b> <span class="mono">180 ms · (.2,.8,.2,1)</span></span></li>
+          <li class="ease__row"><span class="ease__track"><span class="ease__dot ease--back"></span></span><span><b>Open</b> <span class="mono">250 ms · back 1.6</span></span></li>
+          <li class="ease__row"><span class="ease__track"><span class="ease__dot ease--spring"></span></span><span><b>Land</b> <span class="mono">spring 3.2 Hz · ζ 0.42</span></span></li>
+        </ul>
+        <p>Interface motion stays under 250 ms. Only the effect may run longer. Reduced motion turns every effect into Oddiy.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="sec sec--alt" id="components">
+  <div class="wrap">
+    <h2>Components for phone and desktop</h2>
+    <div class="comp">
+      <article class="comp__card">
+        <h3>Buttons</h3>
+        <div class="demo demo--stack">
+          <button class="btn btn--primary" type="button">Ruxsat berish</button>
+          <button class="btn btn--secondary" type="button">Keyinroq</button>
+          <a class="link" href="#screens">IP manzil orqali ulanish</a>
+        </div>
+      </article>
+      <article class="comp__card">
+        <h3>Send zone</h3>
+        <div class="demo">
+          <div class="seg" role="radiogroup" aria-label="Yuborish zonasi">
+            <button type="button" role="radio" aria-checked="false">Chap</button>
+            <button type="button" role="radio" aria-checked="true">Oʻng</button>
+            <button type="button" role="radio" aria-checked="false">Yuqori</button>
+          </div>
+          <label class="slider">
+            <span class="slider__head"><span class="t-label">Davomiylik</span><output class="mono" data-slider-out>1,0 s</output></span>
+            <input type="range" min="0.6" max="2" step="0.1" value="1" data-slider aria-label="Effekt davomiyligi">
+          </label>
+        </div>
+      </article>
+      <article class="comp__card">
+        <h3>Toggles and chips</h3>
+        <div class="demo demo--stack">
+          <label class="toggle"><input type="checkbox" checked><span class="toggle__ui" aria-hidden="true"></span><span>Kompyuter yonganda ishga tushirish</span></label>
+          <label class="toggle"><input type="checkbox"><span class="toggle__ui" aria-hidden="true"></span><span>Faqat Wi-Fi orqali</span></label>
+          <span class="chip"><span class="dot dot--live" aria-hidden="true"></span>Studio PC · ulangan</span>
+        </div>
+      </article>
+      <article class="comp__card comp__card--wide">
+        <h3>Effect cards</h3>
+        <div class="fx" role="radiogroup" aria-label="Effekt">
+          <button class="fx__card" type="button" role="radio" aria-checked="true">
+            <span class="fx__view fx--halqa" aria-hidden="true"><i></i><b></b></span>
+            <span class="fx__name">Halqa</span>
+          </button>
+          <button class="fx__card" type="button" role="radio" aria-checked="false">
+            <span class="fx__view fx--kometa" aria-hidden="true"><i></i><b></b></span>
+            <span class="fx__name">Kometa <span class="tag">Rejada</span></span>
+          </button>
+          <button class="fx__card" type="button" role="radio" aria-checked="false">
+            <span class="fx__view fx--pufak" aria-hidden="true"><i></i><b></b></span>
+            <span class="fx__name">Pufak <span class="tag">Rejada</span></span>
+          </button>
+          <button class="fx__card" type="button" role="radio" aria-checked="false">
+            <span class="fx__view fx--oddiy" aria-hidden="true"><i></i><b></b></span>
+            <span class="fx__name">Oddiy <span class="tag">Rejada</span></span>
+          </button>
+        </div>
+      </article>
+      <article class="comp__card">
+        <h3>Transfer rows</h3>
+        <ul class="rows">
+          <li class="row"><span class="thumb ph--dusk" aria-hidden="true"></span><span class="row__text"><b>IMG_2041.jpg</b><span>4,2 MB · Yuborildi</span></span><span class="state state--ok" aria-label="Yuborildi"></span></li>
+          <li class="row"><span class="thumb ph--sea" aria-hidden="true"></span><span class="row__text"><b>VID_0193.mp4</b><span class="bar" aria-label="64 foiz"><span class="bar__fill w-64"></span></span></span><span class="mono row__pct">64%</span></li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="effect" data-grade="night">
+  <div class="wrap">
+    <h2>Halqa, the default effect</h2>
+    <div class="effect">
+      <div class="effect__stage">
+        <canvas class="effect__canvas" data-halqa="studio" aria-label="Halqa effect, scrubbable"></canvas>
+      </div>
+      <div class="effect__side">
+        <ol class="phases" aria-label="Halqa timeline">
+          <li data-phase="open"><b>Open</b><span class="mono">0–250 ms</span><span>The portal grows with a small overshoot.</span></li>
+          <li data-phase="fly"><b>Fly</b><span class="mono">105–650 ms</span><span>The photo follows your throw: speed sets depth, angle bends the path.</span></li>
+          <li data-phase="land"><b>Land</b><span class="mono">650 ms →</span><span>A spring settles scale and tilt.</span></li>
+          <li data-phase="hold"><b>Hold</b><span class="mono">1,4 s</span><span>The photo rests where it landed.</span></li>
+          <li data-phase="dock"><b>Dock</b><span class="mono">450 ms</span><span>It shrinks into the notification corner.</span></li>
+        </ol>
+        <div class="scrub">
+          <button class="btn btn--secondary btn--sm" type="button" data-halqa-toggle="studio" aria-pressed="false">Pause</button>
+          <input type="range" min="0" max="1000" value="0" step="1" data-halqa-scrub="studio" aria-label="Timeline position">
+        </div>
+        <p class="measure-note">Measured on an Intel UHD 730 at 2560×1440: 60 fps, first frame under 11 ms, keyboard focus never taken.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec sec--alt sec--tall" id="screens">
+  <div class="wrap">
+    <h2>Android screens, first release</h2>
+    <div class="phones">
+
+      <figure class="screen">
+        <h3 class="screen__id"><span class="mono">A1</span> Onboarding</h3>
+        <div class="phone">
+          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
+          <div class="phone__body p-onboard">
+            <svg class="p-onboard__mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>
+            <p class="p-title">Rasmlarni kompyuterga otib yuboring</p>
+            <p class="p-sub">Uchta ruxsat kerak. Hech narsa internetga chiqmaydi.</p>
+            <ul class="perm">
+              <li><span class="perm__icon pi-photo" aria-hidden="true"></span><span><b>Rasmlar</b>Galereyadan tanlash uchun</span></li>
+              <li><span class="perm__icon pi-wifi" aria-hidden="true"></span><span><b>Yaqin Wi-Fi qurilmalar</b>Kompyuterni topish uchun</span></li>
+              <li><span class="perm__icon pi-bell" aria-hidden="true"></span><span><b>Bildirishnomalar</b>Yuborish holatini koʻrsatish uchun</span></li>
+            </ul>
+            <span class="btn btn--primary btn--block">Ruxsat berish</span>
+          </div>
+        </div>
+      </figure>
+
+      <figure class="screen">
+        <h3 class="screen__id"><span class="mono">A2</span> Pair by QR</h3>
+        <div class="phone phone--night">
+          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
+          <div class="phone__body p-scan">
+            <p class="p-title">Kompyuterdagi QR kodni skanerlang</p>
+            <div class="scan" aria-hidden="true"><span class="scan__qr qr"></span><span class="scan__line"></span></div>
+            <p class="p-sub">Kompyuterda: Vutric → Telefonni ulash</p>
+            <span class="link link--inv">IP manzil orqali ulanish</span>
+          </div>
+        </div>
+      </figure>
+
+      <figure class="screen">
+        <h3 class="screen__id"><span class="mono">A3</span> Home</h3>
+        <div class="phone">
+          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
+          <div class="phone__body p-home">
+            <span class="chip chip--sm"><span class="dot dot--live" aria-hidden="true"></span>Studio PC · ulangan</span>
+            <div class="tabs" aria-hidden="true"><span class="is-on">Rasmlar</span><span>Videolar</span><span>Fayllar</span><span>Clipboard</span></div>
+            <div class="grid9" aria-hidden="true">
+              <span class="ph--dusk is-sel"></span><span class="ph--sea"></span><span class="ph--leaf"></span>
+              <span class="ph--city"></span><span class="ph--sand"></span><span class="ph--dusk2"></span>
+              <span class="ph--sea2"></span><span class="ph--leaf2"></span><span class="ph--city2"></span>
+              <span class="ph--sand2"></span><span class="ph--dusk"></span><span class="ph--sea"></span>
+            </div>
+            <div class="bnav" aria-hidden="true"><span class="is-on"><i class="bi bi-grid"></i>Tanlash</span><span><i class="bi bi-clock"></i>Tarix</span><span><i class="bi bi-device"></i>Qurilmalar</span></div>
+          </div>
+        </div>
+      </figure>
+
+      <figure class="screen">
+        <h3 class="screen__id"><span class="mono">A4</span> Share sheet</h3>
+        <div class="phone">
+          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
+          <div class="phone__body p-share">
+            <div class="p-share__photo ph--leaf" aria-hidden="true"></div>
+            <div class="sheet">
+              <span class="sheet__grab" aria-hidden="true"></span>
+              <p class="sheet__title">1 ta rasm ulashish</p>
+              <div class="apps" aria-hidden="true">
+                <span class="app app--vutric"><i><svg viewBox="0 0 32 32"><use href="#mark"/></svg></i>Vutric</span>
+                <span class="app"><i class="app__g a1"></i>Xabarlar</span>
+                <span class="app"><i class="app__g a2"></i>Pochta</span>
+                <span class="app"><i class="app__g a3"></i>Disk</span>
+              </div>
+              <p class="sheet__hint">Vutric → Studio PC ga otish</p>
+            </div>
+          </div>
+        </div>
+      </figure>
+
+      <figure class="screen">
+        <h3 class="screen__id"><span class="mono">A5</span> Fling</h3>
+        <div class="phone phone--night">
+          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
+          <div class="phone__body p-fling">
+            <span class="chip chip--sm chip--inv"><span class="dot dot--live" aria-hidden="true"></span>Studio PC</span>
+            <div class="fling" aria-hidden="true">
+              <span class="fling__echo e3"></span><span class="fling__echo e2"></span><span class="fling__echo e1"></span>
+              <span class="fling__card ph--dusk"></span>
+            </div>
+            <p class="p-hint"><span class="up" aria-hidden="true"></span>Yuborish uchun yuqoriga suring</p>
+            <span class="status"><span class="state state--ok" aria-hidden="true"></span>Yuborildi</span>
+          </div>
+        </div>
+      </figure>
+
+      <figure class="screen">
+        <h3 class="screen__id"><span class="mono">A6</span> History</h3>
+        <div class="phone">
+          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
+          <div class="phone__body p-hist">
+            <p class="p-title p-title--left">Tarix</p>
+            <ul class="rows rows--phone">
+              <li class="row"><span class="thumb ph--dusk" aria-hidden="true"></span><span class="row__text"><b>IMG_2041.jpg</b><span>Studio PC · hozir</span></span><span class="state state--ok" aria-label="Yuborildi"></span></li>
+              <li class="row"><span class="thumb ph--sea" aria-hidden="true"></span><span class="row__text"><b>VID_0193.mp4</b><span class="bar" aria-label="64 foiz"><span class="bar__fill w-64"></span></span></span><span class="mono row__pct">64%</span></li>
+              <li class="row"><span class="thumb ph--city" aria-hidden="true"></span><span class="row__text"><b>chek.pdf</b><span class="row__err">Uzildi</span></span><span class="row__act">Qayta</span></li>
+              <li class="row"><span class="thumb ph--leaf" aria-hidden="true"></span><span class="row__text"><b>IMG_2038.jpg</b><span>Studio PC · 12:04</span></span><span class="state state--ok" aria-label="Yuborildi"></span></li>
+              <li class="row"><span class="thumb ph--sand" aria-hidden="true"></span><span class="row__text"><b>IMG_2031.jpg</b><span>Studio PC · kecha</span></span><span class="state state--ok" aria-label="Yuborildi"></span></li>
+            </ul>
+          </div>
+        </div>
+      </figure>
+
+    </div>
+  </div>
+</section>
+
+<section class="sec sec--tall" id="desktop">
+  <div class="wrap">
+    <h2>Windows and Ubuntu screens</h2>
+    <div class="desk">
+
+      <figure class="screen screen--w1">
+        <h3 class="screen__id"><span class="mono">W1</span> Pair a phone</h3>
+        <div class="win">
+          <div class="win__bar" aria-hidden="true"><span class="win__title"><svg viewBox="0 0 32 32"><use href="#mark"/></svg>Vutric</span><span class="win__ctl"><i></i><i></i><i></i></span></div>
+          <div class="win__body w-pair">
+            <div class="w-pair__qr qr" aria-hidden="true"></div>
+            <div class="w-pair__text">
+              <p class="w-title">Telefonni ulash</p>
+              <ol class="steps">
+                <li><span>Telefonda Vutric ilovasini oching</span></li>
+                <li><span>Bu QR kodni skanerlang</span></li>
+                <li><span>Ikkala qurilmada bir xil soʻz chiqadi: <b>qamish</b></span></li>
+              </ol>
+              <p class="w-meta">Kompyuter nomi: <b>Studio PC</b></p>
+            </div>
+          </div>
+        </div>
+      </figure>
+
+      <figure class="screen screen--w3">
+        <h3 class="screen__id"><span class="mono">W3</span> Arrival toast</h3>
+        <div class="toast">
+          <span class="toast__thumb ph--dusk" aria-hidden="true"></span>
+          <span class="toast__text"><span class="toast__app"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>Vutric</span><b>Pixel 8 dan rasm keldi</b><span>IMG_2041.jpg · 4,2 MB</span></span>
+          <span class="toast__actions"><span class="btn btn--primary btn--sm">Ochish</span><span class="btn btn--secondary btn--sm">Papkada koʻrsatish</span></span>
+        </div>
+        <h3 class="screen__id"><span class="mono">U4</span> GNOME notification</h3>
+        <div class="gnote">
+          <span class="gnote__icon"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg></span>
+          <span class="gnote__text"><b>Pixel 8 dan rasm keldi</b><span>IMG_2041.jpg · Rasmlar/Vutric</span></span>
+          <span class="gnote__time">hozir</span>
+        </div>
+      </figure>
+
+      <figure class="screen screen--w4">
+        <h3 class="screen__id"><span class="mono">W4</span> Settings</h3>
+        <div class="win">
+          <div class="win__bar" aria-hidden="true"><span class="win__title"><svg viewBox="0 0 32 32"><use href="#mark"/></svg>Vutric · Sozlamalar</span><span class="win__ctl"><i></i><i></i><i></i></span></div>
+          <div class="win__body w-set">
+            <p class="t-label">Effekt</p>
+            <div class="fx fx--mini" aria-hidden="true">
+              <span class="fx__card" aria-checked="true"><span class="fx__view fx--halqa"><i></i><b></b></span><span class="fx__name">Halqa</span></span>
+              <span class="fx__card"><span class="fx__view fx--kometa"><i></i><b></b></span><span class="fx__name">Kometa</span></span>
+              <span class="fx__card"><span class="fx__view fx--pufak"><i></i><b></b></span><span class="fx__name">Pufak</span></span>
+              <span class="fx__card"><span class="fx__view fx--oddiy"><i></i><b></b></span><span class="fx__name">Oddiy</span></span>
+            </div>
+            <div class="set">
+              <div class="set__row"><span>Yuborish zonasi</span><span class="seg seg--sm" aria-hidden="true"><span>Chap</span><span class="is-on">Oʻng</span><span>Yuqori</span></span></div>
+              <div class="set__row"><span>Davomiylik</span><span class="fakeslide" aria-hidden="true"><i></i><b class="mono">1,0 s</b></span></div>
+              <div class="set__row"><span>Saqlash papkasi</span><span class="path mono">Rasmlar\Vutric</span></div>
+              <div class="set__row"><span>Kompyuter yonganda ishga tushirish</span><span class="toggle__ui is-on" aria-hidden="true"></span></div>
+            </div>
+          </div>
+        </div>
+      </figure>
+
+      <figure class="screen screen--u1">
+        <h3 class="screen__id"><span class="mono">U1</span> Ubuntu first run</h3>
+        <div class="win win--gnome">
+          <div class="win__bar" aria-hidden="true"><span></span><span class="win__title">Vutric</span><span class="win__ctl win__ctl--gnome"><i></i></span></div>
+          <div class="win__body u-first">
+            <p class="w-title">Deyarli tayyor</p>
+            <ul class="check">
+              <li class="is-done"><span class="state state--ok" aria-hidden="true"></span>Vutric oʻrnatildi</li>
+              <li><span class="state state--todo" aria-hidden="true"></span><span>GNOME kengaytmasini yoqing: effekt shu orqali chiziladi</span><span class="btn btn--primary btn--sm">Yoqish</span></li>
+              <li class="is-done"><span class="state state--ok" aria-hidden="true"></span>Fon xizmati ishlayapti</li>
+            </ul>
+          </div>
+        </div>
+      </figure>
+
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot__row">
+    <a class="brand" href="#top"><svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg><span>Vutric</span></a>
+    <p>Open source under Apache-2.0 · <a class="link" href="https://github.com/wonmortech/vutric">wonmortech/vutric</a> · A <a class="link" href="https://wonmor.io">Wonmor</a> project · Geist fonts under the <a class="link" href="assets/fonts/OFL.txt">SIL Open Font License</a></p>
+  </div>
+</footer>
+
+<svg class="defs" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="mark-rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2F6BFF"/>
+      <stop offset="1" stop-color="#F4D9A6"/>
+    </linearGradient>
+    <symbol id="mark" viewBox="0 0 32 32">
+      <ellipse cx="21" cy="16" rx="7" ry="13" fill="none" stroke="url(#mark-rim)" stroke-width="3"/>
+      <rect x="3" y="10" width="13" height="12" rx="3" fill="currentColor" transform="rotate(-8 9.5 16)"/>
+    </symbol>
+  </defs>
+</svg>
+</body>
+</html>
