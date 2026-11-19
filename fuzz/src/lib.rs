@@ -664,6 +664,20 @@ pub fn quickshare_frames(data: &[u8]) {
     {
         assert!(!n.is_empty() && !n.chars().any(char::is_control));
     }
+    // ADR-0076: endpoint-info records and the QR invite check on a hostile receiver's info.
+    let total: usize = endpoint::records(data)
+        .iter()
+        .map(|(_, v)| v.len() + 2)
+        .sum();
+    assert!(total <= data.len());
+    let invite = vutric_compat_quickshare::wake::QrInvite::from_key(vec![0, 0, 2, 9, 9, 9]);
+    if let Some(m) = invite.matches(data) {
+        assert!(
+            m.name
+                .is_none_or(|n| !n.is_empty() && !n.chars().any(char::is_control))
+        );
+    }
+    let _ = vutric_compat_quickshare::wake::is_wake(data);
 }
 
 /// A hostile `ClientInit`, and hostile secure messages on an established channel: refused, never a panic.

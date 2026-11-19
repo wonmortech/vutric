@@ -68,6 +68,36 @@ pub fn info(device: Device, name: &str) -> Vec<u8> {
     b
 }
 
+/// The TLV records after the name (ADR-0076): `(type, value)`; type 1 is the QR answer, 2 the vendor. A record
+/// that runs past the end stops the list.
+#[must_use]
+pub fn records(b: &[u8]) -> Vec<(u8, &[u8])> {
+    let Some((&first, rest)) = b.split_first() else {
+        return Vec::new();
+    };
+    let Some(mut rest) = rest.get(16..) else {
+        return Vec::new();
+    };
+    if (first >> 4) & 1 == 0 {
+        let Some((&n, after)) = rest.split_first() else {
+            return Vec::new();
+        };
+        let Some(after) = after.get(usize::from(n)..) else {
+            return Vec::new();
+        };
+        rest = after;
+    }
+    let mut out = Vec::new();
+    while let [kind, len, tail @ ..] = rest {
+        let Some(value) = tail.get(..usize::from(*len)) else {
+            break;
+        };
+        out.push((*kind, value));
+        rest = &tail[usize::from(*len)..];
+    }
+    out
+}
+
 /// The TXT `n` value.
 #[must_use]
 pub fn txt(info: &[u8]) -> String {
