@@ -12,6 +12,8 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.wonmor.vutric_spike.w6.ShareShortcuts
+import io.wonmor.vutric_spike.w6.W6
 import java.util.concurrent.Executors
 
 /**
@@ -63,6 +65,7 @@ class MainActivity : FlutterActivity() {
         channel = MethodChannel(messenger, "vutric/android").apply { setMethodCallHandler(::onCall) }
         CompanionPrefs.sink = { event -> runOnUiThread { channel?.invokeMethod("event", event) } }
         ForeignDiscovery.sink = { event -> runOnUiThread { channel?.invokeMethod("event", event) } }
+        W6.sink = { event -> runOnUiThread { channel?.invokeMethod("event", event) } }
     }
 
     private fun onCall(call: MethodCall, result: MethodChannel.Result) {
@@ -175,7 +178,8 @@ class MainActivity : FlutterActivity() {
                 val apps = runCatching { launcherApps() }.getOrDefault(emptyList())
                 runOnUiThread { result.success(apps) }
             }
-            else -> result.notImplemented()
+            // W6 modules (ADR-0130): every `w6.*` method.
+            else -> if (!W6.handle(this, call, result)) result.notImplemented()
         }
     }
 
@@ -206,7 +210,7 @@ class MainActivity : FlutterActivity() {
             intent.action == ACTION_RECEIVE -> deliver(mapOf("kind" to "receive"))
             ShareEntry.isShare(intent) -> io.execute {
                 val files = ShareEntry.files(applicationContext, intent)
-                runOnUiThread { deliver(if (files.isEmpty()) null else mapOf("kind" to "share", "files" to files)) }
+                runOnUiThread { deliver(if (files.isEmpty()) null else mapOf("kind" to "share", "files" to files, "device" to (ShareShortcuts.deviceOf(intent) ?: ""))) }
             }
             else -> deliver(null)
         }
@@ -242,6 +246,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (W6.onPermissionsResult(requestCode)) return
         when (requestCode) {
             REQUEST_HOTSPOT -> {
                 val r = pendingHotspot ?: return
@@ -278,6 +283,7 @@ class MainActivity : FlutterActivity() {
         CompanionPrefs.sink = null
         ForeignDiscovery.sink = null
         ForeignDiscovery.stop()
+        W6.onDestroy(this)
         if (isFinishing) CompatHost.close(applicationContext)
         lock?.release()
         lock = null

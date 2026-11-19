@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import io.wonmor.vutric_spike.w6.UserTransferJob
 
 /**
  * TransferJob (ADR-0009 part 2, backlog A4): keeps a big transfer going with the app in the background or the
@@ -72,7 +73,7 @@ class TransferService : Service() {
         @Volatile private var running = false
 
         /** Whether a transfer still holds the foreground service (MainActivity keeps the hotspot up for it). */
-        val isRunning: Boolean get() = running
+        val isRunning: Boolean get() = running || UserTransferJob.isRunning
 
         /**
          * Starts the service (the first call, made while the app is in front) or updates its notification.
@@ -80,6 +81,8 @@ class TransferService : Service() {
          * refuses a background startForegroundService, and the user may have left the app mid-transfer.
          */
         fun update(context: Context, title: String, text: String, permille: Int) {
+            // W6, F7 (ADR-0130): Android 14+ takes the transfer as a user-initiated job when it can.
+            if (!running && UserTransferJob.update(context, title, text, permille)) return
             if (running) {
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 nm.notify(ID, build(context, title, text, permille))
@@ -99,6 +102,7 @@ class TransferService : Service() {
         }
 
         fun stop(context: Context) {
+            UserTransferJob.stop(context)
             if (!running) return
             running = false
             context.startService(Intent(context, TransferService::class.java).setAction(ACTION_STOP))

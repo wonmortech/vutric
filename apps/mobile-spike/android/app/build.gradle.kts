@@ -36,6 +36,19 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // W6 (ADR-0130): Robolectric tests read the merged resources (w6_ strings, share targets).
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+}
+
+// W6 (ADR-0130): sharing shortcuts per paired device (F2) and the chooser bridge for Android 7-9; unit tests.
+dependencies {
+    implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.sharetarget:sharetarget:1.2.0")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.16")
 }
 
 kotlin {
