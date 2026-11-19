@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let link = DaemonLink()
     private let notifier = Notifier()
     private let compat = CompatLink()
+    private let windows = WindowLink()
     private var history = History.load()
     private var item: NSStatusItem!
     private var state: DaemonLink.State = .starting
@@ -40,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationWillTerminate(_: Notification) {
         link.stopHelper()
         compat.stop()
+        windows.stop()
     }
 
     func application(_: NSApplication, open urls: [URL]) {
@@ -73,8 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let login = entry("menu.login", #selector(toggleLogin))
         login.state = LoginItem.isOn ? .on : .off
         menu.addItem(login)
-        let settings = entry("menu.settings", nil)
-        settings.toolTip = t("menu.settings.later")
+        // The settings window is W2's Slint app (ADR-0121); until it is bundled the item explains why it is off.
+        let settings = entry("menu.settings", WindowLink.isBundled ? #selector(openSettings) : nil)
+        if !WindowLink.isBundled { settings.toolTip = t("menu.settings.later") }
         menu.addItem(settings)
         menu.addItem(.separator())
         menu.addItem(entry("menu.quit", #selector(quit)))
@@ -153,10 +156,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             i.toolTip = e.path
             sub.addItem(i)
         }
-        if !shown.isEmpty {
-            sub.addItem(.separator())
-            sub.addItem(entry("menu.history.clear", #selector(clearHistory)))
-        }
+        if !shown.isEmpty || WindowLink.isBundled { sub.addItem(.separator()) }
+        if WindowLink.isBundled { sub.addItem(entry("menu.history.all", #selector(openHistory))) }
+        if !shown.isEmpty { sub.addItem(entry("menu.history.clear", #selector(clearHistory))) }
         parent.submenu = sub
         return parent
     }
@@ -164,6 +166,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func revealHistory(_ sender: NSMenuItem) {
         guard let path = sender.representedObject as? String else { return }
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    @objc private func openSettings() {
+        if !windows.open(.settings) { notifier.failed(reason: t("menu.settings.failed")) }
+    }
+
+    @objc private func openHistory() {
+        if !windows.open(.history) { notifier.failed(reason: t("menu.settings.failed")) }
     }
 
     @objc private func clearHistory() {

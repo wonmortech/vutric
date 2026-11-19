@@ -103,3 +103,24 @@ New `packaging/macos/check-entitlements.sh` runs in the app job. It reads the Bo
 constant or move its file, the script's `sed` pattern must follow, or the check fails (on purpose).
 Owner-questions row proposed (not edited): "Mac App Store distribution: yes/no? A yes means an XPC split of the
 helpers (ADR-0120 §1)."
+
+### Slint desktop windows on macOS, and history/settings through W2's windows (ADR-0121)
+
+Packaging:
+- `build-app.sh` bundles `crates/vutric-app` (W2) as `Contents/MacOS/vutric-app` once that crate exists.
+- `WINDOWS_SPIKE=1` bundles W2's M1 Slint spike instead. It is TEMP and opt-in, never in CI.
+
+Agent (`WindowLink.swift`):
+- "Sozlamalar…" runs `vutric-app --page settings`.
+- "Butun tarix…" runs `--page history`.
+- Both pass `VUTRIC_IPC` and `SLINT_BACKEND=winit-software`.
+- A second open brings the running window forward.
+- New keys: `menu.history.all` and `menu.settings.failed`; `menu.settings` now ends with an ellipsis. The catalog
+  has 54 keys.
+
+**needs-w2** (not filed as an issue in this mode; for the coordinator):
+1. `vutric-app` CLI `--page settings|history|devices` plus env `VUTRIC_IPC`.
+2. macOS: accessory activation policy and activate on open.
+   - With winit 0.30 this is `EventLoopBuilderExtMacOS::with_activation_policy(ActivationPolicy::Accessory)`.
+   - How Slint 1.19 exposes the builder (`BackendSelector` with a winit event-loop builder hook) is unverified.
+3. Single-instance page switching.

@@ -8,6 +8,12 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Recently received" } }
       }
     },
+    "menu.history.all" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Butun tarix…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "All history…" } }
+      }
+    },
     "menu.history.none" : {
       "localizations" : {
         "uz" : { "stringUnit" : { "state" : "translated", "value" : "Hali hech narsa kelmadi" } },
@@ -190,8 +196,14 @@
     },
     "menu.settings" : {
       "localizations" : {
-        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Sozlamalar" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings" } }
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Sozlamalar…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings…" } }
+      }
+    },
+    "menu.settings.failed" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Oyna ochilmadi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The window did not open" } }
       }
     },
     "menu.settings.later" : {
