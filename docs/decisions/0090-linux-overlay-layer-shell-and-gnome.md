@@ -1,7 +1,7 @@
 # ADR-0090: The Linux overlay: layer-shell where it exists, a GNOME Shell extension where it does not, and the GPU in its own process
 
-- Status: accepted for Phase 2. Spike 0.3 is built and runs in CI under headless sway; nothing is verified on a real
-  Linux desktop yet (checklist: [`../checklists/linux-desktop.md`](../checklists/linux-desktop.md)).
+- Status: accepted for Phase 2. Spike 0.3 is built and runs in CI under headless sway and headless GNOME Shell 46
+  (with the limits in "CI limits"); nothing is verified on a real Linux desktop yet (checklist: [`../checklists/linux-desktop.md`](../checklists/linux-desktop.md)).
 - Date: 2026-11-18
 - Stream: W4 · Linux desktop. Backlog: D10, spike 0.3.
 - Builds on: [ADR-0004](0004-windows-overlay-composition.md) (what the overlay must do),
@@ -136,11 +136,19 @@ and the Linux branch of the daemon are W2 files, filed as a `needs-w2` issue (se
 
 ## Spike 0.3 measurements
 
-Only CI numbers exist so far: GitHub's `ubuntu-24.04` runner, headless sway (wlroots, pixman renderer), Mesa
-lavapipe (software Vulkan). They prove the protocol path (layer surface configured, wgpu surface created with a
-transparent alpha mode, frames presented, card surfaces shown and replaced) but say nothing about real GPU frame
-pacing. The numbers are in the `linux-overlay` workflow artifact and in
-[`../reports/phase-0.3-linux-overlay.md`](../reports/phase-0.3-linux-overlay.md).
+Only CI numbers exist so far: GitHub's `ubuntu-24.04` runner, headless sway (wlroots, pixman renderer) and headless
+GNOME Shell 46.0 (Mutter 46.2, virtual monitor), Mesa llvmpipe (software Vulkan). They prove the protocol paths but
+say nothing about real GPU frame pacing. Numbers: [`../reports/phase-0.3-linux-overlay.md`](../reports/phase-0.3-linux-overlay.md)
+and the `linux-overlay-sway` / `linux-overlay-gnome` workflow artifacts.
+
+### CI limits (what CI cannot verify)
+
+| Path | Verified in CI | Not verifiable in CI |
+|---|---|---|
+| layer-shell (sway headless) | layer surface configured, transparent wgpu surface, 5 + 3 effects at ~59 fps with 0 hitches, 50 cards, the daemon protocol | focus, click-through, transparency as seen, real GPUs |
+| GNOME (Shell 46 headless) | extension loads; `Ping`, `ShowCard`, `HideCard`, `SetStatus`; the surface plays effects as a plain Mutter client; the extension launches it as a trusted client, `Ready` + `Warmed` at the full 1920×1080 monitor; the window is adopted (`make_dock` + `hide_from_window_list` on 46) | **effects after the dock retype**: headless Mutter (surfaceless renderer, no GPU) sends the dock window no frame callbacks, so the first `Play` times out after 30 s. Whether a real GNOME 46/50 session paces a dock window normally is checklist rows 1, 5 and 9; if it does not, the fallback is to keep the window `NORMAL` + above + skip-taskbar and only hide it from the window list. GNOME 47–50 APIs (`new_subprocess`, `Window.set_type`) are not on the runner at all |
+
+The GNOME job gates on the verified column and records the post-retype play count without gating on it.
 
 ## Consequences
 

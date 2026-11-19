@@ -50,19 +50,40 @@ fi
 cat "$out/ping.txt"
 gnome-extensions info "$uuid" | tee "$out/extension-info.txt" || true
 
-# 1. The surface as an ordinary Wayland client of Mutter (no extension): proves wgpu on GNOME's compositor.
+fail=0
+check() { # name, condition result (0 = ok)
+    local line="PASS  $1"
+    if [ "$2" != 0 ]; then line="FAIL  $1"; fail=1; fi
+    echo "$line" | tee -a "$out/summary.txt"
+}
+note() { echo "NOTE  $1" | tee -a "$out/summary.txt"; }
+check "extension loaded, Ping answered" 0
+
+# 1. The surface as an ordinary Wayland client of Mutter (no extension): wgpu on GNOME's compositor.
 direct=0
 WAYLAND_DISPLAY=wayland-0 "$bin/vutric-surface" --backend gnome --self-test 3 --cards 0 \
     --out "$out/self-test.json" > "$out/self-test.txt" 2>&1 || direct=$?
 cat "$out/self-test.txt"
-echo "direct self-test exit: $direct"
+check "surface as a plain Mutter client plays 3 effects (self-test)" "$direct"
+
 # 2. Launched by the extension as a trusted client and driven over the daemon protocol.
-"$bin/examples/surface_driver" --gnome --runs 3 --out "$out/driver.json" || {
-    sleep 1
-    echo "--- surface stderr"; ls -la "$out"; cat "$out/surface.log" 2>/dev/null || true
-    echo "--- Vutric lines in the shell log"; grep -F 'Vutric' "$out/gnome-shell.log" || true
-    echo "--- shell log (tail)"; tail -n 40 "$out/gnome-shell.log"
-    exit 1
-}
-grep -F 'Vutric: surface window adopted' "$out/gnome-shell.log" | tee "$out/adopted.txt"
-echo "GNOME extension + surface: OK"
+"$bin/examples/surface_driver" --gnome --runs 3 --out "$out/driver.json" || true
+sleep 1
+cat "$out/driver.json"
+has() { jq -e "$1" "$out/driver.json" > /dev/null; echo $?; }
+check "ShowCard / HideCard / SetStatus over D-Bus" "$(has '.card != null')"
+check "extension launched the surface, Ready received" "$(has '.ready | test("Ready")')"
+check "surface warmed (GPU up) inside the extension-launched window" "$(has '.warmed | test("Warmed")')"
+adopted=0
+grep -F 'Vutric: surface window adopted' "$out/gnome-shell.log" > "$out/adopted.txt" || adopted=$?
+check "extension adopted the window (dock, hidden from window list)" "$adopted"
+
+# 3. Frames after the dock retype. Headless Mutter (virtual monitor, surfaceless renderer, no GPU) sends the dock
+#    window no frame callbacks, so effects time out there; whether a real GNOME session does is checklist row 1/5
+#    (ADR-0090 "CI limits"). Recorded, not gated.
+played=$(jq '.played | length' "$out/driver.json")
+note "effects played after the dock retype on headless Mutter: $played of 3 (not gated; needs a real GNOME session)"
+grep -F 'Vutric' "$out/gnome-shell.log" || true
+echo "--- surface stderr"; cat "$out/surface.log" 2>/dev/null || true
+[ "$fail" = 0 ] || { tail -n 40 "$out/gnome-shell.log"; exit 1; }
+echo "GNOME extension + surface: all gated checks passed"
