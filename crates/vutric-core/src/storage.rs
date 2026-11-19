@@ -386,6 +386,8 @@ pub struct Settings {
     pub route: crate::route::Picker,
     /// Encrypted cloud handoff, off by default (backlog R8, ADR-0072).
     pub cloud: crate::cloud::CloudSettings,
+    /// Opt-in anonymous route counts, off by default (backlog M2, ADR-0077).
+    pub telemetry: crate::telemetry::TelemetrySettings,
 }
 
 /// One foreign protocol adapter.
@@ -500,6 +502,7 @@ impl Default for Settings {
             told_missing_folder: None,
             route: crate::route::Picker::Auto,
             cloud: crate::cloud::CloudSettings::default(),
+            telemetry: crate::telemetry::TelemetrySettings::default(),
         }
     }
 }
@@ -815,6 +818,10 @@ mod tests {
         assert!(
             !old.cloud.enabled,
             "cloud handoff is off unless the user turns it on"
+        );
+        assert!(
+            !old.telemetry.enabled,
+            "telemetry is off unless the user turns it on"
         );
 
         for bad in [

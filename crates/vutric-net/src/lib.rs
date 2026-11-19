@@ -27,6 +27,7 @@ pub mod lan;
 pub mod preview;
 pub mod probe;
 pub mod settings;
+pub mod telemetry;
 pub mod transfer;
 pub mod trust;
 pub mod usb;

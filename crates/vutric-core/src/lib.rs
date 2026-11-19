@@ -25,6 +25,8 @@ pub mod route;
 pub mod sas;
 pub mod sound;
 pub mod storage;
+pub mod telemetry;
+pub mod telemetry;
 pub mod trust;
 
 pub use effect::{EffectId, SendZone};

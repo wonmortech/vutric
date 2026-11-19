@@ -7,6 +7,7 @@ From 2026-11-19, W3 does not edit the shared docs (`backlog.md`, `workstreams.md
 
 | Item | State | Evidence |
 |---|---|---|
+| M2 direct vs relay share | [~] | ADR-0077: `vutric_core::telemetry` (off by default, `Tally` per UTC day by last badge, bucketed counts, report = `{v, day, platform, tally}` only), `Settings.telemetry`, `vutric_net::telemetry::send` + `jitter`; tests `telemetry::tests`, `tests/telemetry_off.rs`; no collector yet (owner question) |
 | C8 adapter rules audit | [~] | Audit below (2026-11-19, from the code on `w3/net-4`): rules 1, 5 and 7 hold for all four adapters; rule 2's pinned shortcut is stored but not wired (every offer is asked, which is the safe side); rule 4 is a separate low-privilege process, not yet an OS sandbox; rule 6 only magic-wormhole runs against the real app in CI (M5 for the rest) |
 | C3 Quick Share sending to Android | [~] | ADR-0076: `vutric_compat_quickshare::wake`: QR invite (P-256 key, HKDF token, hidden-name AES-GCM, `endpoint::records`, mDNS `browse`, `send_via_qr`) for any desktop; BLE wake-up bytes `0xFE2C` for W6/W2 advertisers; tests `wake::tests`, fuzz `quickshare_frames` extended; no real phone yet (M5) |
 | F15 phone as mouse and keyboard | [~] | ADR-0075: `Message::Pointer` (wire 17), `vutric_core::pointer` (bounded fields, trusted only, `PointerLimit` with releases always passing, coalescing), `Session::pointer`; tests `pointer::tests`; injection W2, UI W1 |
@@ -44,6 +45,8 @@ Read from the code, not from the ADRs. "Holds" means the evidence named is in th
   bucket (we pay storage and must handle abuse reports even though we only see ciphertext). Default meanwhile: (a),
   and the feature stays off until the user turns it on.
 
+- (W3) 2026-11-19 · Route telemetry (ADR-0077) needs a collector: (a) a tiny endpoint on the relay host that keeps only daily sums and never logs IPs (what the ADR assumes), (b) a hosted privacy-first analytics service, or (c) none, keep M2 off for phase 1. Default meanwhile: (c), the endpoint stays empty, so nothing can be sent.
+
 ## Cross-stream needs
 
 - **needs-w2 (F15, ADR-0075):** inject `Message::Pointer` on the desktop: a switch "Telefondan boshqarish" off by
@@ -54,4 +57,7 @@ Read from the code, not from the ADRs. "Holds" means the evidence named is in th
   QR code, then `wake::send_via_qr`. **needs-w6:** optional BLE advertiser of `wake::wake_service_data_random()`
   under 16-bit UUID `0xFE2C`. **needs-w2 (Windows):** check whether `BluetoothLEAdvertisementPublisher` accepts that
   service data. No shim needed: nothing calls it yet.
+- **needs-w1 / needs-w2 (M2, ADR-0077):** a "Anonim statistika yuborish" switch, off by default, with the exact
+  report shown; count each ended session with `Tally::record(session.badge(), started_relayed)` into a `Day` kept
+  in a small file; on start, `Day::roll(today)` and send the finished day after `telemetry::jitter(6 h)`.
 - **needs-w1 (F15):** a touchpad + keyboard screen sending `Session::pointer` at about 120 Hz, moves coalesced.
