@@ -24,11 +24,12 @@ pub enum Kind {
     Oddiy,
     Kometa,
     Pufak,
+    Stack,
 }
 
 impl Kind {
     /// Every kind, in pipeline order (`kind as usize` indexes it).
-    pub const ALL: [Self; 3] = [Self::Oddiy, Self::Kometa, Self::Pufak];
+    pub const ALL: [Self; 4] = [Self::Oddiy, Self::Kometa, Self::Pufak, Self::Stack];
 
     /// The effect's own WGSL (without the prelude).
     #[must_use]
@@ -37,13 +38,14 @@ impl Kind {
             Self::Oddiy => include_str!("oddiy.wgsl"),
             Self::Kometa => include_str!("kometa.wgsl"),
             Self::Pufak => include_str!("pufak.wgsl"),
+            Self::Stack => include_str!("stack.wgsl"),
         }
     }
 
     /// Drawn over what is already in the target instead of clearing it.
     #[must_use]
     pub const fn is_overlay(self) -> bool {
-        false
+        matches!(self, Self::Stack)
     }
 
     const fn label(self) -> &'static str {
@@ -51,6 +53,7 @@ impl Kind {
             Self::Oddiy => "vutric.oddiy",
             Self::Kometa => "vutric.kometa",
             Self::Pufak => "vutric.pufak",
+            Self::Stack => "vutric.stack",
         }
     }
 }

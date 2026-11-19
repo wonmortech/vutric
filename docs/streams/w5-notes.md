@@ -33,7 +33,7 @@ struct Run { fling: Fling, started: Instant, notify: Option<oneshot::Sender<Inst
 let setup = Setup { cfg, screen: gpu.screen(), zone, gesture: fling.gesture, image_aspect: aspect };
 let reduce = host_reduce_motion(); // Windows: SPI_GETCLIENTAREAANIMATION == FALSE; macOS: vutric_host_mac::reduce_motion()
 let played = if reduce { Fling::still(setup) } else { Fling::new(self.prefs.effect, setup) };
-// many files: `.with_files(total_files)` once E5 is in (see below)
+// many files: `.with_files(total_files)` (E5); the daemon knows the count from `Message::Offer::total_files`
 
 // draw(): replaces run.halqa.* with run.fling.* ; `gpu.draw(&sample, t)`
 
@@ -62,3 +62,15 @@ thin-film rim (Signal to Glow), two highlights and a faint night-blue body. On l
 of `travel`: the skin becomes an expanding ring, 12 droplets fall away, and the card springs to full size.
 
 GPU cost: still one texture sample per pixel; the refraction only moves the coordinate.
+
+### E5 many files (`effects/stack.rs`, `stack.wgsl`)
+
+The first item is thrown with the chosen effect. Once it lands, up to 3 blank cards fan out behind it. Their face
+is Night mixed towards white, with a Glow rim and a soft shadow. A Signal badge with seven-segment digits sits on
+the top card's corner and shows the file count, capped at 99. The stack follows the top card's pose, so it rests,
+docks and fades with it.
+
+The stack is an overlay layer: it is blended over the main layer once per pixel, over the union of its
+rectangles, and hidden where the top card covers it.
+
+Host API: `Fling::new(effect, setup).with_files(n)`. One file adds nothing.

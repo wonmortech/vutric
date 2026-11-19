@@ -1,4 +1,5 @@
-//! The effects next to Halqa (docs/effects.md, "Planned"): Kometa, Pufak, Oddiy, plus the selection a host plays.
+//! The effects next to Halqa (docs/effects.md, "Planned"): Kometa, Pufak, Oddiy, the many-files stack,
+//! and the selection a host plays.
 //!
 //! Each effect is a pure timeline that turns a time into a [`Scene`] (unit-tested, no GPU) and one WGSL fragment
 //! shader appended to the shared prelude `common.wgsl`. Halqa keeps W2's [`crate::Renderer`]; [`Effects`] owns
@@ -13,11 +14,13 @@ mod math;
 pub mod oddiy;
 pub mod pufak;
 pub mod scene;
+pub mod stack;
 
 pub use kometa::Kometa;
 pub use oddiy::Oddiy;
 pub use pufak::Pufak;
 pub use scene::{FX_LEN, Kind, Scene, SceneRenderer};
+pub use stack::Stack;
 
 use vutric_core::{EffectId, Gesture, SendZone};
 
@@ -112,6 +115,8 @@ enum Motion {
 pub struct Fling {
     effect: EffectId,
     motion: Motion,
+    screen: Vec2,
+    stack: Option<Stack>,
 }
 
 impl Fling {
@@ -133,7 +138,12 @@ impl Fling {
                 setup.cfg,
             ),
         };
-        Self { effect, motion }
+        Self {
+            effect,
+            motion,
+            screen: setup.screen,
+            stack: None,
+        }
     }
 
     /// What plays when the OS asks for reduced motion: Oddiy with no movement at all, only a fade.
@@ -142,7 +152,17 @@ impl Fling {
         Self {
             effect: EffectId::Oddiy,
             motion: Motion::Oddiy(Oddiy::new(&setup, true)),
+            screen: setup.screen,
+            stack: None,
         }
+    }
+
+    /// A fling of `files` items (E5): the first one plays the effect, the rest appear stacked behind it with a
+    /// counter once it has landed. One file (or zero) changes nothing.
+    #[must_use]
+    pub fn with_files(mut self, files: u32) -> Self {
+        self.stack = Stack::new(files, self.landed_at(), self.screen);
+        self
     }
 
     /// The effect that actually plays.
@@ -187,10 +207,13 @@ impl Fling {
             Motion::Pufak(p) => Layer::Scene(p.sample(t)),
             Motion::Oddiy(o) => Layer::Scene(o.sample(t)),
         };
-        Sample {
+        let mut sample = Sample {
             layer,
             overlay: None,
-        }
+        };
+        let pose = sample.pose();
+        sample.overlay = self.stack.map(|s| s.sample(t, &pose));
+        sample
     }
 }
 
@@ -360,6 +383,28 @@ pub(crate) mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn many_files_stack_over_every_effect() {
+        for effect in EffectId::ALL {
+            let fling = Fling::new(effect, setup(SendZone::Right)).with_files(12);
+            assert!(fling.sample(0.0).overlay.is_some_and(|o| o.fx[0][3] == 0.0));
+            let rest = fling.sample(fling.landed_at() + 0.5);
+            let stack = rest.overlay.expect("stack layer");
+            assert_eq!(stack.kind, Kind::Stack);
+            assert_eq!(stack.fx[0][0], 12.0);
+            assert!(stack.fx[0][3] > 0.99, "{effect:?}");
+            assert_eq!(stack.card, rest.pose(), "{effect:?}: follows the top card");
+            assert_sane(&rest, &format!("{effect:?} stack"));
+        }
+        assert!(
+            Fling::new(EffectId::Halqa, setup(SendZone::Left))
+                .with_files(1)
+                .sample(1.0)
+                .overlay
+                .is_none()
+        );
     }
 
     #[test]
