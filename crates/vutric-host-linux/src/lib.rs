@@ -10,12 +10,14 @@
 //! | [`gnome`] | the GNOME Shell extension's D-Bus API | contract yes |
 //! | [`files`] | systemd user unit, Nautilus script, Dolphin menu | yes |
 //! | [`i18n`] | Linux-only strings, Uzbek default | yes |
+//! | [`fonts`] | the desktop's UI font files for the CPU cards | yes |
 //! | [`paths`] | XDG Downloads (localised), staging, identity, device name, helper binaries | yes |
 //!
 //! The `vutric-surface` binary owns the GPU and the Wayland surfaces; the daemon starts it on demand
 //! (layer-shell) or asks the GNOME extension to (GNOME), and talks to it over [`proto`].
 
 pub mod files;
+pub mod fonts;
 pub mod gnome;
 pub mod i18n;
 pub mod menu;
