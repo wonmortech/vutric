@@ -57,6 +57,22 @@ pub const CATALOG: &[(&str, &str, &str)] = &[
         "Turn on the extension",
     ),
     (
+        "linux.gnome.extension.update.title",
+        "Vutric GNOME kengaytmasini yangilang",
+        "Update the Vutric GNOME extension",
+    ),
+    (
+        "linux.gnome.extension.update.body",
+        "Kengaytma eski. Yangilanmaguncha fayllar effektsiz qabul qilinadi.",
+        "The extension is too old. Until it is updated, files arrive without the effect.",
+    ),
+    (
+        "linux.gnome.extension.relogin",
+        "Kengaytma o'rnatildi. Effekt tizimga qayta kirgandan keyin ishlaydi.",
+        "The extension is installed. The effect works after you log out and back in.",
+    ),
+    ("linux.gnome.extension.later", "Keyinroq", "Later"),
+    (
         "linux.unsupported.x11",
         "X11 seansida effekt ko'rsatilmaydi, fayllar qabul qilinadi",
         "No effect in an X11 session; files are still received",

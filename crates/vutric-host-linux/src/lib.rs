@@ -13,6 +13,7 @@
 //! | [`cards`] | the CPU card raster (ADR-0032) to the layer-shell surface or the GNOME extension | yes |
 //! | `link` | the daemon's end of the `vutric-surface` socket: start, accept, frames (Linux) | socket path yes; flow in CI via `surface_driver` |
 //! | `desktop` | overlay plan, tray (SNI or extension), autostart choice: what the daemon's Linux branch calls (Linux) | plan yes |
+//! | `onboarding` | the one-time first-run question (turn on / update the GNOME extension, no effect on X11) (Linux) | yes |
 //! | [`fonts`] | the desktop's UI font files for the CPU cards | yes |
 //! | [`paths`] | XDG Downloads (localised), staging, identity, device name, helper binaries | yes |
 //!
@@ -30,6 +31,8 @@ pub mod i18n;
 pub mod link;
 pub mod menu;
 pub mod notify;
+#[cfg(target_os = "linux")]
+pub mod onboarding;
 pub mod paths;
 pub mod proto;
 #[cfg(target_os = "linux")]

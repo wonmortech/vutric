@@ -78,6 +78,33 @@ mod imp {
         fn menu_activated(&self, id: String) -> zbus::Result<()>;
     }
 
+    /// GNOME Shell's own extension manager (what `gnome-extensions enable` calls).
+    #[zbus::proxy(
+        interface = "org.gnome.Shell.Extensions",
+        default_service = "org.gnome.Shell",
+        default_path = "/org/gnome/Shell"
+    )]
+    pub trait ShellExtensions {
+        fn enable_extension(&self, uuid: &str) -> zbus::Result<bool>;
+    }
+
+    /// Turns the Vutric extension on (the first-run question, ADR-0093 §2). `Ok(true)` once its `Ping` answers;
+    /// `Ok(false)` when Shell accepted the request but has not loaded it (installed during this session: on
+    /// Wayland that needs a new login).
+    pub async fn enable(conn: &zbus::Connection) -> zbus::Result<bool> {
+        let ext = ShellExtensionsProxy::new(conn).await?;
+        if !ext.enable_extension(super::UUID).await? {
+            return Ok(false);
+        }
+        for _ in 0..10 {
+            if matches!(probe(conn).await, super::Extension::Ready { .. }) {
+                return Ok(true);
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+        Ok(false)
+    }
+
     /// Asks the extension whether it runs; `Missing` when GNOME Shell does not have it enabled.
     pub async fn probe(conn: &zbus::Connection) -> super::Extension {
         let ping = match ShellProxy::new(conn).await {
