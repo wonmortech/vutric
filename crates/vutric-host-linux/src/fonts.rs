@@ -70,7 +70,11 @@ mod tests {
                 "/usr/share/fonts/adwaita-sans-fonts/AdwaitaSans-Regular.ttf"
             ))
         );
-        let old_ubuntu = |p: &Path| p.starts_with("/usr/share/fonts/truetype/ubuntu/Ubuntu-");
+        // Path::starts_with compares whole components; a file-name prefix needs the string.
+        let old_ubuntu = |p: &Path| {
+            p.to_string_lossy()
+                .starts_with("/usr/share/fonts/truetype/ubuntu/Ubuntu-")
+        };
         assert_eq!(
             first(REGULAR, old_ubuntu),
             Some(PathBuf::from(
