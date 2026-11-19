@@ -1,22 +1,28 @@
 //! The one-time pairing payload shown as a QR code by the desktop.
 //!
-//! Format: `vutric://pair?v=1&id=<64 hex>&n=<percent-encoded name>&a=<ip:port>,<ip:port>`
-//! Address hints let the phone connect when multicast/mDNS is blocked on the network.
+//! Format: `vutric://pair?v=<PROTOCOL_VERSION>&id=<64 hex>&n=<percent-encoded name>&a=<ip:port>,<ip:port>&r=<relay url>`
+//! Address hints let the phone connect when multicast/mDNS is blocked on the network. The optional relay URL
+//! (percent-encoded) lets it connect from another network at once; older links without it still parse, and
+//! older apps ignore it.
 
 use core::fmt::Write as _;
 use std::net::SocketAddr;
 
+use crate::sas::LinkSecret;
 use crate::{EndpointId, Error, PROTOCOL_VERSION, Result};
 
 const PREFIX: &str = "vutric://pair?";
 const MAX_ADDRS: usize = 8;
 const MAX_NAME_CHARS: usize = 64;
+const MAX_RELAY_CHARS: usize = 200;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PairingTicket {
     pub endpoint: EndpointId,
     pub device_name: String,
     pub addrs: Vec<SocketAddr>,
+    /// The device's home relay (`https://…`) when it had one: lets a device on another network reach it.
+    pub relay: Option<String>,
 }
 
 impl PairingTicket {
@@ -29,6 +35,10 @@ impl PairingTicket {
             let addrs: Vec<String> = self.addrs.iter().map(ToString::to_string).collect();
             uri.push_str(&addrs.join(","));
         }
+        if let Some(relay) = &self.relay {
+            uri.push_str("&r=");
+            percent_encode(relay, &mut uri);
+        }
         uri
     }
 
@@ -37,6 +47,7 @@ impl PairingTicket {
             .strip_prefix(PREFIX)
             .ok_or(Error::InvalidTicket("not a vutric pairing link"))?;
         let (mut version, mut endpoint, mut name, mut addrs) = (None, None, None, Vec::new());
+        let mut relay = None;
         for pair in query.split('&') {
             let (key, value) = pair
                 .split_once('=')
@@ -45,6 +56,16 @@ impl PairingTicket {
                 "v" => version = value.parse::<u16>().ok(),
                 "id" => endpoint = Some(value.parse::<EndpointId>()?),
                 "n" => name = Some(percent_decode(value)?),
+                "r" => {
+                    let url = percent_decode(value)?;
+                    if url.len() > MAX_RELAY_CHARS
+                        || !url.starts_with("https://")
+                        || url.chars().any(|c| c.is_control() || c.is_whitespace())
+                    {
+                        return Err(Error::InvalidTicket("bad relay url"));
+                    }
+                    relay = Some(url);
+                }
                 "a" => {
                     for addr in value.split(',').filter(|s| !s.is_empty()) {
                         addrs.push(
@@ -74,11 +95,36 @@ impl PairingTicket {
             endpoint: endpoint.ok_or(Error::InvalidTicket("missing endpoint id"))?,
             device_name,
             addrs,
+            relay,
         })
     }
 }
 
-fn percent_encode(input: &str, out: &mut String) {
+/// The pairing link `uri` (plain or with a hotspot) with the one-time [`LinkSecret`] added as `s=` (ADR-0064).
+/// Shown only while the pairing window is open; older apps ignore the key.
+#[must_use]
+pub fn with_secret(uri: &str, secret: &LinkSecret) -> String {
+    format!("{uri}&s={}", secret.to_hex())
+}
+
+/// The [`LinkSecret`] in a pairing link, if it carries one. A malformed or repeated `s=` is an error, so a
+/// damaged QR is never mistaken for a link without a secret.
+pub fn secret_in(uri: &str) -> Result<Option<LinkSecret>> {
+    let query = uri
+        .strip_prefix(PREFIX)
+        .ok_or(Error::InvalidTicket("not a vutric pairing link"))?;
+    let mut found = None;
+    for value in query.split('&').filter_map(|p| p.strip_prefix("s=")) {
+        if found.is_some() {
+            return Err(Error::InvalidTicket("two pairing secrets"));
+        }
+        found =
+            Some(LinkSecret::from_hex(value).ok_or(Error::InvalidTicket("bad pairing secret"))?);
+    }
+    Ok(found)
+}
+
+pub(crate) fn percent_encode(input: &str, out: &mut String) {
     for byte in input.bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
             out.push(byte as char);
@@ -88,7 +134,7 @@ fn percent_encode(input: &str, out: &mut String) {
     }
 }
 
-fn percent_decode(input: &str) -> Result<String> {
+pub(crate) fn percent_decode(input: &str) -> Result<String> {
     let bytes = input.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
@@ -119,6 +165,7 @@ mod tests {
                 "192.168.1.24:47110".parse().unwrap(),
                 "[fe80::1]:47110".parse().unwrap(),
             ],
+            relay: Some("https://euc1-1.relay.n0.iroh.link./".into()),
         }
     }
 
@@ -132,7 +179,9 @@ mod tests {
     #[test]
     fn rejects_foreign_links_and_wrong_versions() {
         assert!(PairingTicket::parse("https://example.com/pair?v=1").is_err());
-        let uri = ticket().to_uri().replace("v=1", "v=7");
+        let uri = ticket()
+            .to_uri()
+            .replace(&format!("v={PROTOCOL_VERSION}"), "v=7");
         assert_eq!(
             PairingTicket::parse(&uri),
             Err(Error::UnsupportedVersion(7))
@@ -141,12 +190,38 @@ mod tests {
 
     #[test]
     fn strips_control_characters_from_name() {
-        let uri = format!("{PREFIX}v=1&id={}&n=a%0Ab%1Bc", EndpointId([1; 32]));
+        let uri = format!(
+            "{PREFIX}v={PROTOCOL_VERSION}&id={}&n=a%0Ab%1Bc",
+            EndpointId([1; 32])
+        );
         assert_eq!(PairingTicket::parse(&uri).unwrap().device_name, "abc");
     }
 
     #[test]
+    fn relay_is_optional_and_must_be_https() {
+        let old = format!(
+            "{PREFIX}v={PROTOCOL_VERSION}&id={}&n=x",
+            EndpointId([1; 32])
+        );
+        assert_eq!(PairingTicket::parse(&old).unwrap().relay, None);
+        let bad = format!("{old}&r=http%3A%2F%2Fevil.example%2F");
+        assert!(PairingTicket::parse(&bad).is_err());
+    }
+
+    #[test]
+    fn secret_rides_along_and_old_parsers_ignore_it() {
+        let s = LinkSecret([0x3c; 16]);
+        let uri = with_secret(&ticket().to_uri(), &s);
+        assert_eq!(PairingTicket::parse(&uri).unwrap(), ticket());
+        assert_eq!(secret_in(&uri).unwrap(), Some(s));
+        assert_eq!(secret_in(&ticket().to_uri()).unwrap(), None);
+        assert!(secret_in(&format!("{uri}&s=00")).is_err());
+        assert!(secret_in(&with_secret(&uri, &s)).is_err());
+        assert!(secret_in("https://x/?s=00").is_err());
+    }
+
+    #[test]
     fn missing_id_is_an_error() {
-        assert!(PairingTicket::parse(&format!("{PREFIX}v=1&n=x")).is_err());
+        assert!(PairingTicket::parse(&format!("{PREFIX}v={PROTOCOL_VERSION}&n=x")).is_err());
     }
 }

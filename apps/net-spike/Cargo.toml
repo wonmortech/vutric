@@ -1,0 +1,22 @@
+[package]
+name = "vutric-net-spike"
+description = "Phase 0.2 spike: LAN-only discovery, pairing check and 30 KB preview latency, in both directions."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+qrcode = { version = "0.14.1", default-features = false }
+serde_json = "1"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "time"] }
+vutric-core.workspace = true
+vutric-net = { path = "../../crates/vutric-net" }
+vutric-relay = { path = "../../crates/vutric-relay" }
+
+[lints]
+workspace = true

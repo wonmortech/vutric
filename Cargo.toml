@@ -4,7 +4,16 @@ members = [
     "crates/vutric-core",
     "crates/vutric-overlay",
     "crates/vutric-host-win",
+    "crates/vutric-net",
+    "crates/vutric-relay",
+    "crates/vutric-compat-localsend",
+    "crates/vutric-compat-quickshare",
+    "crates/vutric-compat-kdeconnect",
+    "apps/net-spike",
+    "crates/vutric-mobile",
     "apps/overlay-spike",
+    "crates/vutric-compat-wormhole",
+    "crates/vutric-host-mac",
 ]
 
 [workspace.package]
@@ -31,6 +40,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 thiserror = "2.0.21"
 wgpu = "30.0.2"
 winit = "0.30.13"
+arbitrary = { version = "1.5.0", features = ["derive"] }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
@@ -51,3 +61,9 @@ float_cmp = "allow"
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# libc >= 0.2.190 exposes some Darwin networking items on macOS only, which breaks iOS builds of iroh's network
+# stack. Vendored copies carry the upstream fixes until they are released (see third_party/README.md).
+[patch.crates-io]
+netdev = { path = "third_party/netdev" }
+netwatch = { path = "third_party/netwatch" }

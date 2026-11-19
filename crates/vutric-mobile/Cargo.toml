@@ -1,0 +1,32 @@
+[package]
+name = "vutric-mobile"
+description = "Vutric for Flutter apps: the vutric-net peer behind a flutter_rust_bridge API."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+anyhow.workspace = true
+flutter_rust_bridge = "=2.13.0"
+serde_json = "1"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "time", "sync", "macros"] }
+vutric-core.workspace = true
+vutric-net = { path = "../vutric-net" }
+
+# The foreign-app adapters (LocalSend, KDE Connect, magic-wormhole), run in the Android `:compat` process and driven
+# from the app process over a socket pair (ADR-0066). iOS does not host them yet.
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+vutric-compat-localsend = { path = "../vutric-compat-localsend" }
+
+[dev-dependencies]
+image.workspace = true
+
+[lints]
+workspace = true

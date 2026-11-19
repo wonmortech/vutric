@@ -1,0 +1,270 @@
+//! Messages between the daemon and the adapter process: one JSON object per line, stdin (to the adapter) and
+//! stdout (from it). The adapter is the side that touched foreign bytes, so the daemon treats everything it
+//! says as untrusted too: lines are size-limited, enums are closed, and paths are checked by [`crate::host`].
+
+use std::net::{IpAddr, SocketAddr};
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
+use crate::proto::DeviceType;
+
+/// Longest line either side reads.
+pub const MAX_LINE: usize = 1 << 20;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Start {
+    pub alias: String,
+    pub device_type: DeviceType,
+    /// HTTPS and multicast port; 0 for any (tests).
+    pub port: u16,
+    pub bind: IpAddr,
+    /// Where accepted files are written (the only folder the adapter writes to, besides its identity file).
+    pub staging: PathBuf,
+    /// The certificate and key kept across restarts.
+    pub identity: PathBuf,
+    pub pin: Option<String>,
+    /// Join the multicast group and answer announcements.
+    pub multicast: bool,
+    pub decide_timeout_secs: u64,
+    /// Also receive from Android's Quick Share (C3, ADR-0056); advertised over mDNS when `multicast` is on.
+    #[serde(default)]
+    pub quickshare: bool,
+    /// Also speak KDE Connect v8, share plugin only (C4, ADR-0062); UDP discovery when `multicast` is on.
+    #[serde(default)]
+    pub kdeconnect: bool,
+}
+
+/// Which protocol an offer came over.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Via {
+    #[default]
+    Localsend,
+    Quickshare,
+    Kdeconnect,
+    Wormhole,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "t", rename_all = "snake_case")]
+pub enum ToAdapter {
+    Start(Start),
+    /// The user's answer to an offer; an empty `accept` rejects it.
+    Decide {
+        session_id: String,
+        accept: Vec<String>,
+    },
+    Announce,
+    Send {
+        request_id: u64,
+        to: SocketAddr,
+        https: bool,
+        paths: Vec<PathBuf>,
+        pin: Option<String>,
+    },
+    /// Open a browser link (C2): download `paths` (none: upload only) for `ttl_secs`.
+    Share {
+        request_id: u64,
+        paths: Vec<PathBuf>,
+        ttl_secs: u64,
+    },
+    Unshare {
+        token: String,
+    },
+    /// Send files to a paired KDE Connect device at `to` (its TCP address from `Seen`).
+    KdeSend {
+        request_id: u64,
+        to: SocketAddr,
+        device_id: String,
+        paths: Vec<PathBuf>,
+    },
+    /// Send one file, or a text, by magic-wormhole (C7). The code to show arrives as `WormholeCode`, the result as
+    /// `Sent` or `SendFailed`.
+    WormholeSend {
+        request_id: u64,
+        #[serde(default)]
+        paths: Vec<PathBuf>,
+        #[serde(default)]
+        text: Option<String>,
+        #[serde(default)]
+        servers: WormholeServers,
+    },
+    /// Receive by a code the user typed (C7). A file comes as `Offer` (session `wh-<request_id>`, answer with
+    /// `Decide`), a text as `Text`; a failure as `WormholeFailed`.
+    WormholeReceive {
+        request_id: u64,
+        code: String,
+        #[serde(default)]
+        servers: WormholeServers,
+    },
+    Stop,
+}
+
+/// Which magic-wormhole servers to use (C7, ADR-0067). Empty fields mean the public servers of the reference tool.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WormholeServers {
+    /// Mailbox server, `ws://…/v1`.
+    #[serde(default)]
+    pub mailbox: Option<String>,
+    /// Transit relay, `tcp:host:port`.
+    #[serde(default)]
+    pub relay: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OfferFile {
+    pub id: String,
+    pub name: String,
+    pub size: u64,
+    pub file_type: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "t", rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum FromAdapter {
+    Ready {
+        fingerprint: String,
+        port: u16,
+        #[serde(default)]
+        quickshare_port: Option<u16>,
+        #[serde(default)]
+        kdeconnect_port: Option<u16>,
+        /// Our KDE Connect device id, which a dialling device must name.
+        #[serde(default)]
+        kdeconnect_id: Option<String>,
+    },
+    Seen {
+        alias: String,
+        device_type: Option<DeviceType>,
+        to: SocketAddr,
+        https: bool,
+        #[serde(default)]
+        via: Via,
+        /// The KDE Connect device id, for `KdeSend`.
+        #[serde(default)]
+        device_id: Option<String>,
+    },
+    /// A device asks to pair (KDE Connect). Show `alias` and `code` on screen; answer with `Decide` on
+    /// `session_id`: a non-empty `accept` pairs, an empty one refuses.
+    PairRequest {
+        session_id: String,
+        via: Via,
+        device_id: String,
+        alias: String,
+        code: String,
+    },
+    Paired {
+        via: Via,
+        device_id: String,
+        alias: String,
+    },
+    Unpaired {
+        via: Via,
+        device_id: String,
+    },
+    Offer {
+        session_id: String,
+        peer: IpAddr,
+        /// The sender's certificate hash, when it presented one: what the user pins.
+        peer_cert: Option<String>,
+        alias: String,
+        files: Vec<OfferFile>,
+        #[serde(default)]
+        via: Via,
+        /// Quick Share's 4-digit code, shown on both screens.
+        #[serde(default)]
+        code: Option<String>,
+    },
+    /// Text or a link shared over Quick Share (kind: 1 text, 2 URL, 3 address, 4 phone number).
+    Text {
+        session_id: String,
+        kind: i64,
+        text: String,
+    },
+    Received {
+        session_id: String,
+        file_id: String,
+        name: String,
+        path: PathBuf,
+        size: u64,
+    },
+    Finished {
+        session_id: String,
+    },
+    Cancelled {
+        session_id: String,
+    },
+    Sent {
+        request_id: u64,
+        files: usize,
+        bytes: u64,
+        peer_cert: Option<String>,
+    },
+    SendFailed {
+        request_id: u64,
+        reason: String,
+    },
+    /// The page is at `https://<address>:<port>/s/<token>/`.
+    Shared {
+        request_id: u64,
+        token: String,
+    },
+    ShareFailed {
+        request_id: u64,
+        reason: String,
+    },
+    Downloaded {
+        token: String,
+        name: String,
+    },
+    Error {
+        message: String,
+    },
+    /// The code for a `WormholeSend`, to show to the user (it is the password: never log it).
+    WormholeCode {
+        request_id: u64,
+        code: String,
+    },
+    /// A `WormholeReceive` that did not finish (wrong code, the sender left, refused).
+    WormholeFailed {
+        request_id: u64,
+        reason: String,
+    },
+}
+
+/// One message as a line (with the trailing newline).
+#[must_use]
+pub fn line<T: Serialize>(m: &T) -> Vec<u8> {
+    let mut v = serde_json::to_vec(m).unwrap_or_default();
+    v.push(b'\n');
+    v
+}
+
+/// Parses one line; `None` for anything too long or malformed.
+#[must_use]
+pub fn parse<T: for<'de> Deserialize<'de>>(line: &[u8]) -> Option<T> {
+    if line.len() > MAX_LINE {
+        return None;
+    }
+    serde_json::from_slice(line).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn round_trip_and_refusals() {
+        let m = FromAdapter::Finished {
+            session_id: "s".into(),
+        };
+        let l = line(&m);
+        assert_eq!(l.last(), Some(&b'\n'));
+        assert_eq!(parse::<FromAdapter>(&l[..l.len() - 1]), Some(m));
+        assert_eq!(parse::<FromAdapter>(br#"{"t":"nope"}"#), None);
+        assert_eq!(parse::<FromAdapter>(&vec![b' '; MAX_LINE + 1]), None);
+    }
+}

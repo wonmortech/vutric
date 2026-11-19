@@ -1,0 +1,25 @@
+[package]
+name = "vutric-compat-quickshare"
+description = "Quick Share (Nearby Share) LAN adapter: receive from Android's share sheet, clean-room."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+vutric-core.workspace = true
+anyhow.workspace = true
+aes = "0.8.4"
+cbc = { version = "0.1.2", features = ["alloc", "block-padding"] }
+data-encoding = "2.11.1"
+mdns-sd = "0.22.0"
+ring = "0.17.14"
+tokio = { version = "1", features = ["net", "io-util", "fs", "sync", "time", "rt", "macros"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread"] }
+
+[lints]
+workspace = true

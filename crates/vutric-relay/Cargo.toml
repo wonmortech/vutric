@@ -1,0 +1,25 @@
+[package]
+name = "vutric-relay"
+description = "Vutric's own relay server: iroh-relay with ACME TLS, per-client rate limits and connection caps."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+iroh-base = { version = "1.4.1", default-features = false, features = ["key"] }
+iroh-relay = { version = "1.4.1", default-features = false, features = ["server", "tls-ring"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "signal", "fs"] }
+toml = "1.0"
+
+[dev-dependencies]
+vutric-core.workspace = true
+vutric-net = { path = "../vutric-net" }
+
+[lints]
+workspace = true

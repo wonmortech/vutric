@@ -1,0 +1,181 @@
+[package]
+name = "vutric-fuzz"
+description = "Protocol-aware fuzz targets for every parser that sees peer or file input (backlog S4)."
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+# Its own workspace: libFuzzer needs nightly and sanitizer flags, which must never leak into the main build.
+[workspace]
+members = ["."]
+
+[features]
+default = ["libfuzzer"]
+# Off for the stable smoke run (`cargo test --no-default-features`), which needs no C++ toolchain.
+libfuzzer = ["dep:libfuzzer-sys"]
+
+[dependencies]
+vutric-core = { path = "../crates/vutric-core", features = ["arbitrary"] }
+arbitrary = { version = "1.5.0", features = ["derive"] }
+libfuzzer-sys = { version = "0.4.13", optional = true }
+serde_json = "1"
+vutric-compat-localsend = { path = "../crates/vutric-compat-localsend" }
+vutric-compat-quickshare = { path = "../crates/vutric-compat-quickshare" }
+vutric-compat-kdeconnect = { path = "../crates/vutric-compat-kdeconnect" }
+vutric-compat-wormhole = { path = "../crates/vutric-compat-wormhole" }
+
+[[bin]]
+name = "frame_stream"
+path = "fuzz_targets/frame_stream.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "message"
+path = "fuzz_targets/message.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "pairing_ticket"
+path = "fuzz_targets/pairing_ticket.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "save_target"
+path = "fuzz_targets/save_target.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "filename"
+path = "fuzz_targets/filename.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "settings_json"
+path = "fuzz_targets/settings_json.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "trust_json"
+path = "fuzz_targets/trust_json.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "beacon"
+path = "fuzz_targets/beacon.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "localsend_prepare"
+path = "fuzz_targets/localsend_prepare.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "localsend_announce"
+path = "fuzz_targets/localsend_announce.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "localsend_ipc"
+path = "fuzz_targets/localsend_ipc.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "quickshare_frames"
+path = "fuzz_targets/quickshare_frames.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "quickshare_secure"
+path = "fuzz_targets/quickshare_secure.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "kdeconnect_packet"
+path = "fuzz_targets/kdeconnect_packet.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "companion"
+path = "fuzz_targets/companion.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "wormhole_messages"
+path = "fuzz_targets/wormhole_messages.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "captive_answer"
+path = "fuzz_targets/captive_answer.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "adb_devices"
+path = "fuzz_targets/adb_devices.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "ble_frames"
+path = "fuzz_targets/ble_frames.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]

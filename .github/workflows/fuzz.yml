@@ -1,0 +1,98 @@
+# SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Backlog S4 (ADR-0007 part 2, ADR-0010 rule 4): every parser that sees peer or file input is fuzzed.
+# - smoke: stable, every push and PR, deterministic random + mutated-valid inputs (seconds).
+# - libfuzzer: nightly libFuzzer with AddressSanitizer, each target for a fixed time; on PRs that touch the
+#   protocol, nightly on a schedule, and by hand. A crash uploads its input as an artifact.
+
+name: Fuzz
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "crates/vutric-core/**"
+      - "crates/vutric-net/**"
+      - "crates/vutric-compat-*/**"
+      - "fuzz/**"
+      - ".github/workflows/fuzz.yml"
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "Seconds per target"
+        default: "300"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  smoke:
+    name: smoke (stable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            fuzz/target
+          key: fuzz-smoke-${{ hashFiles('rust-toolchain.toml', 'fuzz/Cargo.lock', 'crates/vutric-core/**') }}
+          restore-keys: fuzz-smoke-
+      - name: Clippy
+        working-directory: fuzz
+        run: cargo clippy --no-default-features --all-targets -- -D warnings
+      - name: Smoke run
+        working-directory: fuzz
+        run: cargo test --release --no-default-features
+
+  libfuzzer:
+    name: libfuzzer ${{ matrix.target }}
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [frame_stream, message, pairing_ticket, save_target, filename, settings_json, trust_json, beacon, localsend_prepare, localsend_announce, localsend_ipc, quickshare_frames, quickshare_secure, kdeconnect_packet, companion, wormhole_messages, captive_answer, adb_devices, ble_frames]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Nightly toolchain and cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo +nightly install cargo-fuzz --locked
+      - uses: actions/cache@v4
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.target }}-
+      - name: Fuzz
+        working-directory: fuzz
+        env:
+          SECONDS_PER_TARGET: ${{ github.event.inputs.seconds || (github.event_name == 'schedule' && '600') || '60' }}
+        run: |
+          mkdir -p corpus/${{ matrix.target }}
+          cargo +nightly fuzz run ${{ matrix.target }} corpus/${{ matrix.target }} -- \
+            -max_total_time="$SECONDS_PER_TARGET" -max_len=262144 -rss_limit_mb=2048 -print_final_stats=1
+      - name: Keep the crashing input
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}
