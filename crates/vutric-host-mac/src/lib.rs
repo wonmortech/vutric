@@ -17,6 +17,8 @@ pub mod policy;
 pub use policy::OverlayLevel;
 
 #[cfg(target_os = "macos")]
+pub mod card;
+#[cfg(target_os = "macos")]
 mod imp;
 #[cfg(target_os = "macos")]
 pub mod link;

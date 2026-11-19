@@ -137,6 +137,9 @@ done. An open question for the owner never blocks a stream. It goes into
 7. Round 2 (PR #34): `CADisplayLink` pacing for ProMotion (ADR-0114), text and links in the Share menu plus the
    Finder Quick Action (ADR-0115), the icon drawn from the brand mark (ADR-0116), foreground LocalSend / Quick
    Share through the `vutric-mac-compat` bridge until the daemon runs on macOS (ADR-0117).
+8. Round 3 (PR #35, stacked on W2 #17): W2's instant cards in a non-activating clickable `NSPanel` with a
+   latency, focus and real-click probe (ADR-0118); receive history and companion notices/clipboard in the
+   menu-bar agent (ADR-0119). Daemon patches for #28/#29/#30 are on the issues.
 
 ## When a stream is "done"
 

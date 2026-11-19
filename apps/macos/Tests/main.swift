@@ -75,8 +75,29 @@ check((try? shared.request().get())?.files.map(\.path) == ["/tmp/a.txt"], "files
 check(SharedItems(texts: [String(repeating: "z", count: SendRequest.maxTextBytes + 1)]).request() == .failure(.tooLong),
       "too long is told apart from nothing")
 
+// History (ADR-0119).
+var h = History()
+let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+h.add(path: "/Users/a/Downloads/a.jpg", label: "a.jpg", from: "Pixel", at: t0)
+h.add(path: "relative/b.jpg", label: "b.jpg", from: nil, at: t0)
+check(h.entries.count == 1, "relative paths are not kept")
+h.add(path: "/Users/a/Downloads/c.pdf", label: "c.pdf", from: nil, at: t0.addingTimeInterval(60))
+h.add(path: "/Users/a/Downloads/a.jpg", label: "a.jpg", from: "Pixel", at: t0.addingTimeInterval(120))
+check(h.entries.map(\.label) == ["a.jpg", "c.pdf"], "the same path moves to the top: \(h.entries.map(\.label))")
+for i in 0..<30 { h.add(path: "/tmp/\(i)", label: "\(i)", from: nil, at: t0.addingTimeInterval(200 + Double(i))) }
+check(h.entries.count == History.maxEntries, "capped at \(History.maxEntries)")
+check(h.shown(now: t0.addingTimeInterval(300), exists: { _ in true }).count == History.shownEntries, "menu shows 10")
+check(h.shown(now: t0.addingTimeInterval(300), exists: { $0 != "/tmp/29" }).first?.label == "28", "missing files hidden")
+check(h.shown(now: t0.addingTimeInterval(History.maxAge + 1000), exists: { _ in true }).isEmpty, "expired")
+let suite = UserDefaults(suiteName: "vutric-tests-\(getpid())")!
+h.save(suite)
+check(History.load(suite) == h, "saved and loaded")
+suite.removePersistentDomain(forName: "vutric-tests-\(getpid())")
+h.clear()
+check(h.entries.isEmpty, "cleared")
+
 if failures > 0 {
     print("\(failures) check(s) failed")
     exit(1)
 }
-print("SendRequest, SharedItems: all checks passed")
+print("SendRequest, SharedItems, History: all checks passed")

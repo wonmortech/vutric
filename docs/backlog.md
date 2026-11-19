@@ -102,8 +102,8 @@ Sources:
 
 | # | Item | Phase | Status |
 |---|---|---|---|
-| D1 | `vutric-daemon`:<br>• tray menu: Telefonni ulash, Sozlamalar, To'xtatib turish, Chiqish<br>• toast: Ochish / Papkada ko'rsatish<br>• IPC (named pipe)<br>• autostart<br>• ≤ 30 MB idle | 1 | [ ] |
-| D2 | Overlay cards ("Qabul qilasizmi?", progress ring, "tushdi") drawn in the overlay, ≤ 16 ms, clickable without focus; fallback is a small Flutter window | 1 | [ ] |
+| D1 | `vutric-daemon`:<br>• tray menu: Telefonni ulash, Sozlamalar, To'xtatib turish, Chiqish<br>• toast: Ochish / Papkada ko'rsatish<br>• IPC (named pipe)<br>• autostart<br>• ≤ 30 MB idle | 1 | [~] built; idle 6.4 MB private over 10 min ([ADR-0031](decisions/0031-desktop-daemon.md)). Left: owner clicks the tray menu and both toast buttons on Windows 10/11; pipe ACL to the user's SID; receive through W3's storage engine and trust gate (`pair_intent`) |
+| D2 | Overlay cards ("Qabul qilasizmi?", progress ring, "tushdi") drawn in the overlay, ≤ 16 ms, clickable without focus; fallback is a small Flutter window | 1 | [~] CPU-drawn no-activate window instead ([ADR-0032](decisions/0032-overlay-cards-without-focus.md)): p99 ≤ 5.8 ms, focus kept. Left: the synthetic-click run of `examples/cards.rs`, then the owner presses "Qabul qilish" while typing in another app · macOS host (W5): `vutric_host_mac::card::CardPanel`, ADR-0118 |
 | D3 | QR pairing window | 1 | [ ] |
 | D4 | Flutter desktop windows (settings, history, devices, big send window), separate process, 0 MB when closed | 1 | [ ] |
 | D5 | Send from the desktop: drag onto the Send Zone; Explorer menu "Vutric bilan yuborish"; Share contract | 1 | [ ] |
@@ -112,7 +112,7 @@ Sources:
 | D8 | Overlay checks: NVIDIA and AMD dGPU, multi-monitor with mixed DPI, Windows 11; choose the monitor | 1 | [ ] |
 | D9 | GPU needing over 2 s to start: the first fling must not be refused | 1 | [ ] |
 | D10 | Linux: `vutric-host-wlr` (KDE, wlroots, COSMIC), GNOME 46/50 extension + D-Bus, systemd user unit, one-time extension checklist, Nautilus/Dolphin scripts, StatusNotifier, `.deb` + PPA, extensions.gnome.org | 2 | [ ] |
-| D11 | macOS: `NSPanel` overlay, notarised `.dmg` · (W5) overlay host `crates/vutric-host-mac` + `vutric-mac-probe` (ADR-0110), menu-bar agent (ADR-0111), Share extension + Services (ADR-0112), universal `.app` → `.dmg`, Developer ID + notarytool waiting for the secrets (ADR-0113); display-link pacing for ProMotion (ADR-0114), icon drawn from the brand mark (ADR-0116); CI: `.github/workflows/macos-desktop.yml`. Daemon side: W2 #28, #29, #30 | 5 | [~] · real-Mac steps: the checklists at the end of ADR-0110–0117 |
+| D11 | macOS: `NSPanel` overlay, notarised `.dmg` · (W5) overlay host `crates/vutric-host-mac` + `vutric-mac-probe` (ADR-0110), menu-bar agent (ADR-0111), Share extension + Services (ADR-0112), universal `.app` → `.dmg`, Developer ID + notarytool waiting for the secrets (ADR-0113); display-link pacing for ProMotion (ADR-0114), icon drawn from the brand mark (ADR-0116); CI: `.github/workflows/macos-desktop.yml`. instant cards in a non-activating clickable `NSPanel` using W2's `vutric_overlay::card` (ADR-0118, total p99 7.25 ms offer / 15.02 ms QR on Apple silicon CI, focus kept, real click lands on "Qabul qilish"), receive history and companion notices/clipboard in the agent (ADR-0119). Daemon side: W2 #28, #29, #30 | 5 | [~] · real-Mac steps: the checklists at the end of ADR-0110–0117 |
 
 ## 6. Android (ADR-0009 §2, roadmap Phase 1)
 
@@ -127,7 +127,7 @@ Sources:
 | A7 | `Nearby`: NSD + MulticastLock (1), BLE (R4) | [~] |
 | A8 | `SafStore`: SAF folder and MediaStore move after verification | [~] tree now kept in Rust settings (ADR-0013 #7) |
 | A9 | Fling screen: velocity threshold, spring back, haptic | [~] |
-| A10 | History with progress and resend | [~] |
+| A10 | History with progress and resend | [~] · macOS (W5): last 10 received files in the menu-bar agent, reveal in Finder (ADR-0119) |
 | A11 | Receive: Halqa in the app when open, otherwise a heads-up notification with a thumbnail; no `SYSTEM_ALERT_WINDOW` | [~] |
 | A12 | `Companion` (notification mirroring) and `Clipboard`, opt-in | [~] (W1) off by default; clipboard and notices as `Message::Clipboard` / `Message::Notice` to a trusted peer only, allowlist picker (empty = nothing mirrored) (ADR-0014 #4, #5); device steps: checklist 31–33 |
 | A13 | Kotlin `ForeignDiscovery` for LocalSend and KDE Connect | [~] (W1) discovery in the connect sheet (NSD, `isolatedProcess` parser); sending, receiving (always asked) and KDE Connect pairing through the `:compat` process on "Boshqa ilovalar" (ADR-0014 #6, #7); device steps: checklist 27, 34–35 |
@@ -163,8 +163,8 @@ Sources:
 | F9 | Progress on the lock screen | A4 notification, I2 | [~] |
 | F10 | Siri, Shortcuts, automation; desktop CLI | I3, `net-spike` CLI | [ ] |
 | F11 | PIN mode and auto-accept (LocalSend, Quick Share) | S1, S3, ADR-0007 | [~] (auto-accept setting) |
-| F12 | Clipboard sharing (KDE Connect, Apple) | A12 | [~] both ways as `Message::Clipboard` on a trusted session (ADR-0014 #4); device steps: checklist 31, 33 |
-| F13 | Notifications mirrored to the PC (KDE Connect, Phone Link) | A12 | [~] opt-in, per-app allowlist, sent as `Message::Notice` to a trusted peer (ADR-0014 #4, #5); device step: checklist 32 |
+| F12 | Clipboard sharing (KDE Connect, Apple) | A12 | [~] both ways as `Message::Clipboard` on a trusted session (ADR-0014 #4); device steps: checklist 31, 33 · macOS receive (W5): shown in the agent, clipboard only on "Nusxalash" (ADR-0119; needs W2 #30 events) |
+| F13 | Notifications mirrored to the PC (KDE Connect, Phone Link) | A12 | [~] opt-in, per-app allowlist, sent as `Message::Notice` to a trusted peer (ADR-0014 #4, #5); device step: checklist 32 · macOS receive (W5): shown in the agent, clipboard only on "Nusxalash" (ADR-0119; needs W2 #30 events) |
 | F14 | Ring my phone (KDE Connect) | Kotlin + Swift module, after Phase 1 | [ ] |
 | F15 | Phone as a mouse for the PC (KDE Connect) | Flutter + daemon input, later | [ ] |
 | F16 | Receive with no app, from a browser link (LocalSend, PairDrop) | C2 | [~] |
@@ -188,7 +188,7 @@ Sources:
 
 | # | Measure | Source |
 |---|---|---|
-| M1 | Desktop UI spike: Flutter, Tauri and Slint, with LocalSend as the reference. Measure RAM (idle, open, after close), cold open ≤ 400 ms and fps | ADR-0009 |
+| M1 | Desktop UI spike: Flutter, Tauri and Slint, with LocalSend as the reference. Measure RAM (idle, open, after close), cold open ≤ 400 ms and fps. **Done (W2):** Slint software renderer 6.3 MB, 132 ms, 60.6 fps, [ADR-0030](decisions/0030-desktop-ui-toolkit.md) | ADR-0009 |
 | M2 | Share of direct versus relay connections (opt-in anonymous telemetry) | ADR-0007 §5 |
 | M3 | LocalOnlyHotspot on 2.4 GHz versus 5 GHz | ADR-0007 §5 |
 | M4 | iPhone ⇄ Windows and Android ⇄ Windows over LAN and hotspot | TM §4.5 |

@@ -1,0 +1,78 @@
+{
+  "app_ever_active": false,
+  "arch": "aarch64",
+  "cards": [
+    {
+      "card": "offer",
+      "png": "/Users/runner/work/_temp/pacing/cards/card-mac-offer.png",
+      "px": [
+        400,
+        176
+      ],
+      "raster_p50_ms": 2.087125,
+      "raster_p99_ms": 4.538333000000001,
+      "show_p50_ms": 0.376834,
+      "show_p99_ms": 3.103667,
+      "total_p50_ms": 2.524625,
+      "total_p99_ms": 7.246333
+    },
+    {
+      "card": "progress",
+      "png": "/Users/runner/work/_temp/pacing/cards/card-mac-progress.png",
+      "px": [
+        400,
+        124
+      ],
+      "raster_p50_ms": 1.811125,
+      "raster_p99_ms": 5.323375,
+      "show_p50_ms": 0.403042,
+      "show_p99_ms": 2.383,
+      "total_p50_ms": 2.308125,
+      "total_p99_ms": 6.42975
+    },
+    {
+      "card": "landed",
+      "png": "/Users/runner/work/_temp/pacing/cards/card-mac-landed.png",
+      "px": [
+        400,
+        124
+      ],
+      "raster_p50_ms": 1.421708,
+      "raster_p99_ms": 3.9081669999999997,
+      "show_p50_ms": 0.3565,
+      "show_p99_ms": 1.59125,
+      "total_p50_ms": 1.895625,
+      "total_p99_ms": 4.783667
+    },
+    {
+      "card": "pair",
+      "png": "/Users/runner/work/_temp/pacing/cards/card-mac-pair.png",
+      "px": [
+        400,
+        398
+      ],
+      "raster_p50_ms": 5.073666,
+      "raster_p99_ms": 12.092209,
+      "show_p50_ms": 0.41554199999999997,
+      "show_p99_ms": 1.8069169999999999,
+      "total_p50_ms": 5.677207999999999,
+      "total_p99_ms": 15.022918
+    }
+  ],
+  "click": {
+    "button": "Accept",
+    "frontmost_unchanged": true,
+    "post_event_access": true,
+    "sent": true
+  },
+  "first_show_ms": 2.425917,
+  "focus_kept": true,
+  "fonts_load_ms": 3.478,
+  "frontmost_before": "TextEdit",
+  "frontmost_changed": false,
+  "os": "Version 15.8.2 (Build 24H232)",
+  "panel_ever_key": false,
+  "runs": 200,
+  "scale": 1.0,
+  "tool": "vutric-host-mac/examples/cards"
+}

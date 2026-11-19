@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "vutric-m1-tauri",
+  "version": "0.0.1",
+  "identifier": "io.wonmor.vutric.m1tauri",
+  "build": { "frontendDist": "dist" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      { "title": "Vutric — Sozlamalar", "width": 960, "height": 640, "backgroundColor": "#040c29" }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": { "active": false, "icon": ["icons/icon.ico", "icons/icon.png"] }
+}

@@ -2,6 +2,36 @@
   "sourceLanguage" : "uz",
   "version" : "1.0",
   "strings" : {
+    "menu.history" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "So'nggi qabul qilinganlar" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recently received" } }
+      }
+    },
+    "menu.history.none" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Hali hech narsa kelmadi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Nothing received yet" } }
+      }
+    },
+    "menu.history.clear" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "Ro'yxatni tozalash" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear the list" } }
+      }
+    },
+    "history.files" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "%lld ta fayl" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld files" } }
+      }
+    },
+    "clipboard.title.from" : {
+      "localizations" : {
+        "uz" : { "stringUnit" : { "state" : "translated", "value" : "%@ dan matn keldi" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Text from %@" } }
+      }
+    },
     "menu.compat" : {
       "localizations" : {
         "uz" : { "stringUnit" : { "state" : "translated", "value" : "LocalSend va Quick Share'dan qabul qilish" } },
