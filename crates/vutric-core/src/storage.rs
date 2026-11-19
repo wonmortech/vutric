@@ -384,6 +384,8 @@ pub struct Settings {
     /// The route choice ("Avtomatik" by default, backlog Rx, ADR-0060).
     #[serde(deserialize_with = "crate::route::lenient")]
     pub route: crate::route::Picker,
+    /// Encrypted cloud handoff, off by default (backlog R8, ADR-0072).
+    pub cloud: crate::cloud::CloudSettings,
 }
 
 /// One foreign protocol adapter.
@@ -497,6 +499,7 @@ impl Default for Settings {
             compat: Compat::default(),
             told_missing_folder: None,
             route: crate::route::Picker::Auto,
+            cloud: crate::cloud::CloudSettings::default(),
         }
     }
 }
@@ -547,6 +550,7 @@ impl Settings {
     #[must_use]
     pub fn migrate(mut self) -> Self {
         self.version = SETTINGS_VERSION;
+        self.cloud = self.cloud.clamped();
         self.parts_keep_days = self.parts_keep_days.clamp(1, 30);
         if self.save.album.trim().is_empty() {
             "Vutric".clone_into(&mut self.save.album);
@@ -808,6 +812,10 @@ mod tests {
 
         let old: Settings = serde_json::from_str(r#"{"save":{"album":"A"}}"#).unwrap();
         assert_eq!(old.save.android_tree, None, "older files have no tree");
+        assert!(
+            !old.cloud.enabled,
+            "cloud handoff is off unless the user turns it on"
+        );
 
         for bad in [
             "file:///sdcard",

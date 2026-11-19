@@ -20,6 +20,7 @@ pub mod beacon;
 #[cfg(feature = "ble")]
 pub mod ble;
 pub mod captive;
+pub mod cloud;
 pub mod disk;
 pub mod find;
 pub mod lan;

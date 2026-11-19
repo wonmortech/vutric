@@ -7,6 +7,7 @@ pub mod adb;
 pub mod beacon;
 pub mod ble;
 pub mod captive;
+pub mod cloud;
 pub mod code;
 pub mod companion;
 pub mod effect;

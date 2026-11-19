@@ -195,3 +195,10 @@ Advertisement service data: `[1][flags][rotating id 8]` (flags: bit 0 phone, bit
 (write) and outbox `2fffdfd4-abf9-4d7a-a6aa-377958c9f563` (read) carry a postcard `BlePayload` (`Link { uri }` or
 `Wake`, ≤ 64 KiB) in chunks `[index u16][count u16][bytes]`. Wi-Fi Aware/Direct discovery carries `LinkHello`:
 `[1][flags][port u16][endpoint id 32]`. Everything is unauthenticated until QUIC checks the key.
+
+## Cloud handoff link ([ADR-0072](decisions/0072-encrypted-cloud-handoff.md))
+
+Opt-in, off by default. `vutric://cloud?v=1&u=<presigned GET, percent-encoded>&x=<expiry, Unix s>&s=<container
+bytes>#<content key, 64 hex>`. The object is a `VTCLOUD1` container: header `"VTCLOUD1" | chunk_size u32 LE |
+plain_len u64 LE` (the AAD of every chunk), then AES-256-GCM chunks: chunk 0 = postcard `Meta { name, mime }` padded
+to 1024 bytes, chunks 1..=n = the file in 64 KiB pieces; the nonce of chunk i is `i u64 LE | last u8 | 0 0 0`.

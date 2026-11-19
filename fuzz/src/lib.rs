@@ -219,6 +219,32 @@ pub fn adb_devices(data: &[u8]) {
     }
 }
 
+/// A cloud link and a downloaded container are attacker bytes (R8, ADR-0072): parsing never panics, an accepted
+/// link re-encodes to itself, and opening a container with any key never yields more than its declared length.
+pub fn cloud_handoff(data: &[u8]) {
+    use vutric_core::cloud::{CloudLink, ContentKey, Opener};
+    if let Ok(text) = std::str::from_utf8(data)
+        && let Ok(link) = CloudLink::parse(text, 1)
+    {
+        assert_eq!(
+            CloudLink::parse(&link.to_uri(), 1).expect("own link parses"),
+            link
+        );
+    }
+    let Some((&step, rest)) = data.split_first() else {
+        return;
+    };
+    let mut o = Opener::new(ContentKey([step; 32]), 1 << 20);
+    let mut out = 0u64;
+    for piece in rest.chunks(usize::from(step).max(1)) {
+        match o.push(piece) {
+            Ok(clear) => out += clear.len() as u64,
+            Err(_) => return,
+        }
+    }
+    assert!(out <= o.plain_len().unwrap_or(0));
+}
+
 /// BLE from any device in radio range (R4, ADR-0071): advertisement service data, the Wi-Fi Aware / GATT hello,
 /// GATT payloads and a stream of chunks. Decoders never panic, what they accept re-encodes to the same value, the
 /// reassembler never yields more than the cap.
@@ -744,6 +770,32 @@ mod smoke {
             b"List of devices attached\nR5CT device usb:1-1 model:SM_G991B\n0A unauthorized\n",
         );
         adb_devices(b"\xff device model:\x01\n x\tdevice\n");
+    }
+
+    #[test]
+    fn cloud_handoff_structured() {
+        run(cloud_handoff, 2048, 43);
+        use vutric_core::cloud::{CloudLink, ContentKey, Meta, Sealer};
+        let link = CloudLink {
+            url: "https://s3.example.com/b/k?X-Amz-Signature=00".into(),
+            expires: 99,
+            size: 10,
+            key: ContentKey([1; 32]),
+        };
+        cloud_handoff(link.to_uri().as_bytes());
+        let (mut s, mut wire) = Sealer::start(
+            ContentKey([7; 32]),
+            3,
+            &Meta {
+                name: "a.txt".into(),
+                mime: String::new(),
+            },
+        )
+        .unwrap();
+        wire.extend(s.chunk(&[1, 2, 3]).unwrap());
+        let mut with_step = vec![7u8];
+        with_step.extend(wire);
+        cloud_handoff(&with_step);
     }
 
     #[test]
