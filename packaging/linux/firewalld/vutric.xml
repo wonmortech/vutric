@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Ports Vutric listens on (ADR-0093 §4). Fedora Workstation's default zone already allows 1025-65535; this
+     service is for stricter zones: `sudo firewall-cmd --add-service=vutric --permanent`. Quick Share and
+     Vutric's own transport use ephemeral TCP/UDP ports announced over mDNS, which a fixed list cannot name;
+     stricter zones need the user's "trusted network" choice for those. -->
+<service>
+  <short>Vutric</short>
+  <description>Receive files flung from a phone with Vutric, LocalSend, Quick Share or KDE Connect on the local network.</description>
+  <port protocol="udp" port="5353"/>
+  <port protocol="tcp" port="53317"/>
+  <port protocol="udp" port="53317"/>
+  <port protocol="udp" port="53319"/>
+  <port protocol="tcp" port="1714-1764"/>
+  <port protocol="udp" port="1714-1764"/>
+</service>

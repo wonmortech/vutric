@@ -11,6 +11,9 @@
 | `../../apps/gnome-extension/vutric@wonmor.io` | `/usr/share/gnome-shell/extensions/` | GNOME extension (the user still turns it on once) |
 | `vutric-surface` (built) | `/usr/libexec/vutric/` | the GPU / surface process |
 | `vutric-daemon` (built, W2) | `/usr/bin/` | the daemon |
+| `vutric-compat` (built, if present) | `/usr/libexec/vutric/` | LocalSend / Quick Share / KDE Connect / wormhole adapter process |
+| `vutric-desktop` (built, W2, if present) | `/usr/libexec/vutric/` | the Slint settings and pairing windows (ADR-0030) |
+| `firewalld/vutric.xml` | `/usr/lib/firewalld/services/` | fixed ports for stricter firewalld zones (Fedora) |
 | `ci/*.sh` | not installed | headless sway and GNOME runs for CI |
 
 Build: `cargo build --release -p vutric-host-linux --bin vutric-surface && packaging/linux/build-deb.sh`. CI does

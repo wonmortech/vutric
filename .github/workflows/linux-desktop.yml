@@ -15,6 +15,7 @@ on:
       - "crates/vutric-host-linux/**"
       - "crates/vutric-overlay/**"
       - "crates/vutric-core/**"
+      - "crates/vutric-compat-*/**"
       - "apps/gnome-extension/**"
       - "packaging/linux/**"
       - ".github/workflows/linux-*.yml"
@@ -99,7 +100,9 @@ jobs:
           key: linux-w4-release-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
           restore-keys: linux-w4-release-
       - name: Build
-        run: cargo build --release --locked -p vutric-host-linux --bin vutric-surface
+        run: |
+          cargo build --release --locked -p vutric-host-linux --bin vutric-surface
+          cargo build --release --locked -p vutric-compat-localsend --bin vutric-compat
       - name: Package
         run: bash packaging/linux/build-deb.sh target/deb
       - name: lintian (report only)
@@ -110,7 +113,9 @@ jobs:
         run: |
           sudo apt-get install -y ./target/deb/*.deb
           test -x /usr/libexec/vutric/vutric-surface
+          test -x /usr/libexec/vutric/vutric-compat
           test -f /usr/share/gnome-shell/extensions/vutric@wonmor.io/metadata.json
+          test -f /usr/lib/firewalld/services/vutric.xml
           systemd-analyze --user verify /usr/lib/systemd/user/vutric.service || true
           desktop-file-validate /usr/share/applications/io.wonmor.Vutric.desktop || true
           sudo apt-get remove -y vutric
@@ -118,6 +123,75 @@ jobs:
         with:
           name: vutric-deb
           path: target/deb/
+
+  compat:
+    name: LocalSend / Quick Share on Linux (with Avahi running)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: linux-w4-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: linux-w4-
+      # Every Ubuntu and Fedora desktop runs avahi-daemon on UDP 5353; the Quick Share advert (mdns-sd) and the
+      # LocalSend multicast must work next to it (ADR-0093 §4).
+      - name: avahi-daemon
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends avahi-daemon avahi-utils
+          sudo systemctl start avahi-daemon
+          systemctl is-active avahi-daemon
+      - name: Engine tests on Linux, next to Avahi
+        run: cargo test --locked -p vutric-compat-quickshare -p vutric-compat-localsend
+      - name: Quick Share advert seen by Avahi
+        run: |
+          cargo build --locked -p vutric-compat-localsend --bin vutric-compat
+          bash packaging/linux/ci/compat-avahi.sh target/debug/vutric-compat compat-avahi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-compat-avahi
+          path: compat-avahi/
+
+  slint-m1:
+    name: Slint windows on Linux (W2 M1 spike, headless sway)
+    runs-on: ubuntu-24.04
+    # TEMP: builds W2's spike from its branch until the windows binary is in the workspace (w4-notes §3).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          ref: w2/desktop
+          path: w2
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: sway, Mesa, Slint build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends sway mesa-vulkan-drivers libegl1 libgl1-mesa-dri \
+            libfontconfig1-dev libxkbcommon-dev libwayland-dev
+      - name: Build the Slint spike
+        working-directory: w2/apps/desktop/m1-spike/slint
+        run: cargo build --release --locked
+      - name: Run it under headless sway
+        run: bash packaging/linux/ci/slint-sway.sh w2/apps/desktop/m1-spike/slint/target/release/vutric-m1-slint slint-m1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-slint-m1
+          path: slint-m1/
 
   overlay-sway:
     name: overlay on headless sway (layer-shell)

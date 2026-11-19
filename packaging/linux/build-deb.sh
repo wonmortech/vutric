@@ -26,8 +26,24 @@ else
     echo "note: vutric-daemon not built (W2 branch not merged yet); packaging the Linux pieces only"
     has_daemon=0
 fi
-strip --strip-unneeded "$stage/usr/libexec/vutric/vutric-surface"
-[ "$has_daemon" = 0 ] || strip --strip-unneeded "$stage/usr/bin/vutric-daemon"
+# Optional helpers, packed when built: the compat adapter process (LocalSend, Quick Share, KDE Connect,
+# magic-wormhole; ADR-0054/0056, ADR-0093 §4) and the Slint settings/pairing windows (W2, ADR-0030).
+extra_depends=""
+for helper in vutric-compat vutric-desktop; do
+    if [ -x "$bin/$helper" ]; then
+        install -Dm0755 "$bin/$helper" "$stage/usr/libexec/vutric/$helper"
+    else
+        echo "note: $helper not built; not packaged"
+    fi
+done
+if [ -x "$stage/usr/libexec/vutric/vutric-desktop" ]; then
+    # Slint's winit + femtovg backend on Linux.
+    extra_depends=", libfontconfig1, libxkbcommon0, libegl1"
+fi
+for f in "$stage"/usr/libexec/vutric/* "$stage"/usr/bin/*; do
+    if [ -f "$f" ]; then strip --strip-unneeded "$f"; fi
+done
+install -Dm0644 "$pkg/firewalld/vutric.xml" "$stage/usr/lib/firewalld/services/vutric.xml"
 install -Dm0644 "$pkg/systemd/vutric.service" "$stage/usr/lib/systemd/user/vutric.service"
 install -Dm0644 "$pkg/applications/io.wonmor.Vutric.desktop" "$stage/usr/share/applications/io.wonmor.Vutric.desktop"
 install -Dm0644 "$pkg/metainfo/io.wonmor.Vutric.metainfo.xml" "$stage/usr/share/metainfo/io.wonmor.Vutric.metainfo.xml"
@@ -55,8 +71,8 @@ mkdir -p "$stage/DEBIAN"
     echo "Architecture: $arch"
     echo "Maintainer: Vutric maintainers <283333996+xnosir@users.noreply.github.com>"
     echo "Installed-Size: $size"
-    echo "Depends: libc6 (>= 2.35), libwayland-client0, libvulkan1, dbus-user-session | default-dbus-session-bus"
-    echo "Recommends: mesa-vulkan-drivers | vulkan-icd, xdg-utils"
+    echo "Depends: libc6 (>= 2.35), libwayland-client0, libvulkan1, dbus-user-session | default-dbus-session-bus$extra_depends"
+    echo "Recommends: mesa-vulkan-drivers | vulkan-icd, xdg-utils, avahi-daemon"
     echo "Section: net"
     echo "Priority: optional"
     echo "Homepage: https://github.com/wonmortech/vutric"
