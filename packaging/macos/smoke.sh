@@ -28,23 +28,26 @@ sleep 5
 if pgrep -x Vutric >/dev/null; then say "agent running: yes (pid $(pgrep -x Vutric))"; else say "agent running: NO"; fail=1; fi
 screencapture -x "$OUT/menubar.png" 2>/dev/null || true
 
-pluginkit -a "$dest/Contents/PlugIns/VutricShare.appex" 2>&1 | tee -a "$LOG"
-sleep 2
-if pluginkit -m -v -i io.wonmor.vutric.share 2>&1 | tee -a "$LOG" | grep -q io.wonmor.vutric.share; then
-  say "share extension registered: yes"
-else
-  say "share extension registered: NO"
-  fail=1
-fi
-
-pluginkit -a "$dest/Contents/PlugIns/VutricQuickAction.appex" 2>&1 | tee -a "$LOG"
-sleep 2
-if pluginkit -m -v -i io.wonmor.vutric.quickaction 2>&1 | tee -a "$LOG" | grep -q io.wonmor.vutric.quickaction; then
-  say "quick action registered: yes"
-else
-  say "quick action registered: NO"
-  fail=1
-fi
+# pluginkit registration is asynchronous and its timing varies on the runners (one base run printed
+# "quick action registered: NO" while the same build passed in the PR). Add the extension explicitly, then poll
+# for up to about 20 s, re-adding every few seconds. It is a failure only if it never shows up.
+registered() { # NAME APPEX BUNDLE_ID
+  local name=$1 appex=$2 id=$3 i
+  for i in $(seq 1 20); do
+    if (( i % 5 == 1 )); then pluginkit -a "$appex" 2>&1 | tee -a "$LOG"; fi
+    if pluginkit -m -v -i "$id" 2>/dev/null | grep -q "$id"; then
+      pluginkit -m -v -i "$id" 2>&1 | tee -a "$LOG" >/dev/null
+      say "$name registered: yes (after ~${i} s)"
+      return 0
+    fi
+    sleep 1
+  done
+  pluginkit -m -v -i "$id" 2>&1 | tee -a "$LOG" >/dev/null
+  say "$name registered: NO (not listed after 20 s)"
+  return 1
+}
+registered "share extension" "$dest/Contents/PlugIns/VutricShare.appex" io.wonmor.vutric.share || fail=1
+registered "quick action" "$dest/Contents/PlugIns/VutricQuickAction.appex" io.wonmor.vutric.quickaction || fail=1
 
 if [[ -s $dest/Contents/Resources/AppIcon.icns ]]; then
   say "app icon: yes ($(wc -c <"$dest/Contents/Resources/AppIcon.icns") bytes)"
