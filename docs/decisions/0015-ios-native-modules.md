@@ -49,7 +49,12 @@ files unless both sides share an App Group.
   extension not force-loading Rust).
 - In CI: VutricKit XCTests on an iPhone simulator, `flutter build ios --release --no-codesign` with both
   extensions embedded, `nm` finds `uniffi_vutric_mobile_fn_func_share_send` in Runner and in the Share Extension,
-  sizes in the job summary, and the ad-hoc IPA's three signatures carry the App Group.
+  sizes in the job summary, and the ad-hoc IPA's three signatures carry the App Group (run 44450699151, all
+  green).
+- Measured sizes (arm64 release, before App Store thinning, run 44450699151): Share Extension binary
+  **11.2 MB** (11 824 848 bytes; whole `.appex` 11 564 KiB), Runner 22.6 MB, `App.framework` 6.4 MB, widget
+  extension 0.5 MB; IPAs 21.6 MB (unsigned) and 21.9 MB (ad hoc). Linking Rust without `-force_load` and with dead
+  stripping keeps the extension at about half of Runner.
 
 ## Not verified (needs a real iPhone)
 
