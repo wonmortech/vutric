@@ -124,3 +124,14 @@ Agent (`WindowLink.swift`):
    - With winit 0.30 this is `EventLoopBuilderExtMacOS::with_activation_policy(ActivationPolicy::Accessory)`.
    - How Slint 1.19 exposes the builder (`BackendSelector` with a winit event-loop builder hook) is unverified.
 3. Single-instance page switching.
+
+### Effects on the macOS probe and reduce motion (ADR-0122)
+
+`vutric-mac-probe` now plays `Fling`s through `Effects`. It has `--effect halqa|kometa|pufak|oddiy` and
+`--files N`, and its JSON records `effect`, `files` and `reduce_motion`. `tools/measure.sh` adds four rows
+(Kometa, Pufak, Oddiy, Halqa x12) in the default panel, so each effect gets fps, p99 and missed refreshes on both
+macOS runners. `vutric_host_mac::reduce_motion()` reads `NSWorkspace.accessibilityDisplayShouldReduceMotion`.
+
+Proposed docs/effects.md change (shared, not edited): move Kometa, Pufak and Oddiy under "implemented in
+`crates/vutric-overlay/src/effects`", link ADR-0122, and add "Many files: the first card plays the effect, the
+rest stack behind it with a counter".

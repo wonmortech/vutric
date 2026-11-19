@@ -177,6 +177,13 @@ pub fn frontmost_name() -> Option<String> {
         .map(|n| n.to_string())
 }
 
+/// System Settings → Accessibility → Display → "Reduce motion". When it is on, the host plays
+/// `vutric_overlay::effects::Fling::still` instead of the chosen effect (docs/effects.md).
+#[must_use]
+pub fn reduce_motion() -> bool {
+    NSWorkspace::sharedWorkspace().accessibilityDisplayShouldReduceMotion()
+}
+
 /// Whether this process is the active app. The overlay must keep this false.
 #[must_use]
 pub fn app_is_active(mtm: MainThreadMarker) -> bool {

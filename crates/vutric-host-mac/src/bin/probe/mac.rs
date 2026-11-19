@@ -7,11 +7,12 @@ use std::time::{Duration, Instant};
 use anyhow::{Context as _, Result, bail};
 use objc2::MainThreadMarker;
 use serde::Serialize;
-use vutric_core::{Gesture, SendZone};
+use vutric_core::{EffectId, Gesture, SendZone};
 use vutric_host_mac::link::{DisplayLink, Tick};
 use vutric_host_mac::pacing::{self, Run, RunReport};
 use vutric_host_mac::{OverlayLevel, OverlayPanel, ScreenInfo, WindowInfo};
-use vutric_overlay::{Halqa, HalqaConfig, Palette, Renderer};
+use vutric_overlay::effects::{Sample, Setup};
+use vutric_overlay::{Effects, Fling, HalqaConfig, Palette};
 use winit::application::ApplicationHandler;
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -46,6 +47,10 @@ struct Args {
     json: Option<std::path::PathBuf>,
     interval: f32,
     max_seconds: f32,
+    /// Which effect each run plays (W5 effects E2-E4 next to W2's Halqa).
+    effect: EffectId,
+    /// Files per fling; more than one adds the stack (E5).
+    files: u32,
 }
 
 impl Args {
@@ -58,6 +63,8 @@ impl Args {
             json: None,
             interval: 0.6,
             max_seconds: 90.0,
+            effect: EffectId::Halqa,
+            files: 1,
         };
         let mut it = std::env::args().skip(1);
         while let Some(flag) = it.next() {
@@ -82,6 +89,12 @@ impl Args {
                 "--json" => a.json = Some(value()?.into()),
                 "--interval" => a.interval = value()?.parse()?,
                 "--max-seconds" => a.max_seconds = value()?.parse()?,
+                "--effect" => {
+                    let key = value()?;
+                    a.effect = EffectId::from_key(&key)
+                        .with_context(|| format!("--effect halqa|kometa|pufak|oddiy, not {key}"))?;
+                }
+                "--files" => a.files = value()?.parse()?,
                 other => bail!("unknown flag {other}"),
             }
         }
@@ -97,6 +110,10 @@ struct Report {
     arch: &'static str,
     mode: Option<Mode>,
     pacing: Option<Pacing>,
+    effect: &'static str,
+    files: u32,
+    /// The system "Reduce motion" setting; a host would play `Fling::still` instead of `effect` when set.
+    reduce_motion: bool,
     /// Median rate the display link delivered, from `1 / (targetTimestamp - timestamp)`.
     link_hz: Option<f64>,
     frontmost_before: Option<String>,
@@ -119,7 +136,7 @@ struct Gpu {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-    renderer: Renderer,
+    renderer: Effects,
     panel: Option<OverlayPanel>,
     window: Option<Arc<Window>>,
 }
@@ -132,7 +149,7 @@ type Surfaced = (
 );
 
 struct Active {
-    halqa: Halqa,
+    fling: Fling,
     triggered: Instant,
     last: Option<Instant>,
     run: Run,
@@ -281,7 +298,7 @@ impl Probe {
         };
         surface.configure(&device, &config);
         self.report.surface_px = [config.width, config.height];
-        let mut renderer = Renderer::new(&device, &queue, config.format, Palette::vutric());
+        let mut renderer = Effects::new(&device, &queue, config.format, Palette::vutric());
         renderer.set_image(&device, &queue, &sample_image(480, 360), 480, 360);
 
         let gpu = Gpu {
@@ -313,13 +330,17 @@ impl Probe {
             exit_x: 0.35 + 0.15 * (self.done % 3) as f32,
         };
         self.active = Some(Active {
-            halqa: Halqa::new(
-                HalqaConfig::default(),
-                screen,
-                SendZone::Right,
-                gesture,
-                4.0 / 3.0,
-            ),
+            fling: Fling::new(
+                self.args.effect,
+                Setup {
+                    cfg: HalqaConfig::default(),
+                    screen,
+                    zone: SendZone::Right,
+                    gesture,
+                    image_aspect: 4.0 / 3.0,
+                },
+            )
+            .with_files(self.args.files),
             triggered: Instant::now(),
             last: None,
             run: Run::new(self.report.refresh_hz),
@@ -359,8 +380,8 @@ impl Probe {
             return Ok(());
         };
         let t = a.triggered.elapsed().as_secs_f32();
-        let finished = a.halqa.is_finished(t);
-        let frame = a.halqa.sample(t.min(a.halqa.duration()));
+        let finished = a.fling.is_finished(t);
+        let frame = a.fling.sample(t.min(a.fling.duration()));
         if !gpu.present(Some(&frame), t)? {
             return Ok(());
         }
@@ -407,7 +428,7 @@ impl Probe {
 
 impl Gpu {
     /// Draws one frame (or a clear one with `None`). `Ok(false)` = no drawable this time; try again.
-    fn present(&self, frame: Option<&vutric_overlay::Frame>, t: f32) -> Result<bool> {
+    fn present(&self, frame: Option<&Sample>, t: f32) -> Result<bool> {
         let texture = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(tex)
             | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
@@ -593,6 +614,8 @@ fn run(args: Args) -> Report {
         arch: std::env::consts::ARCH,
         mode: Some(args.mode),
         pacing: Some(args.pacing),
+        effect: args.effect.key(),
+        files: args.files,
         ..Default::default()
     };
     report.os = vutric_host_mac::os_version();
@@ -617,6 +640,7 @@ fn run(args: Args) -> Report {
         .map_or(60, |s| s.maximumFramesPerSecond())
         .max(1) as f64;
     report.frontmost_before = vutric_host_mac::frontmost_name();
+    report.reduce_motion = vutric_host_mac::reduce_motion();
     let front_pid = vutric_host_mac::frontmost_pid();
     let now = Instant::now();
     let mut probe = Probe {

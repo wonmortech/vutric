@@ -28,9 +28,12 @@ osascript -e 'tell application "TextEdit" to make new document' -e 'tell applica
 sleep 1
 
 status=0
-for spec in "panel status fifo" "winit status fifo" "panel screen-saver fifo" "panel status link" "winit status link"; do
-  read -r mode level pacing <<<"$spec"
+# The first five rows are Halqa in each window mode; the last four are the other effects (and the many-files stack)
+# in the default panel, so every effect gets the same fps / p99 / missed-refresh numbers.
+for spec in "panel status fifo halqa 1" "winit status fifo halqa 1" "panel screen-saver fifo halqa 1"   "panel status link halqa 1" "winit status link halqa 1" "panel status fifo kometa 1"   "panel status fifo pufak 1" "panel status fifo oddiy 1" "panel status fifo halqa 12"; do
+  read -r mode level pacing effect files <<<"$spec"
   name="$mode-$level-$pacing"
+  [[ $effect != halqa || $files != 1 ]] && name="$name-$effect-$files"
   # A system prompt (UserNotificationCenter) can be frontmost on a fresh runner; give focus back to TextEdit.
   osascript -e 'tell application "TextEdit" to activate' >/dev/null 2>&1 || true
   sleep 1
@@ -42,7 +45,7 @@ for spec in "panel status fifo" "winit status fifo" "panel screen-saver fifo" "p
     done
   ) &
   shots=$!
-  "$PROBE" --runs 5 --window "$mode" --level "$level" --pacing "$pacing" --json "$OUT/$name.json" >"$OUT/$name.log" 2>&1
+  "$PROBE" --runs 5 --window "$mode" --level "$level" --pacing "$pacing" --effect "$effect" --files "$files"     --json "$OUT/$name.json" >"$OUT/$name.log" 2>&1
   code=$?
   wait "$shots"
   echo "$name exit=$code" | tee -a "$OUT/exits.txt"
@@ -59,8 +62,8 @@ out = pathlib.Path(sys.argv[1])
 print("### macOS overlay probe\n")
 m = (out / "machine.txt").read_text(errors="replace").splitlines()
 print("```\n" + "\n".join(m[:8]) + "\n```\n")
-print("| run | os | refresh | pacing | link Hz | adapter | alpha | level | fps | p50 | p99 | max | missed | first | frontmost before | focus kept | frontmost changed | app inactive | never key | pass | error |")
-print("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+print("| run | os | refresh | effect | pacing | link Hz | adapter | alpha | level | fps | p50 | p99 | max | missed | first | frontmost before | focus kept | frontmost changed | app inactive | never key | pass | error |")
+print("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 for f in sorted(out.glob("*.json")):
     r = json.loads(f.read_text())
     runs = r.get("runs") or [{}]
@@ -69,7 +72,8 @@ for f in sorted(out.glob("*.json")):
         def v(k, fmt="{:.1f}"):
             val = x.get(k)
             return "–" if val is None else (fmt.format(val) if isinstance(val, float) else str(val))
-        print(f"| {f.stem} #{i} | {r.get('os','')} | {r.get('refresh_hz','')} | {r.get('pacing') or '–'} | "
+        effect = f"{r.get('effect') or 'halqa'}" + (f" ×{r['files']}" if (r.get('files') or 1) > 1 else "")
+        print(f"| {f.stem} #{i} | {r.get('os','')} | {r.get('refresh_hz','')} | {effect} | {r.get('pacing') or '–'} | "
               f"{'–' if r.get('link_hz') is None else '{:.1f}'.format(r['link_hz'])} | {r.get('adapter') or '–'} | "
               f"{r.get('alpha_mode') or '–'} | {win.get('level','–')} | {v('fps')} | {v('p50_ms','{:.2f}')} | "
               f"{v('p99_ms','{:.2f}')} | {v('max_ms','{:.2f}')} | {v('missed_refreshes')} | "
