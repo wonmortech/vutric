@@ -1,0 +1,46 @@
+# W5 notes (macOS + effects E2–E5)
+
+W5's working notes for the coordinator and the other streams. Shared docs (backlog, workstreams, roadmap,
+owner-questions) are not edited in this mode; their rows are proposed here instead.
+
+## Lines W5 added to other streams' files
+
+| File (owner) | Lines | Why |
+|---|---|---|
+| `crates/vutric-overlay/src/lib.rs` (W2) | `pub mod effects;` and `pub use effects::{Effects, Fling};` | Registers the new effects module. Nothing else in W2's files changed. |
+
+## Effects (E2 Kometa, E3 Pufak, E4 Oddiy, E5 many files)
+
+All of them are new files under `crates/vutric-overlay/src/effects/`:
+
+- each effect is a timeline (pure Rust, unit-tested) plus one WGSL file;
+- the WGSL is appended to `common.wgsl`;
+- `scene.rs` is the renderer for all of them.
+
+Halqa and W2's `Renderer` are unchanged. `effects::Effects` wraps both renderers, and `effects::Fling` chooses the
+timeline from `EffectId`.
+
+### Daemon patch for W2 (not applied; W2's file)
+
+In `crates/vutric-daemon/src/bin/vutric-daemon/main.rs` and `gpu.rs`:
+
+```rust
+// main.rs
+use vutric_overlay::effects::{Fling, Setup};
+struct Run { fling: Fling, started: Instant, notify: Option<oneshot::Sender<Instant>> }
+
+// play(): replaces `halqa: Halqa::new(cfg, gpu.screen(), zone, fling.gesture, aspect)`
+let setup = Setup { cfg, screen: gpu.screen(), zone, gesture: fling.gesture, image_aspect: aspect };
+let reduce = host_reduce_motion(); // Windows: SPI_GETCLIENTAREAANIMATION == FALSE; macOS: vutric_host_mac::reduce_motion()
+let played = if reduce { Fling::still(setup) } else { Fling::new(self.prefs.effect, setup) };
+// many files: `.with_files(total_files)` once E5 is in (see below)
+
+// draw(): replaces run.halqa.* with run.fling.* ; `gpu.draw(&sample, t)`
+
+// gpu.rs: `renderer: vutric_overlay::Effects` instead of `Renderer`;
+// `Effects::new(&device, &queue, config.format, Palette::vutric())`, same `set_image`,
+// `draw(&mut self, sample: &vutric_overlay::effects::Sample, t)` calls `self.renderer.encode(.., sample, t)`.
+```
+
+`prefs.effect_for(reduce)` already picks Oddiy when the OS asks for reduced motion. `Fling::still` goes further:
+the card does not even slide.

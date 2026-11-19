@@ -5,10 +5,12 @@
 //! without stealing focus is the job of the platform host crates.
 
 pub mod card;
+pub mod effects;
 pub mod palette;
 pub mod renderer;
 pub mod timeline;
 
+pub use effects::{Effects, Fling};
 pub use palette::Palette;
 pub use renderer::Renderer;
 pub use timeline::{Frame, Halqa, HalqaConfig};
