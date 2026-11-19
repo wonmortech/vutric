@@ -106,6 +106,13 @@ impl Fonts {
                 load(&[&format!(r"{dir}\Fonts\segoeui.ttf")]),
                 load(&[&format!(r"{dir}\Fonts\seguisb.ttf")]),
             )
+        } else if cfg!(target_os = "macos") {
+            // SF is a variable font; `ab_glyph` draws its default instance. A `.ttc` loads face 0.
+            let paths = [
+                "/System/Library/Fonts/SFNS.ttf",
+                "/System/Library/Fonts/Helvetica.ttc",
+            ];
+            (load(&paths), load(&paths))
         } else {
             let paths = [
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",

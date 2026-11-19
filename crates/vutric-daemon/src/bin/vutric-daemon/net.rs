@@ -10,6 +10,7 @@
 //! (ADR-0065) and rings (ADR-0069) are taken from trusted devices only.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -54,8 +55,14 @@ pub enum Cmd {
     Ring(u16),
     /// Stop our ring, or tell the phone that rang us that it was found.
     StopRing,
-    /// Text for the phone's clipboard prompt (only on the user's action).
-    Clipboard(String),
+    /// Files or folders the user chose to send (Explorer menu, Send Zone, the macOS Share menu and Services).
+    Files(Vec<PathBuf>),
+    /// Text for the phone's clipboard prompt (ADR-0065), sent only on the user's action. A guest, or text over
+    /// the cap, gets `fallback` as a file instead.
+    Text {
+        text: String,
+        fallback: Option<PathBuf>,
+    },
 }
 
 /// One connected device, as the UI and the IPC see it.
@@ -65,6 +72,8 @@ pub struct Live {
     pub platform: Platform,
     pub trusted: bool,
     pub tx: mpsc::UnboundedSender<Cmd>,
+    /// When it connected; the newest paired device is the default target of a send.
+    pub since: Instant,
 }
 
 /// State shared between the network thread, the UI thread and the IPC server.
@@ -183,6 +192,20 @@ impl Shared {
             .ok()
             .and_then(|live| live.get(id).map(|l| l.tx.send(cmd).is_ok()))
             .unwrap_or(false)
+    }
+
+    /// Hands `cmd` to `device` (an endpoint id) or, with `None`, to the most recently connected paired device, else
+    /// the most recently connected guest. `false` when nobody is connected.
+    #[must_use]
+    pub fn to_target(&self, device: Option<&str>, cmd: Cmd) -> bool {
+        let Ok(live) = self.live.lock() else {
+            return false;
+        };
+        let pick = match device {
+            Some(id) => live.get(id),
+            None => live.values().max_by_key(|l| (l.trusted, l.since)),
+        };
+        pick.is_some_and(|l| l.tx.send(cmd).is_ok())
     }
 
     /// The paired devices with whether each is connected now, plus connected guests, for the desktop window and
@@ -524,6 +547,47 @@ async fn offer(
     }
 }
 
+/// Sends `paths` on this session, reporting through `progress` / `sent` / `failed` events. A failed send is
+/// reported, not returned: the session stays up for the next fling.
+async fn outbound(s: &mut Session, paths: Vec<PathBuf>, shared: &Shared) {
+    let id = hex(&vutric_net::new_fling_id().0);
+    let fail = |reason: String| {
+        let _ = shared.events.send(Event::Failed {
+            id: id.clone(),
+            reason,
+        });
+    };
+    let files = match transfer::collect(&paths) {
+        Ok(f) => f,
+        Err(e) => return fail(format!("{e:#}")),
+    };
+    let progress: transfer::OnProgress = {
+        let (events, id) = (shared.events.clone(), id.clone());
+        Arc::new(move |p: transfer::Progress| {
+            let _ = events.send(Event::Progress {
+                id: id.clone(),
+                bytes_done: p.bytes_done,
+                bytes_total: p.bytes_total,
+                files_done: p.files_done,
+                files_total: p.files_total,
+            });
+        })
+    };
+    shared.transfers.fetch_add(1, Ordering::Relaxed);
+    let result = transfer::send(s, files, progress).await;
+    shared.transfers.fetch_sub(1, Ordering::Relaxed);
+    match result {
+        Ok(sum) => {
+            let _ = shared.events.send(Event::Sent {
+                id: id.clone(),
+                files: sum.files,
+                to: s.remote_name.clone(),
+            });
+        }
+        Err(e) => fail(format!("{e:#}")),
+    }
+}
+
 /// A companion message or ring from a trusted device, turned into UI work (ADR-0065, ADR-0069). `None`: not
 /// one, not trusted, or over its rate limit.
 fn companion_event(
@@ -593,6 +657,7 @@ async fn session(
                 platform: s.remote_platform,
                 trusted,
                 tx,
+                since: Instant::now(),
             },
         );
     }
@@ -623,7 +688,19 @@ async fn session_loop(
                 match cmd {
                     Some(Cmd::Ring(secs)) => s.ring(secs).await?,
                     Some(Cmd::StopRing) => s.stop_ring().await?,
-                    Some(Cmd::Clipboard(text)) => s.send_clipboard(&text).await?,
+                    Some(Cmd::Files(paths)) => outbound(s, paths, shared).await,
+                    Some(Cmd::Text { text, fallback }) => {
+                        if *trusted && text.len() <= MAX_CLIPBOARD_BYTES && !text.is_empty() {
+                            s.send_clipboard(&text).await?;
+                        } else if let Some(f) = fallback {
+                            outbound(s, vec![f], shared).await;
+                        } else {
+                            let _ = shared.events.send(Event::Failed {
+                                id: String::new(),
+                                reason: "text_not_sent".into(),
+                            });
+                        }
+                    }
                     None => return Ok(()),
                 }
                 continue;
@@ -706,16 +783,6 @@ async fn session_loop(
     }
 }
 
-/// `s` cut to at most `max` bytes on a character boundary.
-#[must_use]
-pub fn clip_bytes(s: &str, max: usize) -> String {
-    let mut end = s.len().min(max);
-    while !s.is_char_boundary(end) {
-        end -= 1;
-    }
-    s[..end].to_owned()
-}
-
 fn hex(b: &[u8]) -> String {
     use std::fmt::Write as _;
     b.iter()
@@ -772,12 +839,6 @@ mod tests {
             text: "\u{0}\u{7}".into(),
         };
         assert!(companion_event(&clip, "P", "id", true, &mut n, &mut r).is_none());
-    }
-
-    #[test]
-    fn text_is_cut_on_a_character_boundary() {
-        assert_eq!(clip_bytes("o\u{2bb}g", 2), "o");
-        assert_eq!(clip_bytes("salom", 64), "salom");
     }
 
     #[test]

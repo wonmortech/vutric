@@ -62,14 +62,18 @@ pub enum Request {
     },
     /// Sends files to a connected device (Explorer "Vutric bilan yuborish", the Send Zone, the macOS Share menu
     /// and Services). `device` `None`: the only connected paired device, or the most recent one.
+    /// Absolute paths, folders allowed (the macOS agent caps a request at 1000 paths, ADR-0112).
     SendFiles {
-        paths: Vec<String>,
+        paths: Vec<std::path::PathBuf>,
         #[serde(default)]
         device: Option<String>,
     },
-    /// Sends text to a connected device's clipboard prompt (ADR-0065).
+    /// Sends text to a connected paired device's clipboard prompt (ADR-0065). A guest, or text over 64 KiB, gets
+    /// the file at `fallback_path` instead (the macOS agent writes it first, ADR-0115).
     SendText {
         text: String,
+        #[serde(default)]
+        fallback_path: Option<std::path::PathBuf>,
         #[serde(default)]
         device: Option<String>,
     },
@@ -163,6 +167,24 @@ pub enum Event {
     },
     /// The device list changed: paired, forgotten, connected or gone.
     Devices,
+    /// A send from this computer finished.
+    Sent {
+        id: String,
+        files: u32,
+        to: String,
+    },
+    /// A notice mirrored from a trusted phone, already cleaned (ADR-0065). The macOS agent shows it itself.
+    Notice {
+        from: String,
+        app: String,
+        title: String,
+        text: String,
+    },
+    /// Clipboard text from a trusted phone, cleaned. Written to the clipboard only after the user's "Nusxalash".
+    Clipboard {
+        from: String,
+        text: String,
+    },
     Paused {
         paused: bool,
     },
@@ -245,6 +267,27 @@ pub fn endpoint_name(user: &str) -> String {
     }
 }
 
+/// Where the Unix socket lives: `$VUTRIC_IPC` when set; on macOS `~/Library/Application Support/Vutric/daemon.sock`
+/// (the menu-bar agent's path, ADR-0111); elsewhere `name` in `$XDG_RUNTIME_DIR`. The macOS folder is made 0700:
+/// the socket is the only gate, as the per-user pipe is on Windows.
+#[cfg(unix)]
+pub fn socket_path(name: &str) -> anyhow::Result<std::path::PathBuf> {
+    use anyhow::Context as _;
+    if let Some(p) = std::env::var_os("VUTRIC_IPC").filter(|p| !p.is_empty()) {
+        return Ok(p.into());
+    }
+    if cfg!(target_os = "macos") {
+        use std::os::unix::fs::PermissionsExt as _;
+        let home = std::env::var_os("HOME").context("no HOME")?;
+        let dir = std::path::PathBuf::from(home).join("Library/Application Support/Vutric");
+        std::fs::create_dir_all(&dir)?;
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))?;
+        return Ok(dir.join("daemon.sock"));
+    }
+    let dir = std::env::var_os("XDG_RUNTIME_DIR").context("no XDG_RUNTIME_DIR")?;
+    Ok(std::path::PathBuf::from(dir).join(name))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280,6 +323,7 @@ mod tests {
             },
             Request::SendText {
                 text: "salom".into(),
+                fallback_path: None,
                 device: None,
             },
             Request::OpenEveryone,
@@ -290,6 +334,50 @@ mod tests {
             let back: Request = decode(&line[..line.len() - 1]).unwrap();
             assert_eq!(back, r);
         }
+    }
+
+    #[test]
+    fn the_macos_agent_requests_parse() {
+        let r: Request =
+            decode(br#"{"op":"send_files","paths":["/Users/me/a.jpg","/Users/me/Folder"]}"#)
+                .unwrap();
+        assert!(matches!(r, Request::SendFiles { ref paths, device: None } if paths.len() == 2));
+        let r: Request = decode(
+            br#"{"op":"send_text","text":"salom","fallback_path":"/Users/me/Outbox/Matn.txt"}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            r,
+            Request::SendText {
+                fallback_path: Some(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn notice_events_have_the_agents_shape() {
+        let line = encode(&Reply::Event(Event::Notice {
+            from: "Pixel 8".into(),
+            app: "Telegram".into(),
+            title: "Ali".into(),
+            text: "salom".into(),
+        }));
+        assert_eq!(
+            line,
+            b"{\"kind\":\"event\",\"event\":\"notice\",\"from\":\"Pixel 8\",\"app\":\"Telegram\",\"title\":\"Ali\",\"text\":\"salom\"}\n"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn vutric_ipc_wins_over_the_default_socket() {
+        // SAFETY: tests in this module do not read the environment concurrently with this one.
+        unsafe { std::env::set_var("VUTRIC_IPC", "/tmp/vutric-test.sock") };
+        let p = socket_path("x").unwrap();
+        // SAFETY: as above.
+        unsafe { std::env::remove_var("VUTRIC_IPC") };
+        assert_eq!(p, std::path::PathBuf::from("/tmp/vutric-test.sock"));
     }
 
     #[test]

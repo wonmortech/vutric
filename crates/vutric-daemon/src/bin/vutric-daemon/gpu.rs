@@ -58,7 +58,24 @@ fn create_window(
     let hwnd = raw_hwnd(&window)?;
     #[cfg(windows)]
     vutric_host_win::make_overlay(hwnd).map_err(|e| anyhow::anyhow!("overlay styles: {e}"))?;
+    #[cfg(target_os = "macos")]
+    {
+        let view = ns_view(&window)?;
+        // SAFETY: the view belongs to `window`, alive here; winit runs this on the main thread.
+        unsafe { vutric_host_mac::make_overlay(view, vutric_host_mac::OverlayLevel::default()) }
+            .map_err(|e| anyhow::anyhow!("overlay styles: {e}"))?;
+    }
     Ok((window, hwnd))
+}
+
+/// The `NSView` of a winit window, for `vutric-host-mac` (ADR-0110).
+#[cfg(target_os = "macos")]
+fn ns_view(window: &Window) -> Result<std::ptr::NonNull<core::ffi::c_void>> {
+    use raw_window_handle::{HasWindowHandle as _, RawWindowHandle};
+    match window.window_handle()?.as_raw() {
+        RawWindowHandle::AppKit(h) => Ok(h.ns_view),
+        _ => bail!("not an AppKit window"),
+    }
 }
 
 fn surface_config(
@@ -108,6 +125,8 @@ impl Gpu {
         if cfg!(windows) {
             desc.backends = wgpu::Backends::DX12;
             desc.backend_options.dx12.presentation_system = wgpu::Dx12SwapchainKind::DxgiFromVisual;
+        } else if cfg!(target_os = "macos") {
+            desc.backends = wgpu::Backends::METAL;
         }
         let instance = wgpu::Instance::new(desc);
         let surface = instance.create_surface(window.clone())?;
@@ -145,7 +164,13 @@ impl Gpu {
         gpu.clear()?;
         #[cfg(windows)]
         vutric_host_win::show_without_activating(hwnd);
-        #[cfg(not(windows))]
+        #[cfg(target_os = "macos")]
+        {
+            let view = ns_view(&gpu.window)?;
+            // SAFETY: as in `create_window`; `set_visible(true)` would make the window key and take focus.
+            unsafe { vutric_host_mac::show_without_activating(view) };
+        }
+        #[cfg(not(any(windows, target_os = "macos")))]
         gpu.window.set_visible(true);
         Ok(gpu)
     }

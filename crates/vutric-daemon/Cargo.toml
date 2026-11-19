@@ -39,5 +39,13 @@ windows = { version = "0.62.2", features = [
 [target.'cfg(windows)'.dependencies.vutric-host-win]
 workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+vutric-host-mac = { path = "../vutric-host-mac" }
+objc2 = { version = "0.6.5", optional = true }
+
+[features]
+# The macOS card window (`vutric_host_mac::card::CardPanel`, W5 PR #35). Off until that is on the base branch.
+mac-cards = ["dep:objc2"]
+
 [lints]
 workspace = true

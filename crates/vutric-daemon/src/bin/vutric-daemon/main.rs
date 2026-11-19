@@ -1,11 +1,13 @@
 //! `vutric-daemon`: starts with the session, stays in the tray, receives, and plays effects on the overlay.
 //!
 //! ```text
-//! vutric-daemon [--autostart] [--portable] [--lan-only] [--name "Ofis kompyuteri"]
+//! vutric-daemon [--autostart] [--portable] [--agent] [--lan-only] [--name "Ofis kompyuteri"]
 //! vutric-daemon ctl '{"op":"status"}'
 //! ```
 //!
-//! A second launch hands over to the running daemon (`Show`) and exits.
+//! A second launch hands over to the running daemon (`Show`) and exits. `--agent`: started by the macOS menu-bar
+//! agent (ADR-0111), which owns the menu bar, login item and notifications: no tray, no autostart, and the daemon
+//! exits when the agent's subscribed connection closes.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -115,6 +117,8 @@ pub enum UiEvent {
 struct Args {
     /// Never touch the registry or autostart entries (measurements, tests, a copy on a USB stick).
     portable: bool,
+    /// Started by the macOS menu-bar agent (ADR-0111).
+    agent: bool,
     lan_only: bool,
     name: String,
 }
@@ -123,6 +127,7 @@ impl Args {
     fn parse() -> Self {
         let mut a = Self {
             portable: false,
+            agent: false,
             lan_only: false,
             name: default_name(),
         };
@@ -131,6 +136,7 @@ impl Args {
             match arg.as_str() {
                 autostart::FLAG => {}
                 "--portable" => a.portable = true,
+                "--agent" => a.agent = true,
                 "--lan-only" => a.lan_only = true,
                 "--name" => {
                     if let Some(n) = it.next() {
@@ -221,8 +227,11 @@ struct Daemon {
     shared: Arc<Shared>,
     proxy: EventLoopProxy<UiEvent>,
     exe: PathBuf,
-    /// `--portable`: the autostart choice is saved but never written to the registry.
+    /// `--portable` or `--agent`: the autostart choice is saved but never written (the macOS agent uses
+    /// `SMAppService`).
     portable: bool,
+    /// `--agent`: quit when the agent's connection goes, so no orphan helper stays behind.
+    agent: bool,
 }
 
 impl server::Handler for Daemon {
@@ -299,17 +308,27 @@ impl server::Handler for Daemon {
                 };
                 sent_or_none(sent)
             }
-            Request::SendText { text, device } => {
-                let text = net::clip_bytes(&text, vutric_core::message::MAX_CLIPBOARD_BYTES);
-                let sent = match device {
-                    Some(id) => usize::from(self.shared.to_device(&id, Cmd::Clipboard(text))),
-                    None => self.shared.to_trusted(&Cmd::Clipboard(text)),
-                };
-                sent_or_none(sent)
+            Request::SendText {
+                text,
+                fallback_path,
+                device,
+            } => sent_or_none(usize::from(self.shared.to_target(
+                device.as_deref(),
+                Cmd::Text {
+                    text,
+                    fallback: fallback_path,
+                },
+            ))),
+            Request::SendFiles { paths, device } => {
+                if paths.is_empty() || paths.iter().any(|p| !p.is_absolute()) {
+                    return Reply::Error {
+                        message: "send_files wants absolute paths".into(),
+                    };
+                }
+                sent_or_none(usize::from(
+                    self.shared.to_target(device.as_deref(), Cmd::Files(paths)),
+                ))
             }
-            Request::SendFiles { .. } => Reply::Error {
-                message: "sending files from the desktop is not wired yet".into(),
-            },
             Request::OpenEveryone => {
                 self.shared.open_everyone();
                 Reply::Ok
@@ -324,6 +343,12 @@ impl server::Handler for Daemon {
     fn events(&self) -> broadcast::Receiver<Event> {
         self.shared.events.subscribe()
     }
+
+    fn closed(&self, subscribed: bool) {
+        if self.agent && subscribed {
+            let _ = self.proxy.send_event(UiEvent::Quit);
+        }
+    }
 }
 
 /// `Ok` when at least one device got the command.
@@ -332,7 +357,7 @@ fn sent_or_none(sent: usize) -> Reply {
         Reply::Ok
     } else {
         Reply::Error {
-            message: "no connected paired device".into(),
+            message: "no phone connected".into(),
         }
     }
 }
@@ -362,6 +387,8 @@ struct App {
     shared: Arc<Shared>,
     proxy: EventLoopProxy<UiEvent>,
     lang: Lang,
+    /// `--agent`: the macOS agent owns the menu bar and shows notices and clipboard prompts itself.
+    agent: bool,
     prefs: DesktopPrefs,
     tray: Option<tray::Tray>,
     gpu: Option<gpu::Gpu>,
@@ -603,7 +630,7 @@ fn vutric_daemon_sample() -> image::RgbaImage {
 
 impl ApplicationHandler<UiEvent> for App {
     fn resumed(&mut self, _: &ActiveEventLoop) {
-        if self.tray.is_none() {
+        if self.tray.is_none() && !self.agent {
             match tray::Tray::new(self.lang, &self.proxy) {
                 Ok(t) => self.tray = Some(t),
                 Err(e) => vutric_net::say(format!("tray unavailable: {e:#}")),
@@ -721,6 +748,15 @@ impl ApplicationHandler<UiEvent> for App {
                 title,
                 text,
             } => {
+                let _ = self.shared.events.send(Event::Notice {
+                    from: device.clone(),
+                    app: app.clone(),
+                    title: title.clone(),
+                    text: text.clone(),
+                });
+                if self.agent {
+                    return;
+                }
                 let head = if app.is_empty() { device } else { app };
                 let line = if title.is_empty() {
                     head
@@ -731,6 +767,13 @@ impl ApplicationHandler<UiEvent> for App {
                 self.sync_card();
             }
             UiEvent::Clipboard { device, text } => {
+                let _ = self.shared.events.send(Event::Clipboard {
+                    from: device.clone(),
+                    text: text.clone(),
+                });
+                if self.agent {
+                    return;
+                }
                 let preview: String = text.chars().take(80).collect();
                 self.clip = Some(text);
                 self.ask(Question::Clipboard, &device, &preview);
@@ -870,11 +913,22 @@ fn main() -> Result<()> {
     let prefs = prefs::load(&dir.join(prefs::FILE));
     let exe = std::env::current_exe()?;
     // Keeps the Run entry pointing at this exe after a move or an update.
-    if !args.portable && prefs.autostart && !autostart::is_enabled(&exe) {
+    if !args.portable && !args.agent && prefs.autostart && !autostart::is_enabled(&exe) {
         let _ = set_autostart(true, &exe);
     }
 
-    let event_loop = EventLoop::<UiEvent>::with_user_event().build()?;
+    #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
+    let mut builder = EventLoop::<UiEvent>::with_user_event();
+    #[cfg(target_os = "macos")]
+    {
+        // A background helper: no Dock icon, no menu, never steals activation (ADR-0110).
+        use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS as _};
+        builder
+            .with_activation_policy(ActivationPolicy::Accessory)
+            .with_default_menu(false)
+            .with_activate_ignoring_other_apps(false);
+    }
+    let event_loop = builder.build()?;
     let proxy = event_loop.create_proxy();
     let (events, _) = broadcast::channel(64);
     let shared = Arc::new(Shared::new(args.name.clone(), events));
@@ -883,7 +937,8 @@ fn main() -> Result<()> {
         shared: Arc::clone(&shared),
         proxy: proxy.clone(),
         exe,
-        portable: args.portable,
+        portable: args.portable || args.agent,
+        agent: args.agent,
     });
     rt.spawn(async move {
         if let Err(e) = server::listen(&pipe, daemon).await {
@@ -895,6 +950,7 @@ fn main() -> Result<()> {
         shared,
         proxy,
         lang,
+        agent: args.agent,
         prefs,
         tray: None,
         gpu: None,

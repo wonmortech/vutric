@@ -4,6 +4,7 @@
 
 pub mod autostart;
 pub mod cards;
+pub mod host;
 pub mod i18n;
 pub mod ipc;
 pub mod prefs;

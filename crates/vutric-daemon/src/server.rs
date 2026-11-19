@@ -15,10 +15,26 @@ use crate::ipc::{self, Event, LineBuffer, Reply, Request};
 pub trait Handler: Send + Sync + 'static {
     fn handle(&self, req: Request) -> Reply;
     fn events(&self) -> broadcast::Receiver<Event>;
+    /// A connection closed; `subscribed` when it had asked for events (the desktop window or the macOS agent).
+    fn closed(&self, subscribed: bool) {
+        let _ = subscribed;
+    }
 }
 
-/// Serves one connection until it closes. Generic over the stream so tests use an in-memory duplex.
+/// Serves one connection until it closes, then tells the handler. Generic over the stream so tests use an
+/// in-memory duplex.
 pub async fn serve_conn<S, H>(stream: S, h: Arc<H>) -> Result<()>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    H: Handler + ?Sized,
+{
+    let mut subscribed = false;
+    let r = conn_loop(stream, &h, &mut subscribed).await;
+    h.closed(subscribed);
+    r
+}
+
+async fn conn_loop<S, H>(stream: S, h: &Arc<H>, subscribed: &mut bool) -> Result<()>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     H: Handler + ?Sized,
@@ -74,6 +90,7 @@ where
                 },
                 Ok(Request::Subscribe) => {
                     events = Some(h.events());
+                    *subscribed = true;
                     Reply::Ok
                 }
                 Ok(req) => h.handle(req),
@@ -105,12 +122,10 @@ pub async fn listen<H: Handler>(name: &str, h: Arc<H>) -> Result<()> {
     }
 }
 
-/// Listens on a Unix socket in `$XDG_RUNTIME_DIR` (private to the user by the spec).
+/// Listens on the per-user Unix socket ([`ipc::socket_path`]).
 #[cfg(unix)]
 pub async fn listen<H: Handler>(name: &str, h: Arc<H>) -> Result<()> {
-    use anyhow::Context as _;
-    let dir = std::env::var_os("XDG_RUNTIME_DIR").context("no XDG_RUNTIME_DIR")?;
-    let path = std::path::PathBuf::from(dir).join(name);
+    let path = ipc::socket_path(name)?;
     let _ = std::fs::remove_file(&path);
     let l = tokio::net::UnixListener::bind(&path)?;
     loop {
@@ -132,9 +147,7 @@ pub async fn call(name: &str, req: &Request) -> Result<Reply> {
 
 #[cfg(unix)]
 pub async fn call(name: &str, req: &Request) -> Result<Reply> {
-    use anyhow::Context as _;
-    let dir = std::env::var_os("XDG_RUNTIME_DIR").context("no XDG_RUNTIME_DIR")?;
-    let s = tokio::net::UnixStream::connect(std::path::PathBuf::from(dir).join(name)).await?;
+    let s = tokio::net::UnixStream::connect(ipc::socket_path(name)?).await?;
     exchange(s, req).await
 }
 
