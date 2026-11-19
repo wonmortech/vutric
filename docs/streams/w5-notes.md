@@ -135,3 +135,21 @@ macOS runners. `vutric_host_mac::reduce_motion()` reads `NSWorkspace.accessibili
 Proposed docs/effects.md change (shared, not edited): move Kometa, Pufak and Oddiy under "implemented in
 `crates/vutric-overlay/src/effects`", link ADR-0122, and add "Many files: the first card plays the effect, the
 rest stack behind it with a counter".
+
+## Not built locally (owner's working mode): where it is most likely not to compile
+
+1. `crates/vutric-host-mac/src/imp.rs` `reduce_motion()`: this assumes objc2-app-kit 0.3.2 exposes
+   `NSWorkspace::accessibilityDisplayShouldReduceMotion` as a safe method under the existing `NSWorkspace`
+   feature. If it is `unsafe` or needs another feature, wrap it in `unsafe {}` or add the feature.
+2. `crates/vutric-overlay/src/effects/scene.rs` uses the wgpu 30 API exactly as W2's `renderer.rs` does
+   (`bind_group_layouts: &[Some(&layout)]`, `multiview_mask`, `MipmapFilterMode`). New in it:
+   `BlendState::PREMULTIPLIED_ALPHA_BLENDING` and `LoadOp::Load`.
+3. The WGSL files (`effects/*.wgsl`): the naga test (`scene::tests::every_shader_parses_and_validates`) is the
+   gate. The riskiest constructs are dynamic indexing of `u.fx[k]` in loops, and the function-local
+   `var masks = array<u32, 10>(…)` indexed dynamically in `stack.wgsl`.
+4. Clippy pedantic: names (`similar_names`, `many_single_char_names`) and doc backticks were checked by eye only.
+5. Shell and CI:
+   - `smoke.sh` reads `.strings` files with `plutil -extract … raw`;
+   - `check-entitlements.sh` uses `codesign -d --entitlements - --xml`;
+   - neither has run on a runner yet.
+6. Swift: `WindowLink.swift` (new). It mirrors `CompatLink`'s `Process` use.

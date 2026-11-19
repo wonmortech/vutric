@@ -50,9 +50,9 @@ impl Stack {
 
     #[must_use]
     pub fn sample(&self, t: f32, top: &Pose) -> Scene {
-        let a = phase(t, self.appear_at, self.appear_at + APPEAR);
-        let appear = ease_out_back(a, 1.4);
-        let opacity = (ease_out_cubic(a) * top.opacity).clamp(0.0, 1.0);
+        let rise = phase(t, self.appear_at, self.appear_at + APPEAR);
+        let appear = ease_out_back(rise, 1.4);
+        let opacity = (ease_out_cubic(rise) * top.opacity).clamp(0.0, 1.0);
         let behind = (self.files - 1).min(MAX_BEHIND);
         let (sin, cos) = top.rotation.sin_cos();
         let rotate = |v: Vec2| [cos * v[0] - sin * v[1], sin * v[0] + cos * v[1]];
@@ -76,8 +76,9 @@ impl Stack {
         if opacity > 0.0 {
             let reach = top.half[0].hypot(top.half[1]) * top.scale + 36.0;
             for k in 1..=behind {
-                let c = math::add(top.center, math::scale(step, k as f32 * appear.max(0.0)));
-                lit = math::union(lit, math::around(c, reach));
+                let behind_center =
+                    math::add(top.center, math::scale(step, k as f32 * appear.max(0.0)));
+                lit = math::union(lit, math::around(behind_center, reach));
             }
             // The badge overshoots to 1.4x while appearing.
             lit = math::union(lit, math::around(badge, badge_r * 1.5 + 4.0));
