@@ -1,0 +1,51 @@
+[package]
+name = "vutric-daemon"
+description = "Vutric desktop daemon: receiving, tray, toasts, overlay and the local IPC for the desktop windows."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+blake3.workspace = true
+serde.workspace = true
+serde_json = "1"
+thiserror.workspace = true
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
+vutric-core.workspace = true
+image.workspace = true
+pollster.workspace = true
+raw-window-handle.workspace = true
+vutric-net = { path = "../vutric-net" }
+vutric-overlay.workspace = true
+wgpu.workspace = true
+winit.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+tray-icon = { version = "0.26.1", default-features = false }
+windows = { version = "0.62.2", features = [
+    "Data_Xml_Dom",
+    "Foundation",
+    "Win32_Globalization",
+    "UI_Notifications",
+    "Win32_Foundation",
+    "Win32_System_Registry",
+] }
+
+[target.'cfg(windows)'.dependencies.vutric-host-win]
+workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+vutric-host-mac = { path = "../vutric-host-mac" }
+objc2 = { version = "0.6.5", optional = true }
+
+[features]
+# The macOS card window (`vutric_host_mac::card::CardPanel`, W5 PR #35). Off until that is on the base branch.
+mac-cards = ["dep:objc2"]
+
+[lints]
+workspace = true
