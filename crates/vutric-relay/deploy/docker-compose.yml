@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Wonmor and Vutric contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Vutric relay with Docker (backlog R2). From this directory:
+#   ./render-config.sh relay.example.org mailto:ops@example.org --container
+#   docker compose up -d --build
+# Ports 80 and 443 must be free on the host (ACME needs 80 from the internet).
+
+services:
+  vutric-relay:
+    build:
+      context: ../../..
+      dockerfile: crates/vutric-relay/deploy/Dockerfile
+    image: vutric-relay:local
+    container_name: vutric-relay
+    restart: unless-stopped
+    ports:
+      - "80:8080/tcp"
+      - "443:8443/tcp"
+      - "7842:7842/udp"
+    volumes:
+      - ./vutric-relay.toml:/etc/vutric-relay/vutric-relay.toml:ro
+      - relay-data:/data
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+volumes:
+  relay-data:

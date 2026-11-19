@@ -7,6 +7,7 @@ From 2026-11-19, W3 does not edit the shared docs (`backlog.md`, `workstreams.md
 
 | Item | State | Evidence |
 |---|---|---|
+| R2 own relay | [~] | Deploy kit `crates/vutric-relay/deploy/` (config template + `render-config.sh`, `install.sh` for systemd, hardened unit, Dockerfile + compose with ACME cache volume), documented in `docs/relay.md`; test `tests/deploy_config.rs`; waits for the owner's domain and server, not run on a server |
 | M2 direct vs relay share | [~] | ADR-0077: `vutric_core::telemetry` (off by default, `Tally` per UTC day by last badge, bucketed counts, report = `{v, day, platform, tally}` only), `Settings.telemetry`, `vutric_net::telemetry::send` + `jitter`; tests `telemetry::tests`, `tests/telemetry_off.rs`; no collector yet (owner question) |
 | C8 adapter rules audit | [~] | Audit below (2026-11-19, from the code on `w3/net-4`): rules 1, 5 and 7 hold for all four adapters; rule 2's pinned shortcut is stored but not wired (every offer is asked, which is the safe side); rule 4 is a separate low-privilege process, not yet an OS sandbox; rule 6 only magic-wormhole runs against the real app in CI (M5 for the rest) |
 | C3 Quick Share sending to Android | [~] | ADR-0076: `vutric_compat_quickshare::wake`: QR invite (P-256 key, HKDF token, hidden-name AES-GCM, `endpoint::records`, mDNS `browse`, `send_via_qr`) for any desktop; BLE wake-up bytes `0xFE2C` for W6/W2 advertisers; tests `wake::tests`, fuzz `quickshare_frames` extended; no real phone yet (M5) |
