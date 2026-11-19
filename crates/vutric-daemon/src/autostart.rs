@@ -93,6 +93,23 @@ pub fn set(enabled: bool, exe: &Path) -> std::io::Result<()> {
     }
 }
 
+/// macOS: the menu-bar agent owns the login item (`SMAppService`, ADR-0111) and starts the daemon with `--agent`;
+/// the daemon never registers itself.
+#[cfg(target_os = "macos")]
+#[must_use]
+pub fn is_enabled(_exe: &Path) -> bool {
+    true
+}
+
+#[cfg(target_os = "macos")]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "same signature as the other platforms"
+)]
+pub fn set(_enabled: bool, _exe: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

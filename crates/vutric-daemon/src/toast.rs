@@ -169,6 +169,7 @@ mod tests {
         );
     }
 
+    #[cfg(windows)]
     #[test]
     fn one_photo_has_a_picture_and_two_buttons() {
         let files = [PathBuf::from(r"C:\D\photo.JPG")];
