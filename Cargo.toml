@@ -14,6 +14,7 @@ members = [
     "apps/overlay-spike",
     "crates/vutric-compat-wormhole",
     "crates/vutric-mobile/uniffi-bindgen",
+    "crates/vutric-host-mac",
 ]
 
 [workspace.package]

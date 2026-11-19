@@ -23,6 +23,7 @@ done. An open question for the owner never blocks a stream. It goes into
 | **W1 · Phone** | Flutter app rebuilt on the Claude Design handoff (`design/claude-design/`), improved where it falls short; Kotlin modules; later the Swift modules | `apps/mobile-spike/**`, `crates/vutric-mobile/**`, `design/**` | A1–A14, I1–I10, T1/T3 phone UI, F1/F2/F8/F9/F19 phone parts, effects on the phone |
 | **W2 · Desktop** | Rust daemon (tray, toast, IPC, autostart), overlay cards, Halqa and the other effects, Explorer menu, installer; desktop settings UI after the M1 spike; Linux hosts later | `crates/vutric-overlay/**`, `crates/vutric-host-*/**`, new `crates/vutric-daemon/**`, `apps/overlay-spike/**`, new `apps/desktop/**`, new `packaging/**` | D1–D11, E1–E5, M1, T8 |
 | **W3 · Network and interop** | routes R1–R10, our own relay, trust store and security, storage engine, every adapter of ADR-0010, fuzzing, interop tests | `crates/vutric-core/**`, `crates/vutric-net/**`, new `crates/vutric-compat-*/**`, new `crates/vutric-relay/**`, `apps/net-spike/**`, new `fuzz/**`, `docs/protocol.md` | R*, C*, S*, T2/T4–T7 engine, M2–M5 |
+| **W5 · macOS** (from 2026-11-18) | Roadmap Phase 5: the `NSPanel` overlay host, the menu-bar agent (the daemon role on macOS: login item, notifications), the Swift Share extension and Finder Quick Action, the signed and notarised `.dmg`, macOS CI, and the macOS host side of LocalSend and Quick Share. Carved out of W2's `crates/vutric-host-*/**` and `packaging/**` for macOS only | new `crates/vutric-host-mac/**`, new `apps/macos/**` (Swift), new `packaging/macos/**`, new `.github/workflows/macos-*.yml`; inside W2's `apps/desktop/**` only a new `apps/desktop/macos/` runner directory | D11, macOS parts of C1, C3 and F1 |
 
 **Shared files.** These have rules instead of a single owner:
 
@@ -35,6 +36,7 @@ done. An open question for the owner never blocks a stream. It goes into
 | `docs/owner-questions.md` | Append only, prefixed with the stream tag. |
 | `.github/workflows/**` | Add new workflow files, or add a new job. Never rewrite another stream's job. |
 | ADR numbers | W1 uses 0011–0029, W2 0030–0049, W3 0050–0069, so numbers never collide. |
+| ADR numbers (W5) | W5 uses 0110–0129. |
 
 ## The interface between streams
 
@@ -59,6 +61,7 @@ done. An open question for the owner never blocks a stream. It goes into
   | W1 | `D:\Projects\wonmortech\vutric` | `w1/phone` |
   | W2 | `D:\Projects\wonmortech\vutric-w2` | `w2/desktop` |
   | W3 | `D:\Projects\wonmortech\vutric-w3` | `w3/net` |
+  | W5 | `C:\vutric-w5` | `w5/macos-*` |
 
 - **Commits are small and finished.**
   - Every commit leaves the stream's crates green: `cargo clippy --all-targets -- -D warnings` and the tests, plus
@@ -119,6 +122,21 @@ done. An open question for the owner never blocks a stream. It goes into
 4. C1 LocalSend v2.1 adapter and C2 browser page, then C3 Quick Share (Windows). Each gets a sandboxed parser
    process, a fuzzer and a real-app test.
 5. T2–T7 storage engine (free-space guard, parts cleanup, history), then the R3 hotspot core.
+
+**W5 · macOS**
+
+1. ADR for the overlay: borderless, transparent, non-activating `NSPanel` hosting a wgpu Metal surface, on every
+   Space and above full-screen apps, ProMotion handled.
+2. `crates/vutric-host-mac`: the same host functions `vutric-host-win` offers, plus a frame-pacing measurement
+   (fps, missed frames, focus kept) that runs on the CI macOS runner and uploads JSON.
+3. Menu-bar agent `apps/macos/` (`LSUIElement`, `SMAppService` login item, `UNUserNotificationCenter`). What the
+   daemon itself needs on macOS goes to W2 as `needs-w2` issues.
+4. Swift Share extension "Vutric bilan yuborish" and a Finder Quick Action; Local Network and Bonjour notes.
+5. `packaging/macos/`: `.dmg`, signed and notarised once the Apple Developer secrets exist, unsigned until then.
+6. A real-Mac checklist (Intel and Apple silicon, macOS 15 and 26); nothing is `[x]` without a real Mac.
+7. Round 2 (PR #34): `CADisplayLink` pacing for ProMotion (ADR-0114), text and links in the Share menu plus the
+   Finder Quick Action (ADR-0115), the icon drawn from the brand mark (ADR-0116), foreground LocalSend / Quick
+   Share through the `vutric-mac-compat` bridge until the daemon runs on macOS (ADR-0117).
 
 ## When a stream is "done"
 
