@@ -47,7 +47,7 @@ and the extension folder to `~/.local/share/gnome-shell/extensions/` (F50). Log 
 | 17 | `kill -SEGV` the daemon: back within 2 s (`Restart=on-failure`) | [~] | [~] | [~] | needs the daemon |
 | 18 | Nautilus: right click → Skriptlar → "Vutric bilan yuborish" sends the file | [~] | – | [~] | needs `vutric-daemon send` (W2, D5) |
 | 19 | Dolphin: right click → "Vutric bilan yuborish" | – | [~] | – | same |
-| 20 | GNOME without the extension: one notification asking to turn it on, files still received | [~] | – | [~] | needs the daemon |
+| 20 | GNOME without the extension: one notification asking to turn it on (once, `onboarding::ask`), "Kengaytmani yoqish" turns it on or asks for a new login, files still received | [~] | – | [~] | needs the daemon |
 
 ## Packaging (ADR-0092)
 
@@ -56,3 +56,15 @@ and the extension folder to `~/.local/share/gnome-shell/extensions/` (F50). Log 
 | 21 | `sudo apt install ./vutric_*.deb`, then remove: no leftovers outside `$HOME` | [~] | [~] | – | CI installs and removes on the runner |
 | 22 | GNOME Software / Discover show the AppStream entry with the icon | [~] | [~] | – | by hand |
 | 23 | Extension from extensions.gnome.org (after review) works the same as the bundled one | [~] | – | [~] | not submitted yet |
+
+## Other apps on Linux: Quick Share, LocalSend, KDE Connect (C3 / C1 / C4 Linux rows, ADR-0093 §4)
+
+| # | Check | U46 | K6 | F50 | Left |
+|---|---|---|---|---|---|
+| 30 | Android share sheet → Quick Share lists the Linux desktop while `avahi-daemon` runs | [~] | [~] | [~] | CI checks Avahi sees `_FC9F5ED42C8A._tcp` (job `compat`) |
+| 31 | Quick Share: photo and 1 GB video land in the localised `Downloads/Vutric`, partial file only in `.incoming` | [~] | [~] | [~] | needs the daemon (w4-notes §1.8) |
+| 32 | Quick Share with the phone's "Everyone / Contacts" visibility; PIN shown on both sides | [~] | [~] | [~] | by hand |
+| 33 | LocalSend (Android and desktop) sends to Vutric and receives from it | [~] | [~] | [~] | engine tests run in CI next to Avahi |
+| 34 | KDE Connect on the phone pairs with Vutric on U46/F50; on K6 the real KDE Connect is running: no port clash on 1714-1764 | [~] | [~] | [~] | K6 is the clash case |
+| 35 | Fedora: stricter zone + `firewall-cmd --add-service=vutric`: LocalSend and KDE Connect work, Quick Share needs the trusted zone | – | – | [~] | ephemeral ports (firewalld/vutric.xml comment) |
+| 36 | The adapter process: `no_new_privs`, dies with the daemon (`kill -9` the daemon), no core file | [~] | [~] | [~] | `grep NoNewPrivs /proc/<pid>/status` |
