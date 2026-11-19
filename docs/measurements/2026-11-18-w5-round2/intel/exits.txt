@@ -1,0 +1,5 @@
+panel-status-fifo exit=0
+winit-status-fifo exit=0
+panel-screen-saver-fifo exit=0
+panel-status-link exit=0
+winit-status-link exit=0
