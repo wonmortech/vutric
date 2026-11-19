@@ -4,7 +4,8 @@ Date: 2026-11-18 · Binaries: `vutric-surface` and `examples/surface_driver` (re
 · Where: GitHub Actions `ubuntu-24.04` runner, workflow `linux-desktop.yml`, **headless compositors with software
 rendering**. No real Linux machine has run it yet.
 
-**Verdict: the path works end to end on wlroots (layer-shell); the GNOME path is not proven yet (see below).
+**Verdict: the path works end to end on wlroots (layer-shell); on GNOME everything up to the effect frames of the
+adopted window works, and those frames are not verifiable on headless Mutter (see below).
 Frame numbers below are from Mesa llvmpipe on a CI VM and say nothing about real GPUs.**
 
 ## Layer-shell on headless sway (KDE / wlroots / COSMIC path)
@@ -34,11 +35,26 @@ created, configured, paced by frame callbacks and stays alive across effects; th
 
 ## GNOME Shell 46 headless (extension path)
 
-`gnome-shell --headless --wayland --virtual-monitor 1920x1080` with the extension enabled: the extension loads and
-answers `Ping` (`(uint32 1, '46.0')`), `ShowCard` round trip 2.2–4.1 ms, `SpawnSurface` returns a pid. The surface
-process launched through `Meta.WaylandClient` then **exits before sending `Ready`**; diagnosis in progress (the
-surface now reports Wayland-connect failures and panics over the socket, and the extension can log its stderr via
-`VUTRIC_SURFACE_LOG`). Until this passes, the GNOME overlay is unproven.
+GNOME Shell 46.0 / Mutter 46.2, `gnome-shell --headless --wayland --virtual-monitor 1920x1080` ("surfaceless
+renderer without GPU"), extension enabled. Runs 44344633456 (645f673) and 44346154783 (7ef6393).
+
+| Check | Result |
+|---|---|
+| Extension loads, `Ping` | `(uint32 1, '46.0')` |
+| `ShowCard` round trip (400×176 raster over D-Bus) | 2.2–4.1 ms over five runs |
+| Surface as a plain Mutter client (xdg toplevel, 1920×1048 under the top bar), self-test 3 runs | warm 90.6–286.8 ms; 30–46 fps, p50 21.4–32.6 ms, many hitches (software compositing on a shared CI VM) |
+| Extension launches the surface (`Meta.WaylandClient.new` + `spawnv`), daemon protocol | `Ready { backend: "gnome-shell" }`, `Warmed` 80–111 ms at **1920×1080** (the full monitor) |
+| Before the window was adopted (645f673): 3 effects | first frame 20.2–38.3 ms, 30.1–30.9 fps, p99 36.1–42.3 ms |
+| Window adopted (`make_dock`, `hide_from_window_list`, 7ef6393) | yes: shell log `Vutric: surface window adopted (new+spawnv, client.make_dock, ...)` |
+| Effects after the dock retype | **none**: no frame callback within 30 s on headless Mutter. Not verifiable in CI (ADR-0090 "CI limits") |
+
+Bugs CI found and fixed on the way: the extension kills the surface when its caller leaves the bus, and the test
+driver dropped its D-Bus connection (SIGKILL); Mutter creates the window before `set_app_id`, so adoption by class
+never matched. The surface now reports connect failures and panics over its socket, and `VUTRIC_SURFACE_LOG`
+captures its stderr.
+
+**GNOME verdict: launch, warm-up, adoption and the D-Bus API work on Shell 46; effect pacing of the adopted dock
+window is unproven until a real GNOME session runs checklist rows 1, 5b and 9.**
 
 ## How to reproduce
 

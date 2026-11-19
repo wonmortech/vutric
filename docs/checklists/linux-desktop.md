@@ -22,6 +22,7 @@ and the extension folder to `~/.local/share/gnome-shell/extensions/` (F50). Log 
 | 3 | Type in a text editor during the self-test: no keystroke lost, caret never leaves the editor | [~] | [~] | [~] | layer: `keyboard_interactivity = none`; GNOME: dock + empty input region. Verify by hand |
 | 4 | Click and drag on the desktop/an app **through** the effect while it plays | [~] | [~] | [~] | empty input region set on both surfaces; verify by hand |
 | 5 | Effect window never appears in Alt+Tab, the overview, the dock or the taskbar | [~] | [~] | [~] | layer surfaces are never listed; GNOME `hide_from_window_list` (46: client API, 50: window API) |
+| 5b | GNOME: effects still play **after** the extension retypes the window to a dock (headless Mutter gives it no frame callbacks; ADR-0090 "CI limits") | [~] | – | [~] | if not: keep it NORMAL + above, hidden from the window list |
 | 6 | Transparent: the desktop is visible through the portal glow, no black rectangle | [~] | [~] | [~] | premultiplied alpha required by the code, else it refuses to start |
 | 7 | Effect above a maximised window; behaviour over a fullscreen video/game noted | [~] | [~] | [~] | layer `overlay` vs GNOME dock + above; record what happens |
 | 8 | Two monitors, different scale (100 % + 200 %, and 125 % fractional on K6): effect on the chosen monitor, sharp | [~] | [~] | [~] | integer `wl_output` scale only (ADR-0090 consequences) |
