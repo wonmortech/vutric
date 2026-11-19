@@ -1,0 +1,40 @@
+[package]
+name = "vutric-app"
+description = "Vutric desktop windows: pairing QR, devices, history, send and settings. Talks to vutric-daemon over its IPC only."
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace for now, like the M1 spike: Slint's dependency tree stays out of the main Cargo.lock and the
+# three-OS CI until a job builds this app (docs/streams/w2-notes.md). Software renderer only (ADR-0030).
+[workspace]
+
+[dependencies]
+blake3 = "1.8.7"
+qrcode = { version = "0.14.1", default-features = false }
+serde_json = "1"
+slint = { version = "1.19.0", default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "accessibility",
+    "backend-winit",
+    "renderer-software",
+    "unstable-winit-030",
+] }
+
+[build-dependencies]
+slint-build = "1.19.0"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+missing_errors_doc = "allow"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

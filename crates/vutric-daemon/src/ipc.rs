@@ -34,8 +34,11 @@ pub enum Request {
     Pause {
         paused: bool,
     },
-    /// The pairing link the phone scans (`vutric://` URI).
+    /// Opens the 10-minute pairing window with a fresh one-time secret and returns the link the QR shows
+    /// (`vutric://` URI with `s=`, ADR-0064).
     Pairing,
+    /// Closes the pairing window: the QR on screen stops working (the desktop window closed).
+    ClosePairing,
     /// Plays the chosen effect once on the overlay with a sample card, for the settings preview button.
     PreviewEffect,
     /// Streams [`Event`]s on this connection from now on.
@@ -304,6 +307,7 @@ mod tests {
             },
             Request::Pause { paused: true },
             Request::Pairing,
+            Request::ClosePairing,
             Request::PreviewEffect,
             Request::Subscribe,
             Request::Show,

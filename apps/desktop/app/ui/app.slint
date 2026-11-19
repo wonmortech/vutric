@@ -1,0 +1,174 @@
+// The Vutric desktop windows (backlog D3/D4/D6): one window, a side list of pages. Every value comes from the daemon
+// over its IPC; this process holds nothing when it is closed. Tokens follow design/claude-design/README.md.
+
+import { LineEdit, Button } from "std-widgets.slint";
+
+export global Palette {
+    out property <color> night: #040c29;
+    out property <color> surface: #0b1640;
+    out property <color> line: #1c2a63;
+    out property <color> brand: #2969ff;
+    out property <color> glow: #f4d9a6;
+    out property <color> text: #eef1fb;
+    out property <color> muted: #9aa6cf;
+    out property <color> ok: #34c759;
+    out property <color> err: #ff3b30;
+}
+
+// Texts, set from Rust (src/i18n.rs) so the catalog stays in one place.
+export global Tr {
+    in-out property <string> nav-pair;
+    in-out property <string> nav-devices;
+    in-out property <string> nav-history;
+    in-out property <string> nav-send;
+    in-out property <string> nav-settings;
+    in-out property <string> pair-title;
+    in-out property <string> pair-hint;
+    in-out property <string> pair-link;
+    in-out property <string> pair-left;
+    in-out property <string> pair-expired;
+    in-out property <string> pair-renew;
+    in-out property <string> pair-done;
+}
+
+component NavItem inherits Rectangle {
+    in property <string> label;
+    in property <bool> active;
+    callback clicked();
+    height: 40px;
+    border-radius: 10px;
+    background: active ? Palette.surface : touch.has-hover ? #0b16408c : transparent;
+    animate background { duration: 140ms; }
+    Text {
+        x: 14px;
+        text: label;
+        color: active ? Palette.text : Palette.muted;
+        font-size: 14px;
+        font-weight: active ? 600 : 400;
+        vertical-alignment: center;
+        height: parent.height;
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+export component Card inherits Rectangle {
+    background: Palette.surface;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: Palette.line;
+}
+
+component PairingPage inherits VerticalLayout {
+    in property <image> qr;
+    in property <string> link;
+    in property <string> left;
+    in property <bool> expired;
+    in property <bool> done;
+    in property <string> error;
+    callback renew();
+    spacing: 14px;
+    alignment: start;
+
+    Text { text: Tr.pair-title; color: Palette.text; font-size: 22px; font-weight: 600; wrap: word-wrap; }
+    Text { text: Tr.pair-hint; color: Palette.muted; font-size: 13px; wrap: word-wrap; }
+    if error != "": Text { text: error; color: Palette.err; font-size: 13px; wrap: word-wrap; }
+
+    HorizontalLayout {
+        alignment: start;
+        spacing: 20px;
+        Rectangle {
+            width: 248px;
+            height: 248px;
+            border-radius: 18px;
+            background: #ffffff;
+            Image {
+                source: qr;
+                width: 232px;
+                height: 232px;
+                image-rendering: pixelated;
+                opacity: expired || done ? 0.15 : 1;
+            }
+            if done: Text {
+                text: Tr.pair-done;
+                color: #0a7d2c;
+                font-size: 22px;
+                font-weight: 700;
+            }
+            if expired && !done: Text {
+                text: Tr.pair-expired;
+                color: #040c29;
+                font-size: 18px;
+                font-weight: 600;
+            }
+        }
+        VerticalLayout {
+            spacing: 10px;
+            alignment: start;
+            Text { text: Tr.pair-left + " " + left; color: Palette.glow; font-size: 15px; visible: !expired && !done; }
+            Button {
+                text: Tr.pair-renew;
+                visible: expired || done;
+                clicked => { root.renew(); }
+            }
+        }
+    }
+
+    Text { text: Tr.pair-link; color: Palette.muted; font-size: 12px; }
+    LineEdit { text: link; read-only: true; font-size: 12px; }
+}
+
+export component AppWindow inherits Window {
+    title: "Vutric";
+    preferred-width: 820px;
+    preferred-height: 560px;
+    min-width: 640px;
+    min-height: 460px;
+    background: Palette.night;
+
+    // pairing | devices | history | send | settings
+    in-out property <string> page: "pairing";
+
+    in property <image> qr;
+    in property <string> link;
+    in property <string> left;
+    in property <bool> expired;
+    in property <bool> paired;
+    in property <string> error;
+    callback renew-pairing();
+    callback page-changed(string);
+
+    HorizontalLayout {
+        VerticalLayout {
+            width: 200px;
+            padding: 14px;
+            spacing: 4px;
+            alignment: start;
+            Text {
+                text: "vutric";
+                color: Palette.text;
+                font-size: 20px;
+                font-weight: 700;
+                height: 44px;
+                vertical-alignment: center;
+            }
+            NavItem {
+                label: Tr.nav-pair;
+                active: page == "pairing";
+                clicked => { root.page = "pairing"; root.page-changed(root.page); }
+            }
+        }
+        Rectangle { width: 1px; background: Palette.line; }
+        VerticalLayout {
+            padding: 24px;
+            if page == "pairing": PairingPage {
+                qr: root.qr;
+                link: root.link;
+                left: root.left;
+                expired: root.expired;
+                done: root.paired;
+                error: root.error;
+                renew => { root.renew-pairing(); }
+            }
+        }
+    }
+}

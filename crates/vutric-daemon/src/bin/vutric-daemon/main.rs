@@ -285,6 +285,10 @@ impl server::Handler for Daemon {
                     message: "network is still starting".into(),
                 },
             },
+            Request::ClosePairing => {
+                self.shared.close_pairing();
+                Reply::Ok
+            }
             Request::Devices => Reply::Devices {
                 devices: self.shared.devices(),
             },
@@ -505,7 +509,8 @@ impl App {
         }
     }
 
-    fn open_settings() {
+    /// Starts the desktop window process (`vutric-app`, ADR-0033) on `page`, in the daemon's language.
+    fn open_app(lang: Lang, page: &str) {
         let Ok(exe) = std::env::current_exe() else {
             return;
         };
@@ -514,8 +519,16 @@ impl App {
         } else {
             "vutric-app"
         });
-        if let Err(e) = std::process::Command::new(&app).spawn() {
-            vutric_net::say(format!("settings window {}: {e}", app.display()));
+        let lang = match lang {
+            Lang::Uz => "uz",
+            Lang::En => "en",
+        };
+        if let Err(e) = std::process::Command::new(&app)
+            .arg(format!("--page={page}"))
+            .env("VUTRIC_LANG", lang)
+            .spawn()
+        {
+            vutric_net::say(format!("desktop window {}: {e}", app.display()));
         }
     }
 
@@ -708,7 +721,7 @@ impl ApplicationHandler<UiEvent> for App {
                     },
                 ),
                 Some(tray::Action::Everyone) => self.shared.open_everyone(),
-                Some(tray::Action::Settings) => Self::open_settings(),
+                Some(tray::Action::Settings) => Self::open_app(self.lang, "settings"),
                 Some(tray::Action::TogglePause) => {
                     let p = !self.shared.paused.load(Ordering::Relaxed);
                     self.set_paused(p);
@@ -716,7 +729,7 @@ impl ApplicationHandler<UiEvent> for App {
                 Some(tray::Action::Quit) => event_loop.exit(),
                 None => {}
             },
-            UiEvent::TrayOpen => Self::open_settings(),
+            UiEvent::TrayOpen => Self::open_app(self.lang, "devices"),
             UiEvent::ShowPairing => {
                 if let Some(link) = self.shared.open_pairing() {
                     self.deck.pair(&link);
