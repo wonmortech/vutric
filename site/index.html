@@ -1,464 +1,318 @@
 <!doctype html>
-<html lang="en" data-page="system">
+<html lang="en" data-page="landing">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Vutric design system</title>
-<meta name="description" content="Colours, type, components, the Halqa effect and the Android, Windows and Ubuntu screens of Vutric, the app that flicks photos from a phone onto a desktop.">
-<meta name="theme-color" content="#040c29">
-<meta property="og:title" content="Vutric design system">
-<meta property="og:description" content="Colours, type, components, the Halqa effect and every first-release screen of Vutric.">
+<title>Vutric — throw files across the room</title>
+<meta name="description" content="Flick a photo off your phone and it flies through a glowing portal onto your desktop. Offline, encrypted, open source.">
+<meta name="theme-color" content="#060713">
+<meta property="og:title" content="Vutric — throw files across the room">
+<meta property="og:description" content="Flick a file off your phone, it flies through a portal onto your desktop. Offline, encrypted, open source.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://vutric.wonmor.io/">
 <link rel="canonical" href="https://vutric.wonmor.io/">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preload" href="assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/vutric.css">
-<script src="assets/boot.js"></script>
-<script src="assets/vutric.js" defer></script>
+<link rel="stylesheet" href="assets/landing.css">
+<script src="assets/halqa3d.js" defer></script>
+<script src="assets/landing.js" defer></script>
 </head>
 <body>
+<div class="prog" aria-hidden="true"></div>
+
 <header class="nav">
   <div class="wrap nav__row">
-    <a class="skip" href="#main">Skip to content</a>
-    <a class="brand" href="#top" aria-label="Vutric design system, top">
+    <a class="brand" href="#top" aria-label="Vutric, top">
       <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>
       <span>Vutric</span>
     </a>
-    <nav class="nav__links" aria-label="Sections">
-      <a href="#colour">Colour</a>
-      <a href="#type">Type</a>
-      <a href="#components">Components</a>
-      <a href="#effect">Effect</a>
-      <a href="#screens">Screens</a>
-    </nav>
     <div class="nav__end">
-      <div class="theme" role="radiogroup" aria-label="Colour theme">
-        <button type="button" role="radio" data-theme-set="auto" aria-checked="true" title="Follow the system">Auto</button>
-        <button type="button" role="radio" data-theme-set="light" aria-checked="false">Light</button>
-        <button type="button" role="radio" data-theme-set="dark" aria-checked="false">Dark</button>
-      </div>
-      <a class="btn btn--primary btn--nav" href="https://github.com/wonmortech/vutric">Read the source</a>
+      <a class="iconbtn" href="https://github.com/wonmortech/vutric" aria-label="Source on GitHub"><svg aria-hidden="true"><use href="#i-github"/></svg></a>
+      <a class="cta" href="https://github.com/wonmortech/vutric/releases"><svg aria-hidden="true"><use href="#i-download"/></svg><span>Download</span></a>
     </div>
   </div>
 </header>
 
 <main id="main">
 
-<!-- Hero: the Halqa effect itself, drawn live by assets/vutric.js from the same timeline the desktop overlay uses. -->
-<section class="hero" id="top" data-grade="night">
+<!-- Hero: the 3D Halqa throw, drawn live by assets/halqa3d.js (WebGL). -->
+<section class="hero" id="top">
   <canvas class="hero__canvas" data-halqa="hero" aria-hidden="true"></canvas>
-  <div class="hero__still" aria-hidden="true"></div>
+  <div class="hero__fallback" aria-hidden="true"></div>
   <div class="wrap hero__inner">
-    <p class="pill">Design system v0.1 · Phase 0 · 17 November 2026</p>
-    <h1>Vutric design system for phone-to-desktop transfer</h1>
-    <p class="lead">Colours, type, controls and every first-release screen of Vutric: flick a photo off your Android phone and it flies onto your Windows or Ubuntu desktop.</p>
-    <div class="btn-row">
-      <a class="btn btn--primary" href="#screens">See the screens</a>
-      <a class="btn btn--secondary" href="#effect">Watch the effect</a>
+    <span class="hero__kicker"><span class="dot"></span>Open source · offline · v0.1</span>
+    <h1>Throw it <span class="grad">across.</span></h1>
+    <p class="hero__line">Flick a file off your phone — it flies through a glowing portal onto your desktop. No cloud, no account.</p>
+    <div class="hero__row">
+      <a class="cta cta--lg" href="https://github.com/wonmortech/vutric/releases"><svg aria-hidden="true"><use href="#i-download"/></svg>Download</a>
+      <a class="ghost" href="#truths"><svg aria-hidden="true"><use href="#i-play"/></svg>See how</a>
     </div>
   </div>
-  <button class="hero__pause" type="button" data-halqa-toggle="hero" aria-pressed="false">Pause animation</button>
+  <a class="hero__scroll" href="#truths" aria-label="Scroll"><span>Scroll</span><svg aria-hidden="true"><use href="#i-chev"/></svg></a>
+  <button class="hero__pause" type="button" data-halqa-toggle="hero" aria-pressed="false" aria-label="Pause animation">
+    <svg class="i-pause" aria-hidden="true"><use href="#i-pause"/></svg>
+    <svg class="i-play" aria-hidden="true"><use href="#i-play"/></svg>
+  </button>
 </section>
 
-<section class="sec" id="colour">
+<!-- Three truths -->
+<section class="scene" id="truths">
   <div class="wrap">
-    <h2>Colour: cobalt and sand. <span class="muted">Neutral interface, colour only for action and the effect.</span></h2>
-    <div class="swatches">
-      <article class="swatch">
-        <div class="swatch__chip chip--cobalt"><span>Aa</span></div>
-        <h3>Cobalt 900</h3>
-        <p class="mono">#062B8A</p>
-        <p>Ink, primary buttons and focus in the light theme. 8.9:1 on Sand 200.</p>
-      </article>
-      <article class="swatch">
-        <div class="swatch__chip chip--signal"><span>Aa</span></div>
-        <h3>Signal 500</h3>
-        <p class="mono">#2F6BFF</p>
-        <p>The outer rim of the portal, links on night, the live connection dot.</p>
-      </article>
-      <article class="swatch">
-        <div class="swatch__chip chip--glow"><span>Aa</span></div>
-        <h3>Glow 200</h3>
-        <p class="mono">#F4D9A6</p>
-        <p>The inner rim and hot core of the portal; primary action in the dark theme.</p>
-      </article>
-      <article class="swatch">
-        <div class="swatch__chip chip--sand"><span>Aa</span></div>
-        <h3>Sand 200</h3>
-        <p class="mono">#E6DBC7</p>
-        <p>Ground of the light theme, phone and desktop alike.</p>
-      </article>
-      <article class="swatch">
-        <div class="swatch__chip chip--paper"><span>Aa</span></div>
-        <h3>Sand 50</h3>
-        <p class="mono">#F7F2E9</p>
-        <p>Raised surfaces: cards, sheets, windows on Sand 200.</p>
-      </article>
-      <article class="swatch">
-        <div class="swatch__chip chip--night"><span>Aa</span></div>
-        <h3>Night 950</h3>
-        <p class="mono">#040C29</p>
-        <p>Ground of the dark theme and the inside of the portal lens.</p>
-      </article>
+    <div class="scene__head" data-reveal>
+      <span class="eyebrow">Why Vutric</span>
+      <h2>Three things. <span class="grad">Nothing else.</span></h2>
     </div>
-    <div class="ramp" aria-hidden="true"><span class="ramp__bar"></span></div>
-    <p class="ramp__note">The portal rim runs Signal 500 → Glow 200 over Night 950. No violet, no rainbow: our effect is a single cobalt halo.</p>
-  </div>
-</section>
-
-<section class="sec sec--alt" id="type">
-  <div class="wrap">
-    <h2>Type: Geist and Geist Mono. <span class="muted">One family, weights 400 and 500.</span></h2>
-    <div class="type">
-      <div class="type__row">
-        <p class="type__meta mono">Display · 64/1.02 · 500 · −4.5%</p>
-        <p class="t-display">Rasm yuborildi</p>
-      </div>
-      <div class="type__row">
-        <p class="type__meta mono">Title · 32/1.15 · 500 · −3%</p>
-        <p class="t-title">Telefonni ulash</p>
-      </div>
-      <div class="type__row">
-        <p class="type__meta mono">Heading · 20/1.3 · 500</p>
-        <p class="t-head">Pixel 8 dan rasm keldi</p>
-      </div>
-      <div class="type__row">
-        <p class="type__meta mono">Body · 16/1.6 · 400</p>
-        <p class="t-body">Kompyuterdagi QR kodni skanerlang. Fayllar faqat mahalliy tarmoq orqali, shifrlangan holda uzatiladi; bulut va akkaunt kerak emas.</p>
-      </div>
-      <div class="type__row">
-        <p class="type__meta mono">Label · 13/1.4 · 500</p>
-        <p class="t-label">Yuborish zonasi · Oʻng chekka</p>
-      </div>
-      <div class="type__row">
-        <p class="type__meta mono">Mono · 14/1.5 · 400</p>
-        <p class="t-mono">vutric://pair?v=1&amp;n=Studio%20PC · IMG_2041.jpg · 4,2 MB</p>
-      </div>
-    </div>
-    <p class="type__note">Uzbek copy uses the modifier letter <span class="mono">ʻ</span> (U+02BB) in oʻ and gʻ, which the Geist Latin subset carries. Sentence case everywhere; numbers keep their unit.</p>
-  </div>
-</section>
-
-<section class="sec" id="foundations">
-  <div class="wrap">
-    <h2>Space, radius and motion tokens</h2>
-    <div class="found">
-      <article class="found__col">
-        <h3>Spacing</h3>
-        <ul class="space" aria-label="Spacing scale">
-          <li><span class="space__bar s-1"></span><span class="mono">4</span></li>
-          <li><span class="space__bar s-2"></span><span class="mono">8</span></li>
-          <li><span class="space__bar s-3"></span><span class="mono">12</span></li>
-          <li><span class="space__bar s-4"></span><span class="mono">16</span></li>
-          <li><span class="space__bar s-5"></span><span class="mono">24</span></li>
-          <li><span class="space__bar s-6"></span><span class="mono">32</span></li>
-          <li><span class="space__bar s-7"></span><span class="mono">48</span></li>
-          <li><span class="space__bar s-8"></span><span class="mono">64</span></li>
-        </ul>
-        <p>Touch targets are 48 px on the phone and 44 px on the desktop.</p>
+    <div class="truths">
+      <article class="truth" data-reveal="scale">
+        <div class="truth__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-offline"/></svg></div>
+        <h3>Offline</h3><p>No cloud, no account. Your own Wi-Fi, end-to-end encrypted.</p>
       </article>
-      <article class="found__col">
-        <h3>Radius</h3>
-        <div class="radii">
-          <div class="radius r-sm"><span class="mono">8</span><span>Controls</span></div>
-          <div class="radius r-md"><span class="mono">14</span><span>Cards, toasts</span></div>
-          <div class="radius r-lg"><span class="mono">22</span><span>Sheets, windows</span></div>
-          <div class="radius r-full"><span class="mono">999</span><span>Chips, toggles</span></div>
-        </div>
+      <article class="truth" data-reveal="scale">
+        <div class="truth__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-throw"/></svg></div>
+        <h3>The throw</h3><p>Flick it off the top edge and it flies through the portal.</p>
       </article>
-      <article class="found__col">
-        <h3>Motion</h3>
-        <ul class="ease" aria-label="Motion tokens">
-          <li class="ease__row"><span class="ease__track"><span class="ease__dot ease--out"></span></span><span><b>Out</b> <span class="mono">180 ms · (.2,.8,.2,1)</span></span></li>
-          <li class="ease__row"><span class="ease__track"><span class="ease__dot ease--back"></span></span><span><b>Open</b> <span class="mono">250 ms · back 1.6</span></span></li>
-          <li class="ease__row"><span class="ease__track"><span class="ease__dot ease--spring"></span></span><span><b>Land</b> <span class="mono">spring 3.2 Hz · ζ 0.42</span></span></li>
-        </ul>
-        <p>Interface motion stays under 250 ms. Only the effect may run longer. Reduced motion turns every effect into Oddiy.</p>
+      <article class="truth" data-reveal="scale">
+        <div class="truth__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-any"/></svg></div>
+        <h3>Any device</h3><p>Phone to desktop, phone to phone, desktop to desktop.</p>
       </article>
     </div>
   </div>
 </section>
 
-<section class="sec sec--alt" id="components">
+<!-- How it works: live demo + 4 steps -->
+<section class="scene" id="how">
   <div class="wrap">
-    <h2>Components for phone and desktop</h2>
-    <div class="comp">
-      <article class="comp__card">
-        <h3>Buttons</h3>
-        <div class="demo demo--stack">
-          <button class="btn btn--primary" type="button">Ruxsat berish</button>
-          <button class="btn btn--secondary" type="button">Keyinroq</button>
-          <a class="link" href="#screens">IP manzil orqali ulanish</a>
-        </div>
-      </article>
-      <article class="comp__card">
-        <h3>Send zone</h3>
-        <div class="demo">
-          <div class="seg" role="radiogroup" aria-label="Yuborish zonasi">
-            <button type="button" role="radio" aria-checked="false">Chap</button>
-            <button type="button" role="radio" aria-checked="true">Oʻng</button>
-            <button type="button" role="radio" aria-checked="false">Yuqori</button>
-          </div>
-          <label class="slider">
-            <span class="slider__head"><span class="t-label">Davomiylik</span><output class="mono" data-slider-out>1,0 s</output></span>
-            <input type="range" min="0.6" max="2" step="0.1" value="1" data-slider aria-label="Effekt davomiyligi">
-          </label>
-        </div>
-      </article>
-      <article class="comp__card">
-        <h3>Toggles and chips</h3>
-        <div class="demo demo--stack">
-          <label class="toggle"><input type="checkbox" checked><span class="toggle__ui" aria-hidden="true"></span><span>Kompyuter yonganda ishga tushirish</span></label>
-          <label class="toggle"><input type="checkbox"><span class="toggle__ui" aria-hidden="true"></span><span>Faqat Wi-Fi orqali</span></label>
-          <span class="chip"><span class="dot dot--live" aria-hidden="true"></span>Studio PC · ulangan</span>
-        </div>
-      </article>
-      <article class="comp__card comp__card--wide">
-        <h3>Effect cards</h3>
-        <div class="fx" role="radiogroup" aria-label="Effekt">
-          <button class="fx__card" type="button" role="radio" aria-checked="true">
-            <span class="fx__view fx--halqa" aria-hidden="true"><i></i><b></b></span>
-            <span class="fx__name">Halqa</span>
-          </button>
-          <button class="fx__card" type="button" role="radio" aria-checked="false">
-            <span class="fx__view fx--kometa" aria-hidden="true"><i></i><b></b></span>
-            <span class="fx__name">Kometa <span class="tag">Rejada</span></span>
-          </button>
-          <button class="fx__card" type="button" role="radio" aria-checked="false">
-            <span class="fx__view fx--pufak" aria-hidden="true"><i></i><b></b></span>
-            <span class="fx__name">Pufak <span class="tag">Rejada</span></span>
-          </button>
-          <button class="fx__card" type="button" role="radio" aria-checked="false">
-            <span class="fx__view fx--oddiy" aria-hidden="true"><i></i><b></b></span>
-            <span class="fx__name">Oddiy <span class="tag">Rejada</span></span>
-          </button>
-        </div>
-      </article>
-      <article class="comp__card">
-        <h3>Transfer rows</h3>
-        <ul class="rows">
-          <li class="row"><span class="thumb ph--dusk" aria-hidden="true"></span><span class="row__text"><b>IMG_2041.jpg</b><span>4,2 MB · Yuborildi</span></span><span class="state state--ok" aria-label="Yuborildi"></span></li>
-          <li class="row"><span class="thumb ph--sea" aria-hidden="true"></span><span class="row__text"><b>VID_0193.mp4</b><span class="bar" aria-label="64 foiz"><span class="bar__fill w-64"></span></span></span><span class="mono row__pct">64%</span></li>
-        </ul>
-      </article>
+    <div class="scene__head" data-reveal>
+      <span class="eyebrow">How it works</span>
+      <h2>Pick it, <span class="grad">flick it, done.</span></h2>
+      <p class="sub">Watch a photo leave the phone and land on the desktop — that is the whole app.</p>
     </div>
-  </div>
-</section>
-
-<section class="sec" id="effect" data-grade="night">
-  <div class="wrap">
-    <h2>Halqa, the default effect</h2>
-    <div class="effect">
-      <div class="effect__stage">
-        <canvas class="effect__canvas" data-halqa="studio" aria-label="Halqa effect, scrubbable"></canvas>
-      </div>
-      <div class="effect__side">
-        <ol class="phases" aria-label="Halqa timeline">
-          <li data-phase="open"><b>Open</b><span class="mono">0–250 ms</span><span>The portal grows with a small overshoot.</span></li>
-          <li data-phase="fly"><b>Fly</b><span class="mono">105–650 ms</span><span>The photo follows your throw: speed sets depth, angle bends the path.</span></li>
-          <li data-phase="land"><b>Land</b><span class="mono">650 ms →</span><span>A spring settles scale and tilt.</span></li>
-          <li data-phase="hold"><b>Hold</b><span class="mono">1,4 s</span><span>The photo rests where it landed.</span></li>
-          <li data-phase="dock"><b>Dock</b><span class="mono">450 ms</span><span>It shrinks into the notification corner.</span></li>
-        </ol>
-        <div class="scrub">
-          <button class="btn btn--secondary btn--sm" type="button" data-halqa-toggle="studio" aria-pressed="false">Pause</button>
-          <input type="range" min="0" max="1000" value="0" step="1" data-halqa-scrub="studio" aria-label="Timeline position">
+    <div class="demo" data-reveal="scale">
+      <div class="device" aria-label="Phone, Vutric gallery">
+        <div class="device__scr">
+          <div class="device__bar"></div>
+          <div class="device__hd"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>Vutric</div>
+          <div class="gallery">
+            <span class="ph"></span><span class="ph ph--sel"></span><span class="ph"></span>
+            <span class="ph"></span><span class="ph"></span><span class="ph"></span>
+            <span class="ph"></span><span class="ph"></span><span class="ph"></span>
+          </div>
         </div>
-        <p class="measure-note">Measured on an Intel UHD 730 at 2560×1440: 60 fps, first frame under 11 ms, keyboard focus never taken.</p>
+      </div>
+      <div class="demo__fly" aria-hidden="true"></div>
+      <div class="monitor" aria-label="Desktop, file received">
+        <div class="monitor__bar"><i></i><i></i><i></i></div>
+        <div class="monitor__body">
+          <div class="recv"><span class="recv__thumb"></span><div><b>IMG_2041.jpg</b><span>4.2 MB · done</span></div></div>
+        </div>
       </div>
     </div>
-  </div>
-</section>
-
-<section class="sec sec--alt sec--tall" id="screens">
-  <div class="wrap">
-    <h2>Android screens, first release</h2>
-    <div class="phones">
-
-      <figure class="screen">
-        <h3 class="screen__id"><span class="mono">A1</span> Onboarding</h3>
-        <div class="phone">
-          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
-          <div class="phone__body p-onboard">
-            <svg class="p-onboard__mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>
-            <p class="p-title">Rasmlarni kompyuterga otib yuboring</p>
-            <p class="p-sub">Uchta ruxsat kerak. Hech narsa internetga chiqmaydi.</p>
-            <ul class="perm">
-              <li><span class="perm__icon pi-photo" aria-hidden="true"></span><span><b>Rasmlar</b>Galereyadan tanlash uchun</span></li>
-              <li><span class="perm__icon pi-wifi" aria-hidden="true"></span><span><b>Yaqin Wi-Fi qurilmalar</b>Kompyuterni topish uchun</span></li>
-              <li><span class="perm__icon pi-bell" aria-hidden="true"></span><span><b>Bildirishnomalar</b>Yuborish holatini koʻrsatish uchun</span></li>
-            </ul>
-            <span class="btn btn--primary btn--block">Ruxsat berish</span>
-          </div>
-        </div>
-      </figure>
-
-      <figure class="screen">
-        <h3 class="screen__id"><span class="mono">A2</span> Pair by QR</h3>
-        <div class="phone phone--night">
-          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
-          <div class="phone__body p-scan">
-            <p class="p-title">Kompyuterdagi QR kodni skanerlang</p>
-            <div class="scan" aria-hidden="true"><span class="scan__qr qr"></span><span class="scan__line"></span></div>
-            <p class="p-sub">Kompyuterda: Vutric → Telefonni ulash</p>
-            <span class="link link--inv">IP manzil orqali ulanish</span>
-          </div>
-        </div>
-      </figure>
-
-      <figure class="screen">
-        <h3 class="screen__id"><span class="mono">A3</span> Home</h3>
-        <div class="phone">
-          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
-          <div class="phone__body p-home">
-            <span class="chip chip--sm"><span class="dot dot--live" aria-hidden="true"></span>Studio PC · ulangan</span>
-            <div class="tabs" aria-hidden="true"><span class="is-on">Rasmlar</span><span>Videolar</span><span>Fayllar</span><span>Clipboard</span></div>
-            <div class="grid9" aria-hidden="true">
-              <span class="ph--dusk is-sel"></span><span class="ph--sea"></span><span class="ph--leaf"></span>
-              <span class="ph--city"></span><span class="ph--sand"></span><span class="ph--dusk2"></span>
-              <span class="ph--sea2"></span><span class="ph--leaf2"></span><span class="ph--city2"></span>
-              <span class="ph--sand2"></span><span class="ph--dusk"></span><span class="ph--sea"></span>
-            </div>
-            <div class="bnav" aria-hidden="true"><span class="is-on"><i class="bi bi-grid"></i>Tanlash</span><span><i class="bi bi-clock"></i>Tarix</span><span><i class="bi bi-device"></i>Qurilmalar</span></div>
-          </div>
-        </div>
-      </figure>
-
-      <figure class="screen">
-        <h3 class="screen__id"><span class="mono">A4</span> Share sheet</h3>
-        <div class="phone">
-          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
-          <div class="phone__body p-share">
-            <div class="p-share__photo ph--leaf" aria-hidden="true"></div>
-            <div class="sheet">
-              <span class="sheet__grab" aria-hidden="true"></span>
-              <p class="sheet__title">1 ta rasm ulashish</p>
-              <div class="apps" aria-hidden="true">
-                <span class="app app--vutric"><i><svg viewBox="0 0 32 32"><use href="#mark"/></svg></i>Vutric</span>
-                <span class="app"><i class="app__g a1"></i>Xabarlar</span>
-                <span class="app"><i class="app__g a2"></i>Pochta</span>
-                <span class="app"><i class="app__g a3"></i>Disk</span>
-              </div>
-              <p class="sheet__hint">Vutric → Studio PC ga otish</p>
-            </div>
-          </div>
-        </div>
-      </figure>
-
-      <figure class="screen">
-        <h3 class="screen__id"><span class="mono">A5</span> Fling</h3>
-        <div class="phone phone--night">
-          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
-          <div class="phone__body p-fling">
-            <span class="chip chip--sm chip--inv"><span class="dot dot--live" aria-hidden="true"></span>Studio PC</span>
-            <div class="fling" aria-hidden="true">
-              <span class="fling__echo e3"></span><span class="fling__echo e2"></span><span class="fling__echo e1"></span>
-              <span class="fling__card ph--dusk"></span>
-            </div>
-            <p class="p-hint"><span class="up" aria-hidden="true"></span>Yuborish uchun yuqoriga suring</p>
-            <span class="status"><span class="state state--ok" aria-hidden="true"></span>Yuborildi</span>
-          </div>
-        </div>
-      </figure>
-
-      <figure class="screen">
-        <h3 class="screen__id"><span class="mono">A6</span> History</h3>
-        <div class="phone">
-          <div class="phone__bar" aria-hidden="true"><span>9:41</span><span class="phone__sys"></span></div>
-          <div class="phone__body p-hist">
-            <p class="p-title p-title--left">Tarix</p>
-            <ul class="rows rows--phone">
-              <li class="row"><span class="thumb ph--dusk" aria-hidden="true"></span><span class="row__text"><b>IMG_2041.jpg</b><span>Studio PC · hozir</span></span><span class="state state--ok" aria-label="Yuborildi"></span></li>
-              <li class="row"><span class="thumb ph--sea" aria-hidden="true"></span><span class="row__text"><b>VID_0193.mp4</b><span class="bar" aria-label="64 foiz"><span class="bar__fill w-64"></span></span></span><span class="mono row__pct">64%</span></li>
-              <li class="row"><span class="thumb ph--city" aria-hidden="true"></span><span class="row__text"><b>chek.pdf</b><span class="row__err">Uzildi</span></span><span class="row__act">Qayta</span></li>
-              <li class="row"><span class="thumb ph--leaf" aria-hidden="true"></span><span class="row__text"><b>IMG_2038.jpg</b><span>Studio PC · 12:04</span></span><span class="state state--ok" aria-label="Yuborildi"></span></li>
-              <li class="row"><span class="thumb ph--sand" aria-hidden="true"></span><span class="row__text"><b>IMG_2031.jpg</b><span>Studio PC · kecha</span></span><span class="state state--ok" aria-label="Yuborildi"></span></li>
-            </ul>
-          </div>
-        </div>
-      </figure>
-
+    <div class="steps">
+      <div class="step" data-reveal><span class="step__n">01</span><div class="step__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-qr"/></svg></div><b>Pair</b><span>Scan one QR. Both devices remember after that.</span></div>
+      <div class="step" data-reveal><span class="step__n">02</span><div class="step__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-image"/></svg></div><b>Pick</b><span>Photos, videos, documents, folders — many at once.</span></div>
+      <div class="step" data-reveal><span class="step__n">03</span><div class="step__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-throw"/></svg></div><b>Flick</b><span>Throw it off the top edge of the screen.</span></div>
+      <div class="step" data-reveal><span class="step__n">04</span><div class="step__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg></div><b>Land</b><span>It appears on the desktop, in your folder.</span></div>
     </div>
   </div>
 </section>
 
-<section class="sec sec--tall" id="desktop">
+<!-- Use cases: tabs for real situations -->
+<section class="scene" id="usecases">
   <div class="wrap">
-    <h2>Windows and Ubuntu screens</h2>
-    <div class="desk">
-
-      <figure class="screen screen--w1">
-        <h3 class="screen__id"><span class="mono">W1</span> Pair a phone</h3>
-        <div class="win">
-          <div class="win__bar" aria-hidden="true"><span class="win__title"><svg viewBox="0 0 32 32"><use href="#mark"/></svg>Vutric</span><span class="win__ctl"><i></i><i></i><i></i></span></div>
-          <div class="win__body w-pair">
-            <div class="w-pair__qr qr" aria-hidden="true"></div>
-            <div class="w-pair__text">
-              <p class="w-title">Telefonni ulash</p>
-              <ol class="steps">
-                <li><span>Telefonda Vutric ilovasini oching</span></li>
-                <li><span>Bu QR kodni skanerlang</span></li>
-                <li><span>Ikkala qurilmada bir xil soʻz chiqadi: <b>qamish</b></span></li>
-              </ol>
-              <p class="w-meta">Kompyuter nomi: <b>Studio PC</b></p>
-            </div>
+    <div class="scene__head" data-reveal>
+      <span class="eyebrow">Real situations</span>
+      <h2>For every <span class="grad">kind of moment.</span></h2>
+      <p class="sub">The same flick, wherever you are — here is when you would reach for it.</p>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Use cases" data-reveal>
+      <button class="tab" role="tab" aria-selected="true" data-tab="home"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-home"/></svg>At home</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="work"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-briefcase"/></svg>At work</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="offline"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-hotspot"/></svg>No Wi-Fi</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="far"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-globe"/></svg>Far away</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="cross"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-any"/></svg>Cross-platform</button>
+    </div>
+    <div data-reveal>
+      <div class="tabpanel on" data-panel="home" role="tabpanel">
+        <div class="uc">
+          <div>
+            <span class="uc__route"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wifi"/></svg>Same Wi-Fi</span>
+            <h3>Holiday photos to the big screen</h3>
+            <p>Flick a whole album from the sofa and it lands in your Pictures folder — full quality, no messaging app squashing it, no cable.</p>
           </div>
+          <div class="uc__flow"><span class="uc__dev"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-phone"/></svg></span><span class="uc__link"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wifi"/></svg>home Wi-Fi</span><span class="uc__dev"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-desktop"/></svg></span></div>
         </div>
-      </figure>
-
-      <figure class="screen screen--w3">
-        <h3 class="screen__id"><span class="mono">W3</span> Arrival toast</h3>
-        <div class="toast">
-          <span class="toast__thumb ph--dusk" aria-hidden="true"></span>
-          <span class="toast__text"><span class="toast__app"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>Vutric</span><b>Pixel 8 dan rasm keldi</b><span>IMG_2041.jpg · 4,2 MB</span></span>
-          <span class="toast__actions"><span class="btn btn--primary btn--sm">Ochish</span><span class="btn btn--secondary btn--sm">Papkada koʻrsatish</span></span>
-        </div>
-        <h3 class="screen__id"><span class="mono">U4</span> GNOME notification</h3>
-        <div class="gnote">
-          <span class="gnote__icon"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg></span>
-          <span class="gnote__text"><b>Pixel 8 dan rasm keldi</b><span>IMG_2041.jpg · Rasmlar/Vutric</span></span>
-          <span class="gnote__time">hozir</span>
-        </div>
-      </figure>
-
-      <figure class="screen screen--w4">
-        <h3 class="screen__id"><span class="mono">W4</span> Settings</h3>
-        <div class="win">
-          <div class="win__bar" aria-hidden="true"><span class="win__title"><svg viewBox="0 0 32 32"><use href="#mark"/></svg>Vutric · Sozlamalar</span><span class="win__ctl"><i></i><i></i><i></i></span></div>
-          <div class="win__body w-set">
-            <p class="t-label">Effekt</p>
-            <div class="fx fx--mini" aria-hidden="true">
-              <span class="fx__card" aria-checked="true"><span class="fx__view fx--halqa"><i></i><b></b></span><span class="fx__name">Halqa</span></span>
-              <span class="fx__card"><span class="fx__view fx--kometa"><i></i><b></b></span><span class="fx__name">Kometa</span></span>
-              <span class="fx__card"><span class="fx__view fx--pufak"><i></i><b></b></span><span class="fx__name">Pufak</span></span>
-              <span class="fx__card"><span class="fx__view fx--oddiy"><i></i><b></b></span><span class="fx__name">Oddiy</span></span>
-            </div>
-            <div class="set">
-              <div class="set__row"><span>Yuborish zonasi</span><span class="seg seg--sm" aria-hidden="true"><span>Chap</span><span class="is-on">Oʻng</span><span>Yuqori</span></span></div>
-              <div class="set__row"><span>Davomiylik</span><span class="fakeslide" aria-hidden="true"><i></i><b class="mono">1,0 s</b></span></div>
-              <div class="set__row"><span>Saqlash papkasi</span><span class="path mono">Rasmlar\Vutric</span></div>
-              <div class="set__row"><span>Kompyuter yonganda ishga tushirish</span><span class="toggle__ui is-on" aria-hidden="true"></span></div>
-            </div>
+      </div>
+      <div class="tabpanel" data-panel="work" role="tabpanel">
+        <div class="uc">
+          <div>
+            <span class="uc__route"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-key"/></svg>Trusted devices</span>
+            <h3>A file to a colleague’s PC</h3>
+            <p>Pair once at the desk; after that, send contracts, decks, anything — straight to their computer, no email thread and no USB stick.</p>
           </div>
+          <div class="uc__flow"><span class="uc__dev"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-phone"/></svg></span><span class="uc__link"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wifi"/></svg>office Wi-Fi</span><span class="uc__dev"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-desktop"/></svg></span></div>
         </div>
-      </figure>
-
-      <figure class="screen screen--u1">
-        <h3 class="screen__id"><span class="mono">U1</span> Ubuntu first run</h3>
-        <div class="win win--gnome">
-          <div class="win__bar" aria-hidden="true"><span></span><span class="win__title">Vutric</span><span class="win__ctl win__ctl--gnome"><i></i></span></div>
-          <div class="win__body u-first">
-            <p class="w-title">Deyarli tayyor</p>
-            <ul class="check">
-              <li class="is-done"><span class="state state--ok" aria-hidden="true"></span>Vutric oʻrnatildi</li>
-              <li><span class="state state--todo" aria-hidden="true"></span><span>GNOME kengaytmasini yoqing: effekt shu orqali chiziladi</span><span class="btn btn--primary btn--sm">Yoqish</span></li>
-              <li class="is-done"><span class="state state--ok" aria-hidden="true"></span>Fon xizmati ishlayapti</li>
-            </ul>
+      </div>
+      <div class="tabpanel" data-panel="offline" role="tabpanel">
+        <div class="uc">
+          <div>
+            <span class="uc__route"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-hotspot"/></svg>Hotspot</span>
+            <h3>No network? Make one.</h3>
+            <p>The phone opens a hotspot, the laptop joins from the QR, and the file flies — on a plane, in a car, anywhere with no shared Wi-Fi.</p>
           </div>
+          <div class="uc__flow"><span class="uc__dev"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-phone"/></svg></span><span class="uc__link"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-hotspot"/></svg>phone hotspot</span><span class="uc__dev"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-desktop"/></svg></span></div>
         </div>
-      </figure>
+      </div>
+      <div class="tabpanel" data-panel="far" role="tabpanel">
+        <div class="uc">
+          <div>
+            <span class="uc__route"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-globe"/></svg>Internet / relay</span>
+            <h3>To a machine in another city</h3>
+            <p>Different networks, still direct where it can — and through our blind relay, which never sees your files, when the network is strict.</p>
+          </div>
+          <div class="uc__flow"><span class="uc__dev"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-desktop"/></svg></span><span class="uc__link"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-globe"/></svg>internet</span><span class="uc__dev"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-desktop"/></svg></span></div>
+        </div>
+      </div>
+      <div class="tabpanel" data-panel="cross" role="tabpanel">
+        <div class="uc">
+          <div>
+            <span class="uc__route"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-any"/></svg>Any to any</span>
+            <h3>Android to Windows today</h3>
+            <p>Phone to desktop, phone to phone, desktop to desktop. Windows and Android now; Ubuntu, iPhone and macOS are on the way.</p>
+          </div>
+          <div class="uc__flow"><span class="uc__dev"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-android"/></svg></span><span class="uc__link"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow"/></svg>direct</span><span class="uc__dev"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-win"/></svg></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
+<!-- Connection -->
+<section class="scene connect" id="connect">
+  <div class="wrap">
+    <div class="scene__head" data-reveal>
+      <span class="eyebrow">Connection</span>
+      <h2>It always <span class="grad">finds a way.</span></h2>
+      <p class="sub">Same Wi-Fi, across the internet, or no shared network at all — tried in order, automatically.</p>
+    </div>
+    <div data-reveal="scale">
+      <svg class="diagram" viewBox="0 0 1000 260" role="img" aria-label="A file travels from a phone to a desktop">
+        <path id="dgPath" class="dg-link" d="M205,130 C400,30 600,230 795,130"/>
+        <path class="dg-flow" d="M205,130 C400,30 600,230 795,130"/>
+        <!-- phone -->
+        <g class="dg-dev" transform="translate(120,70)">
+          <rect x="0" y="0" width="86" height="150" rx="16"/>
+          <rect class="scr" x="9" y="12" width="68" height="118" rx="8"/>
+          <svg x="26" y="44" width="34" height="34" viewBox="0 0 24 24"><use href="#i-throw"/></svg>
+        </g>
+        <!-- desktop -->
+        <g class="dg-dev" transform="translate(790,52)">
+          <rect x="0" y="0" width="190" height="124" rx="12"/>
+          <rect class="scr" x="12" y="12" width="166" height="100" rx="6"/>
+          <rect x="78" y="124" width="34" height="26"/>
+          <rect x="56" y="150" width="78" height="9" rx="4"/>
+          <svg x="74" y="40" width="42" height="42" viewBox="0 0 32 32"><use href="#mark"/></svg>
+        </g>
+        <circle class="dg-pulse" r="7" cx="205" cy="130"/>
+      </svg>
+    </div>
+    <div class="chain" data-reveal>
+      <span class="chain__step" data-step="0"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wifi"/></svg>Wi-Fi</span>
+      <span class="chain__arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow"/></svg></span>
+      <span class="chain__step" data-step="1"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-globe"/></svg>Internet</span>
+      <span class="chain__arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow"/></svg></span>
+      <span class="chain__step" data-step="2"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-relay"/></svg>Relay</span>
+      <span class="chain__arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow"/></svg></span>
+      <span class="chain__step" data-step="3"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-hotspot"/></svg>Hotspot</span>
+    </div>
+  </div>
+</section>
+
+<!-- Platforms -->
+<section class="scene" id="platforms">
+  <div class="wrap">
+    <div class="scene__head" data-reveal>
+      <span class="eyebrow">Platforms</span>
+      <h2>Everywhere, <span class="grad">in order.</span></h2>
+    </div>
+    <div class="plats">
+      <article class="plat" data-reveal="scale"><div class="plat__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-win"/></svg></div><b>Windows</b><span class="pdot now"><i></i>Now</span></article>
+      <article class="plat" data-reveal="scale"><div class="plat__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-android"/></svg></div><b>Android</b><span class="pdot now"><i></i>Now</span></article>
+      <article class="plat" data-reveal="scale"><div class="plat__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-ubuntu"/></svg></div><b>Ubuntu</b><span class="pdot soon"><i></i>Soon</span></article>
+      <article class="plat" data-reveal="scale"><div class="plat__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-apple"/></svg></div><b>iPhone</b><span class="pdot soon"><i></i>Soon</span></article>
+      <article class="plat" data-reveal="scale"><div class="plat__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-apple"/></svg></div><b>macOS</b><span class="pdot later"><i></i>Later</span></article>
+    </div>
+  </div>
+</section>
+
+<!-- Security -->
+<section class="scene" id="security">
+  <div class="wrap shieldwrap">
+    <div class="shield" data-reveal="scale">
+      <span class="shield__glow"></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-shield"/></svg>
+    </div>
+    <div data-reveal>
+      <span class="eyebrow">Private</span>
+      <h2>Encrypted, <span class="grad">end to end.</span></h2>
+      <div class="sectiles">
+        <div class="tile"><div class="tile__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-key"/></svg></div><div><b>Trusted devices</b><span>Paired once, remembered.</span></div></div>
+        <div class="tile"><div class="tile__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-hash"/></svg></div><div><b>Six-digit check</b><span>Matched on both screens.</span></div></div>
+        <div class="tile"><div class="tile__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-lock"/></svg></div><div><b>Nothing before trust</b><span>No names, no previews.</span></div></div>
+        <div class="tile"><div class="tile__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bug"/></svg></div><div><b>Hardened</b><span>Every parser is fuzzed.</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Works with -->
+<section class="scene" id="works">
+  <div class="wrap">
+    <div class="scene__head" data-reveal>
+      <span class="eyebrow">Interoperable</span>
+      <h2>Plays <span class="grad">with others.</span></h2>
+    </div>
+    <div class="logos">
+      <div class="logo" data-reveal="scale"><div class="logo__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-localsend"/></svg></div><b>LocalSend</b><span>Built</span></div>
+      <div class="logo" data-reveal="scale"><div class="logo__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-browser"/></svg></div><b>Browser</b><span>No app needed</span></div>
+      <div class="logo" data-reveal="scale"><div class="logo__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-quickshare"/></svg></div><b>Quick Share</b><span>Experimental</span></div>
+      <div class="logo" data-reveal="scale"><div class="logo__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-kde"/></svg></div><b>KDE Connect</b><span>Soon</span></div>
+      <div class="logo" data-reveal="scale"><div class="logo__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wormhole"/></svg></div><b>magic-wormhole</b><span>Soon</span></div>
+    </div>
+    <div class="nope" data-reveal>
+      <span class="nope__chip"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-airdrop"/></svg><s>AirDrop</s></span>
+      <span class="nope__chip"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-link"/></svg><s>Continuity</s></span>
+      <span class="nope__chip"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-nearby"/></svg><s>Nearby Share</s></span>
+      <span class="nope__chip"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-nearby"/></svg><s>Mi Share</s></span>
+    </div>
+  </div>
+</section>
+
+<!-- Cases -->
+<section class="scene" id="cases">
+  <div class="wrap">
+    <div class="scene__head" data-reveal>
+      <span class="eyebrow">Resilient</span>
+      <h2>When it breaks, <span class="grad">it tells you.</span></h2>
+    </div>
+    <div class="cases">
+      <div class="case" data-reveal><div class="case__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refresh"/></svg></div><div><b>Lost link</b><span>Reconnects, nothing half-saved.</span></div></div>
+      <div class="case" data-reveal><div class="case__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-timer"/></svg></div><div><b>No answer</b><span>Times out, never hangs.</span></div></div>
+      <div class="case" data-reveal><div class="case__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-disk"/></svg></div><div><b>Low disk</b><span>Refused before it starts.</span></div></div>
+      <div class="case" data-reveal><div class="case__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg></div><div><b>Corrupt</b><span>Caught by the hash check.</span></div></div>
+      <div class="case" data-reveal><div class="case__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wifi"/></svg></div><div><b>Hotel Wi-Fi</b><span>Named, with a way around.</span></div></div>
+      <div class="case" data-reveal><div class="case__ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-lock"/></svg></div><div><b>A stranger</b><span>Treated as a guest.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-scene" id="get">
+  <div class="wrap" data-reveal="scale">
+    <span class="eyebrow">Free · Apache-2.0</span>
+    <h2>Open source. <span class="grad">Yours.</span></h2>
+    <div class="cta-row">
+      <a class="cta cta--lg" href="https://github.com/wonmortech/vutric/releases"><svg aria-hidden="true"><use href="#i-download"/></svg>Download</a>
+      <a class="ghost" href="https://github.com/wonmortech/vutric"><svg aria-hidden="true"><use href="#i-github"/></svg>Star on GitHub</a>
     </div>
   </div>
 </section>
@@ -468,20 +322,73 @@
 <footer class="foot">
   <div class="wrap foot__row">
     <a class="brand" href="#top"><svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg><span>Vutric</span></a>
-    <p>Open source under Apache-2.0 · <a class="link" href="https://github.com/wonmortech/vutric">wonmortech/vutric</a> · A <a class="link" href="https://wonmor.io">Wonmor</a> project · Geist fonts under the <a class="link" href="assets/fonts/OFL.txt">SIL Open Font License</a></p>
+    <p>Apache-2.0 · <a href="https://github.com/wonmortech/vutric">wonmortech/vutric</a> · <a href="system.html">Design system</a> · A <a href="https://wonmor.io">Wonmor</a> project</p>
   </div>
 </footer>
 
 <svg class="defs" aria-hidden="true" focusable="false">
   <defs>
-    <linearGradient id="mark-rim" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2F6BFF"/>
-      <stop offset="1" stop-color="#F4D9A6"/>
-    </linearGradient>
+    <linearGradient id="mark-rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f8cff"/><stop offset=".55" stop-color="#34e0f0"/><stop offset="1" stop-color="#9a6bff"/></linearGradient>
+    <linearGradient id="dgGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4f8cff"/><stop offset=".5" stop-color="#34e0f0"/><stop offset="1" stop-color="#9a6bff"/></linearGradient>
     <symbol id="mark" viewBox="0 0 32 32">
       <ellipse cx="21" cy="16" rx="7" ry="13" fill="none" stroke="url(#mark-rim)" stroke-width="3"/>
       <rect x="3" y="10" width="13" height="12" rx="3" fill="currentColor" transform="rotate(-8 9.5 16)"/>
     </symbol>
+
+    <!-- UI -->
+    <symbol id="i-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 0 0-3.16 19.49c.5 .09 .68-.22 .68-.48v-1.7c-2.78 .6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62 .07-.6 .07-.6 1 .07 1.53 1.03 1.53 1.03 .9 1.52 2.34 1.08 2.91 .83 .09 -.65 .35-1.08 .63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09 .39-1.98 1.03-2.68-.1-.26-.45-1.27 .1-2.65 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02 .55 1.38 .2 2.39 .1 2.65 .64 .7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93 .36 .31 .68 .92 .68 1.85v2.74c0 .27 .18 .58 .69 .48A10 10 0 0 0 12 2Z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></g></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M7 4.5 19 12 7 19.5z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><g fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></g></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+
+    <!-- truths -->
+    <symbol id="i-offline" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4 4 0 0 1-.5-7.97 6 6 0 0 1 11.3-.78A3.5 3.5 0 0 1 18 18"/><path d="m4 4 16 16"/></g></symbol>
+    <symbol id="i-throw" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="9" height="9" rx="2"/><path d="M14 10c3-5 6-6 7-6m0 0-3.5 .3M21 4l-.4 3.6"/></g></symbol>
+    <symbol id="i-any" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="12" height="9" rx="1.5"/><path d="M5 17h7"/><rect x="15.5" y="9" width="6" height="11" rx="1.5"/></g></symbol>
+
+    <!-- chain / diagram -->
+    <symbol id="i-wifi" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a16 16 0 0 1 18 0"/><path d="M6 12.5a11 11 0 0 1 12 0"/><path d="M9 16a6 6 0 0 1 6 0"/></g><circle cx="12" cy="19" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></g></symbol>
+    <symbol id="i-relay" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="6" rx="1.5"/><rect x="3.5" y="14" width="17" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></g></symbol>
+    <symbol id="i-hotspot" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15a8 8 0 0 1 12 0M9 17.5a4 4 0 0 1 6 0"/></g><circle cx="12" cy="20" r="1.4" fill="currentColor"/><path d="M12 4v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+
+    <!-- platforms -->
+    <symbol id="i-win" viewBox="0 0 24 24"><g fill="currentColor"><rect x="3" y="3.5" width="8" height="8" rx="1"/><rect x="13" y="3.5" width="8" height="8" rx="1"/><rect x="3" y="12.5" width="8" height="8" rx="1"/><rect x="13" y="12.5" width="8" height="8" rx="1"/></g></symbol>
+    <symbol id="i-android" viewBox="0 0 24 24"><g fill="currentColor"><path d="M6 10.5a1 1 0 0 1 1 1V17a1.3 1.3 0 0 1-2.6 0v-5.5a1 1 0 0 1 1.6-.8z" transform="translate(-.4 0)"/><path d="M17 10.5a1 1 0 0 1 1 1V17a1.3 1.3 0 0 1-2.6 0v-5.5a1 1 0 0 1 1.6-.8z"/><rect x="6.8" y="10.5" width="10.4" height="7.5" rx="1.2"/><path d="M8.5 20v1.5a1.2 1.2 0 0 0 2.4 0V20zm4.6 0v1.5a1.2 1.2 0 0 0 2.4 0V20z"/><path d="M7 10a5 5 0 0 1 10 0z"/></g><g fill="none" stroke="#141834" stroke-width="1"><path d="m9 6-1-1.6M15 6l1-1.6"/></g></symbol>
+    <symbol id="i-ubuntu" viewBox="0 0 24 24"><g fill="currentColor"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="4.6" cy="12" r="1.9"/><circle cx="15.7" cy="5.6" r="1.9"/><circle cx="15.7" cy="18.4" r="1.9"/></g></symbol>
+    <symbol id="i-apple" viewBox="0 0 24 24"><path fill="currentColor" d="M16 13c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.15-2.8 .85-3.5 .85s-1.8-.83-3-.8c-1.5 0-2.9 .9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .75 1.1 1.6 2.3 2.8 2.26 1.1-.05 1.5-.72 2.9-.72s1.7 .72 2.9 .7c1.2-.02 2-1.1 2.7-2.2 .5-.7 .8-1.5 1-2.3-2.1-.8-2.5-3.6-2.5-3.7zM13.8 6.1c.6-.75 1-1.8 .9-2.85-.86 .04-1.9 .58-2.5 1.3-.55 .66-1 1.7-.9 2.7 .95 .07 1.9-.5 2.5-1.15z"/></symbol>
+
+    <!-- security -->
+    <symbol id="i-shield" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 20 6v5.5c0 4.7-3.2 8.3-8 9.9-4.8-1.6-8-5.2-8-9.9V6z"/><path d="m8.5 12 2.4 2.4 4.6-4.8"/></g></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4.3"/><path d="m11 11 8 8m-3-3 2-2m-4 0 2.3 2.3"/></g></symbol>
+    <symbol id="i-hash" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 7 20M17 4l-2 16M4 9h16M3 15h16"/></g></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><path d="M12 14.5v2"/></g></symbol>
+    <symbol id="i-bug" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="7.5" width="8" height="11" rx="4"/><path d="M12 7.5V5m-4 4.5L5.5 8M16 9.5 18.5 8M7.5 13H4m16 0h-3.5M8 17l-2.5 2M16 17l2.5 2M9 5.2a3 3 0 0 1 6 0"/></g></symbol>
+
+    <!-- works -->
+    <symbol id="i-localsend" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7 3 11l4 4"/><path d="M3 11h11a5 5 0 0 1 5 5v2"/></g></symbol>
+    <symbol id="i-browser" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M3 9h18M6.5 6.75h.01M9 6.75h.01"/></g></symbol>
+    <symbol id="i-quickshare" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="12" r="2.4"/><circle cx="17" cy="6.5" r="2.4"/><circle cx="17" cy="17.5" r="2.4"/><path d="m9.1 10.9 5.8-3.3M9.1 13.1l5.8 3.3"/></g></symbol>
+    <symbol id="i-kde" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></g></symbol>
+    <symbol id="i-wormhole" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="5.5" ry="9"/><path d="M3 12h18"/></g></symbol>
+    <symbol id="i-airdrop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 15a5.5 5.5 0 1 1 8 0"/><path d="M10 13a2.5 2.5 0 0 1 4 0"/><path d="m9.5 19 2.5-3 2.5 3z"/></g></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15 15 9"/><path d="M10.5 6.5 12 5a4 4 0 0 1 6 6l-1.5 1.5M13.5 17.5 12 19a4 4 0 0 1-6-6l1.5-1.5"/></g></symbol>
+    <symbol id="i-nearby" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 4 12l8 8 8-8z"/><path d="M9 12a3 3 0 0 1 6 0"/></g><circle cx="12" cy="12" r="1" fill="currentColor"/></symbol>
+
+    <!-- cases -->
+    <symbol id="i-refresh" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14-4.5L4 9"/><path d="M4 4v5h5"/><path d="M4 13a8 8 0 0 0 14 4.5L20 15"/><path d="M20 20v-5h-5"/></g></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></g></symbol>
+    <symbol id="i-disk" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h.01M3 12h18"/></g></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.4 2.4 4.6-4.8"/></g></symbol>
+    <!-- workflow / use-cases -->
+    <symbol id="i-qr" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 14v7M14 20h3" stroke-linecap="round"/></g></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="m3 17 5-5 4 4 3-3 6 6"/></g></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></g></symbol>
+    <symbol id="i-briefcase" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></g></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/></g></symbol>
+    <symbol id="i-desktop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M9 20h6M12 16v4"/></g></symbol>
   </defs>
 </svg>
 </body>
