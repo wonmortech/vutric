@@ -2,6 +2,7 @@
 // overrides). Every override can be left on "Umumiy", which follows the general setting; all "Umumiy" removes
 // the entry. Rust checks the id and the values and keeps at most 1024 entries.
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:material_ui/material_ui.dart';
@@ -9,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 import '../design/tokens.dart';
 import '../design/widgets.dart';
 import '../i18n.dart';
+import '../session.dart';
 import '../src/rust/api.dart' as vutric;
 import '../ui.dart';
 
@@ -130,6 +132,8 @@ class _DevicePageState extends State<DevicePage> {
     if (ok != true) return;
     try {
       await _forget(widget.device.id);
+      // iOS: the Share sheet, the widget and Shortcuts must stop offering it (ADR-0015).
+      unawaited(Session.instance.syncIos());
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) setState(() => _error = errorText(e));

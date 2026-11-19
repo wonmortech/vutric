@@ -10,22 +10,33 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'ios.dart';
 import 'src/rust/api.dart' as vutric;
 import 'ui.dart';
 
 const _multicast = MethodChannel('vutric/multicast');
 
-/// The device identity lives in app-private storage and is reused, so the pairing link stays stable.
+/// The device identity lives in app-private storage and is reused, so the pairing link stays stable. On iOS it
+/// lives in the Keychain item the Share Extension and App Intents share (ADR-0015); the file copy stays only while
+/// the Keychain refuses it.
 Future<Uint8List> loadIdentity() async {
+  final ios = IosBridge.instance;
+  final kept = await ios.identity();
+  if (kept != null) return kept;
   final dir = await getApplicationSupportDirectory();
   final file = File('${dir.path}/identity.key');
+  Uint8List? key;
   if (await file.exists()) {
     final bytes = await file.readAsBytes();
-    if (bytes.length == 32) return bytes;
+    if (bytes.length == 32) key = bytes;
   }
-  final fresh = await vutric.newIdentity();
-  await file.writeAsBytes(fresh, flush: true);
-  return fresh;
+  key ??= await vutric.newIdentity();
+  if (await ios.storeIdentity(key)) {
+    if (await file.exists()) await file.delete();
+  } else {
+    await file.writeAsBytes(key, flush: true);
+  }
+  return key;
 }
 
 /// One line of history: what went where, when and how fast.
@@ -124,6 +135,11 @@ class Session extends ChangeNotifier {
         }
         final name = (j['name'] as String?)?.trim();
         if (name != null && name.isNotEmpty) deviceName = name;
+        heicToJpeg = j['heic_to_jpeg'] == true;
+        final iosF = j['ios_folder'];
+        if (iosF is Map && iosF['bookmark'] is String && looksLikeBookmark(iosF['bookmark'] as String)) {
+          iosFolder = (bookmark: iosF['bookmark'] as String, label: '${iosF['label'] ?? ''}');
+        }
         final c = j['companion'];
         if (c is Map) {
           mirrorNotifications = c['notifications'] == true;
@@ -153,6 +169,8 @@ class Session extends ChangeNotifier {
         'name': deviceName,
         'onboarded': onboarded,
         'companion': {'notifications': mirrorNotifications, 'clipboard': clipboardButton, 'apps': mirrorApps},
+        'heic_to_jpeg': heicToJpeg,
+        if (iosFolder != null) 'ios_folder': {'bookmark': iosFolder!.bookmark, 'label': iosFolder!.label},
       }),
       flush: true,
     );
@@ -231,6 +249,46 @@ class Session extends ChangeNotifier {
     if (apps != null) mirrorApps = apps;
     notifyListeners();
     await _saveUi();
+  }
+
+  /// iOS (I6): HEIC photos go out as JPEG, which every Windows PC opens. Off by default: the original is kept.
+  bool heicToJpeg = false;
+
+  /// iOS (I7): a Files folder (security-scoped bookmark) where received files go after they are checked.
+  // TEMP until W3 #26: kept in ui.json, as Android's tree was before W3 #8 gave it a settings field.
+  IosFolder? iosFolder;
+
+  Future<void> setHeicToJpeg(bool on) async {
+    heicToJpeg = on;
+    notifyListeners();
+    await _saveUi();
+    await syncIos();
+  }
+
+  Future<void> setIosFolder(IosFolder? folder) async {
+    iosFolder = folder;
+    notifyListeners();
+    await _saveUi();
+  }
+
+  /// iOS: tells the Share Extension, the widget and App Intents who is paired and what this phone is called
+  /// (ADR-0015). Called after every start, pairing and forget; a no-op elsewhere.
+  Future<void> syncIos() async {
+    if (!Platform.isIOS) return;
+    try {
+      final list = await vutric.devices();
+      await IosBridge.instance.syncShared(
+        deviceName: deviceName,
+        heicToJpeg: heicToJpeg,
+        devices: [
+          for (final d in list)
+            if (d.method != 'pinned')
+              (id: d.id, name: d.name, platform: d.platform, code: d.code, lastSeen: d.lastSeen.toInt()),
+        ],
+      );
+    } catch (e) {
+      debugPrint('vutric: iOS snapshot not written: $e');
+    }
   }
 
   /// The open session's route badge key (`route.badge.*`), refreshed every 2 s while connected.
@@ -345,6 +403,7 @@ class Session extends ChangeNotifier {
     lostPeer = null;
     badge = '';
     notifyListeners();
+    if (c.trusted || c.needsCheck) unawaited(syncIos());
     _watchBadge();
     unawaited(_listen());
     return c;
@@ -453,6 +512,7 @@ class Session extends ChangeNotifier {
       if (Platform.isAndroid) await _multicast.invokeMethod<void>('acquire');
       myLink = await vutric.start(name: deviceName, identity: await loadIdentity());
       notifyListeners();
+      unawaited(syncIos());
       online = await vutric.waitOnline(maxMs: 10000);
       myLink = await vutric.currentLink();
     } catch (e) {

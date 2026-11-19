@@ -15,6 +15,7 @@ import '../android.dart';
 import '../companion.dart';
 import '../design/tokens.dart';
 import '../design/widgets.dart';
+import '../ios.dart';
 import '../session.dart';
 import '../src/rust/api.dart' as vutric;
 import '../transfer_ui.dart';
@@ -150,6 +151,7 @@ Future<void> _offer(BuildContext context, vutric.FilesOffer offer) async {
     context,
     title: '$peer’dan qabul qilinmoqda',
     stream: vutric.receiveFiles(dir: dir, date: localDate()),
+    sending: false,
   );
   if (r == null) {
     await s.stillConnected();
@@ -163,6 +165,12 @@ Future<void> _offer(BuildContext context, vutric.FilesOffer offer) async {
   final folder = s.saveFolder;
   if (folder != null && saved.isNotEmpty && await AndroidBridge.instance.folderUsable(folder.uri)) {
     inFolder = await AndroidBridge.instance.moveToFolder(folder.uri, saved);
+    saved = saved.where((p) => File(p).existsSync()).toList();
+  }
+  // iOS: the same for a Files folder (I7), kept as a bookmark.
+  final iosFolder = s.iosFolder;
+  if (iosFolder != null && saved.isNotEmpty && await IosBridge.instance.folderUsable(iosFolder.bookmark)) {
+    inFolder += await IosBridge.instance.moveToFolder(iosFolder.bookmark, saved);
     saved = saved.where((p) => File(p).existsSync()).toList();
   }
   Catches.instance

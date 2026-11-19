@@ -16,6 +16,7 @@ import 'android.dart';
 import 'design/tokens.dart';
 import 'design/widgets.dart';
 import 'i18n.dart';
+import 'ios.dart';
 import 'session.dart';
 import 'src/rust/api.dart' as vutric;
 import 'ui.dart';
@@ -224,19 +225,21 @@ Future<vutric.TransferProgress?> runTransfer(
   BuildContext context, {
   required String title,
   required Stream<vutric.TransferProgress> stream,
+  bool sending = true,
 }) {
   return showModalBottomSheet<vutric.TransferProgress?>(
     context: context,
     isDismissible: false,
     enableDrag: false,
-    builder: (_) => _TransferSheet(title: title, stream: stream),
+    builder: (_) => _TransferSheet(title: title, stream: stream, sending: sending),
   );
 }
 
 class _TransferSheet extends StatefulWidget {
-  const _TransferSheet({required this.title, required this.stream});
+  const _TransferSheet({required this.title, required this.stream, required this.sending});
   final String title;
   final Stream<vutric.TransferProgress> stream;
+  final bool sending;
 
   @override
   State<_TransferSheet> createState() => _TransferSheetState();
@@ -249,12 +252,27 @@ class _TransferSheetState extends State<_TransferSheet> {
   bool _cancelled = false;
 
   final _bridge = AndroidBridge.instance;
+  final _ios = IosBridge.instance;
+  final _device = Session.instance.peer?.peerName ?? '';
+  var _end = IosTransferPhase.failed;
+
+  void _activity(IosTransferPhase phase, [vutric.TransferProgress? p]) => _ios.transferUpdate(
+    device: _device,
+    sending: widget.sending,
+    phase: phase,
+    bytesDone: p?.bytesDone.toInt() ?? 0,
+    bytesTotal: p?.bytesTotal.toInt() ?? 0,
+    filesDone: p?.filesDone ?? 0,
+    filesTotal: p?.filesTotal ?? 0,
+  );
 
   @override
   void initState() {
     super.initState();
     // Android: a foreground service keeps the process alive if the user leaves the app mid-transfer (A4).
+    // iOS: a Live Activity shows the progress on the lock screen and in the Dynamic Island (I2).
     _bridge.transferUpdate(widget.title, 'Javob kutilmoqda…', force: true);
+    _activity(IosTransferPhase.waiting);
     _sub = widget.stream.listen(
       (p) {
         if (!mounted) return;
@@ -265,7 +283,11 @@ class _TransferSheetState extends State<_TransferSheet> {
           '${p.filesDone} / ${p.filesTotal} fayl · ${sizeText(p.bytesDone.toDouble())} / ${sizeText(total)}',
           fraction: total > 0 ? p.bytesDone.toDouble() / total : null,
         );
-        if (p.done) Navigator.of(context).pop(p);
+        _activity(p.done ? IosTransferPhase.done : IosTransferPhase.running, p);
+        if (p.done) {
+          _end = IosTransferPhase.done;
+          Navigator.of(context).pop(p);
+        }
       },
       onError: (Object e) {
         if (!mounted) return;
@@ -282,6 +304,7 @@ class _TransferSheetState extends State<_TransferSheet> {
   void dispose() {
     _sub?.cancel();
     _bridge.transferStop();
+    _ios.transferStop(device: _device, sending: widget.sending, phase: _end);
     super.dispose();
   }
 

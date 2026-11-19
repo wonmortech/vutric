@@ -30,8 +30,28 @@ be reinstalled). On the iPhone: Settings → Privacy & Security → Developer Mo
 Settings → General → VPN & Device Management, and allow **Local Network** on first launch.
 
 mDNS needs Apple's multicast entitlement, which a free Apple ID cannot get, so on iPhone pair with
-**QR kodni skanerlab oʻlchash** against `vutric-net-spike listen` on the desktop. Discovery through `NWBrowser`
-(no entitlement needed) comes with the real iOS client.
+**QR kodni skanerlab oʻlchash** against `vutric-net-spike listen` on the desktop. The Share Extension and App
+Intents browse `_vutric._udp` with `NWBrowser` (no entitlement needed) to dial a desktop on the same Wi-Fi directly.
+
+### Share Extension, widget, Live Activity, Shortcuts (ADR-0015)
+
+The same artifact also holds `vutric-spike-adhoc.ipa`: the same app with the App Group
+(`group.io.wonmor.vutricSpike`) and hotspot entitlements in its signatures. The Share Extension, the widget and App
+Intents read the pairing from that App Group, so without it they say "open Vutric once".
+
+1. In Sideloadly, choose `vutric-spike-adhoc.ipa`. Under **Advanced options** keep the app's own bundle id
+   (`io.wonmor.vutricSpike`) and leave "Remove app extensions" **off**; if it offers to sign app extensions or keep
+   entitlements, turn that on.
+2. Install. Sideloadly registers three App IDs (`io.wonmor.vutricSpike`, `.share`, `.widgets`); a free Apple ID has
+   a small weekly App ID allowance, so reinstalling with other ids can fail for a few days.
+3. If the install fails or the extensions are missing, install `vutric-spike-unsigned.ipa` instead and write down
+   what Sideloadly said about App Groups and Hotspot Configuration (owner question in `docs/owner-questions.md`).
+4. Open Vutric once and pair a computer; then go through the device checklist in
+   [ADR-0015](../../docs/decisions/0015-ios-native-modules.md).
+
+On a Mac the extensions build from Xcode after `tool/ios_bindings.sh` (it builds the Rust library for iPhone and
+writes the UniFFI Swift bindings into `ios/Generated/`, which is not committed); set your own team and App Group
+in Signing & Capabilities for all three targets, and `VUTRIC_APP_GROUP` in the project's build settings to match.
 
 ## Measure
 

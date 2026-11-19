@@ -15,6 +15,7 @@ import 'design/themes.g.dart';
 import 'design/tokens.dart';
 import 'design/widgets.dart';
 import 'i18n.dart';
+import 'ios.dart';
 import 'screens/app_picker_page.dart';
 import 'screens/connect.dart' show PrivacyLine;
 import 'screens/device_page.dart';
@@ -139,6 +140,12 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     // The tree now lives in settings.json (W3 #8): read it back, so the next change does not write an old copy.
     await _load();
+  }
+
+  Future<void> _pickIosFolder() async {
+    final f = await IosBridge.instance.pickFolder();
+    if (f != null) await _session.setIosFolder(f);
+    if (mounted) setState(() {});
   }
 
   Future<void> _clearFolder() async {
@@ -295,6 +302,39 @@ class _SettingsPageState extends State<SettingsPage> {
                           icon: Icon(Icons.close_rounded, color: v.muted),
                           onPressed: _clearFolder,
                         ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (Platform.isIOS) ...[
+                VRowCard(
+                  icon: Icons.folder_open_rounded,
+                  title: _session.iosFolder?.label ?? tr('ios.folder.pick'),
+                  subtitle: tr(_session.iosFolder == null ? 'ios.folder.hint.none' : 'ios.folder.hint.set'),
+                  onTap: _pickIosFolder,
+                  trailing: _session.iosFolder == null
+                      ? Icon(Icons.chevron_right_rounded, color: v.muted)
+                      : IconButton(
+                          tooltip: tr('ios.folder.reset'),
+                          icon: Icon(Icons.close_rounded, color: v.muted),
+                          onPressed: () async {
+                            await _session.setIosFolder(null);
+                            if (mounted) setState(() {});
+                          },
+                        ),
+                ),
+                const SizedBox(height: 10),
+                _Group(
+                  children: [
+                    _Switch(
+                      label: tr('ios.heic.label'),
+                      hint: tr('ios.heic.hint'),
+                      value: _session.heicToJpeg,
+                      onChanged: (x) async {
+                        await _session.setHeicToJpeg(x);
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 10),
               ],

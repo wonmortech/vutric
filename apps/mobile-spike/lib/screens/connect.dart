@@ -17,6 +17,7 @@ import '../companion.dart';
 import '../design/tokens.dart';
 import '../design/widgets.dart';
 import '../i18n.dart';
+import '../ios.dart';
 import '../session.dart';
 import '../src/rust/api.dart' as vutric;
 import '../ui.dart';
@@ -68,7 +69,7 @@ Future<vutric.Connected?> connectWithLink(BuildContext context, String link) asy
     }
     return null;
   }
-  final joined = net != null && Platform.isAndroid;
+  final joined = net != null && (Platform.isAndroid || Platform.isIOS);
   if (joined) {
     if (!context.mounted || !await joinHotspot(context, net)) return null;
   }
@@ -77,7 +78,7 @@ Future<vutric.Connected?> connectWithLink(BuildContext context, String link) asy
   if (c == null && joined) {
     // Not paired after all: back to the phone's own Wi-Fi.
     Session.instance.onDisconnect = null;
-    await AndroidBridge.instance.hotspotLeave();
+    Platform.isIOS ? await IosBridge.instance.hotspotLeave(net.ssid) : await AndroidBridge.instance.hotspotLeave();
     await Session.instance.restart();
   }
   return c;

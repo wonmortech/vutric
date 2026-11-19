@@ -16,6 +16,21 @@
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
+		A01500000000000000000015 /* VutricIosPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000001 /* VutricIosPlugin.swift */; };
+		A01500000000000000000016 /* Intents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000002 /* Intents.swift */; };
+		A01500000000000000000017 /* RustShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000005 /* RustShare.swift */; };
+		A01500000000000000000018 /* vutric_mobile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000006 /* vutric_mobile.swift */; };
+		A01500000000000000000019 /* ShareModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000007 /* ShareModel.swift */; };
+		A0150000000000000000001A /* ShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000008 /* ShareView.swift */; };
+		A0150000000000000000001B /* RustShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000005 /* RustShare.swift */; };
+		A0150000000000000000001C /* vutric_mobile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000006 /* vutric_mobile.swift */; };
+		A0150000000000000000001D /* VutricWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0150000000000000000000B /* VutricWidgets.swift */; };
+		A0150000000000000000001E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000004 /* Localizable.xcstrings */; };
+		A0150000000000000000001F /* VutricKit in Frameworks */ = {isa = PBXBuildFile; productRef = A01500000000000000000011 /* VutricKit */; };
+		A01500000000000000000020 /* VutricKit in Frameworks */ = {isa = PBXBuildFile; productRef = A01500000000000000000012 /* VutricKit */; };
+		A01500000000000000000021 /* VutricKit in Frameworks */ = {isa = PBXBuildFile; productRef = A01500000000000000000013 /* VutricKit */; };
+		A01500000000000000000022 /* VutricShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A0150000000000000000000F /* VutricShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A01500000000000000000023 /* VutricWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A01500000000000000000010 /* VutricWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,6 +40,20 @@
 			proxyType = 1;
 			remoteGlobalIDString = 97C146ED1CF9000F007C117D;
 			remoteInfo = Runner;
+		};
+		A01500000000000000000026 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A01500000000000000000024;
+			remoteInfo = VutricShare;
+		};
+		A01500000000000000000027 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A01500000000000000000025;
+			remoteInfo = VutricWidgets;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -37,6 +66,18 @@
 			files = (
 			);
 			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A0150000000000000000002A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A01500000000000000000022 /* VutricShare.appex in Embed Foundation Extensions */,
+				A01500000000000000000023 /* VutricWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -59,6 +100,22 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A01500000000000000000001 /* VutricIosPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VutricIosPlugin.swift; sourceTree = "<group>"; };
+		A01500000000000000000002 /* Intents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intents.swift; sourceTree = "<group>"; };
+		A01500000000000000000003 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
+		A01500000000000000000004 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		A01500000000000000000005 /* RustShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RustShare.swift; sourceTree = "<group>"; };
+		A01500000000000000000006 /* vutric_mobile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vutric_mobile.swift; sourceTree = "<group>"; };
+		A01500000000000000000007 /* ShareModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareModel.swift; sourceTree = "<group>"; };
+		A01500000000000000000008 /* ShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareView.swift; sourceTree = "<group>"; };
+		A01500000000000000000009 /* ShareInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A0150000000000000000000A /* VutricShare.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VutricShare.entitlements; sourceTree = "<group>"; };
+		A0150000000000000000000B /* VutricWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VutricWidgets.swift; sourceTree = "<group>"; };
+		A0150000000000000000000C /* WidgetsInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A0150000000000000000000D /* VutricWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VutricWidgets.entitlements; sourceTree = "<group>"; };
+		A0150000000000000000000E /* VutricKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = VutricKit; sourceTree = "<group>"; };
+		A0150000000000000000000F /* VutricShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VutricShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A01500000000000000000010 /* VutricWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VutricWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +124,23 @@
 			buildActionMask = 2147483647;
 			files = (
 				78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
+				A0150000000000000000001F /* VutricKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A0150000000000000000002B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A01500000000000000000020 /* VutricKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A0150000000000000000002C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A01500000000000000000021 /* VutricKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -99,6 +173,11 @@
 				9740EEB11CF90186004384FC /* Flutter */,
 				97C146F01CF9000F007C117D /* Runner */,
 				97C146EF1CF9000F007C117D /* Products */,
+				A0150000000000000000000E /* VutricKit */,
+				A0150000000000000000002D /* VutricShare */,
+				A0150000000000000000002E /* VutricWidgets */,
+				A0150000000000000000002F /* RustShare */,
+				A01500000000000000000030 /* Generated */,
 				331C8082294A63A400263BE5 /* RunnerTests */,
 			);
 			sourceTree = "<group>";
@@ -108,6 +187,8 @@
 			children = (
 				97C146EE1CF9000F007C117D /* Runner.app */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
+				A0150000000000000000000F /* VutricShare.appex */,
+				A01500000000000000000010 /* VutricWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -124,8 +205,49 @@
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
+				A01500000000000000000001 /* VutricIosPlugin.swift */,
+				A01500000000000000000002 /* Intents.swift */,
+				A01500000000000000000004 /* Localizable.xcstrings */,
+				A01500000000000000000003 /* Runner.entitlements */,
 			);
 			path = Runner;
+			sourceTree = "<group>";
+		};
+		A0150000000000000000002D /* VutricShare */ = {
+			isa = PBXGroup;
+			children = (
+				A01500000000000000000007 /* ShareModel.swift */,
+				A01500000000000000000008 /* ShareView.swift */,
+				A01500000000000000000009 /* ShareInfo.plist */,
+				A0150000000000000000000A /* VutricShare.entitlements */,
+			);
+			path = VutricShare;
+			sourceTree = "<group>";
+		};
+		A0150000000000000000002E /* VutricWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				A0150000000000000000000B /* VutricWidgets.swift */,
+				A0150000000000000000000C /* WidgetsInfo.plist */,
+				A0150000000000000000000D /* VutricWidgets.entitlements */,
+			);
+			path = VutricWidgets;
+			sourceTree = "<group>";
+		};
+		A0150000000000000000002F /* RustShare */ = {
+			isa = PBXGroup;
+			children = (
+				A01500000000000000000005 /* RustShare.swift */,
+			);
+			path = RustShare;
+			sourceTree = "<group>";
+		};
+		A01500000000000000000030 /* Generated */ = {
+			isa = PBXGroup;
+			children = (
+				A01500000000000000000006 /* vutric_mobile.swift */,
+			);
+			path = Generated;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -157,19 +279,63 @@
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
+				A0150000000000000000002A /* Embed Foundation Extensions */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A01500000000000000000028 /* PBXTargetDependency */,
+				A01500000000000000000029 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			packageProductDependencies = (
 				78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */,
+				A01500000000000000000011 /* VutricKit */,
 			);
 			productName = Runner;
 			productReference = 97C146EE1CF9000F007C117D /* Runner.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A01500000000000000000024 /* VutricShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A01500000000000000000035 /* Build configuration list for PBXNativeTarget "VutricShare" */;
+			buildPhases = (
+				A01500000000000000000031 /* Sources */,
+				A0150000000000000000002B /* Frameworks */,
+				A01500000000000000000033 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VutricShare;
+			packageProductDependencies = (
+				A01500000000000000000012 /* VutricKit */,
+			);
+			productName = VutricShare;
+			productReference = A0150000000000000000000F /* VutricShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		A01500000000000000000025 /* VutricWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A01500000000000000000036 /* Build configuration list for PBXNativeTarget "VutricWidgets" */;
+			buildPhases = (
+				A01500000000000000000032 /* Sources */,
+				A0150000000000000000002C /* Frameworks */,
+				A01500000000000000000034 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VutricWidgets;
+			packageProductDependencies = (
+				A01500000000000000000013 /* VutricKit */,
+			);
+			productName = VutricWidgets;
+			productReference = A01500000000000000000010 /* VutricWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -185,6 +351,12 @@
 						CreatedOnToolsVersion = 14.0;
 						TestTargetID = 97C146ED1CF9000F007C117D;
 					};
+					A01500000000000000000024 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					A01500000000000000000025 = {
+						CreatedOnToolsVersion = 16.0;
+					};
 					97C146ED1CF9000F007C117D = {
 						CreatedOnToolsVersion = 7.3.1;
 						LastSwiftMigration = 1100;
@@ -198,10 +370,12 @@
 			knownRegions = (
 				en,
 				Base,
+				uz,
 			);
 			mainGroup = 97C146E51CF9000F007C117D;
 			packageReferences = (
 				781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage" */,
+				A01500000000000000000014 /* XCLocalSwiftPackageReference "VutricKit" */,
 			);
 			productRefGroup = 97C146EF1CF9000F007C117D /* Products */;
 			projectDirPath = "";
@@ -209,6 +383,8 @@
 			targets = (
 				97C146ED1CF9000F007C117D /* Runner */,
 				331C8080294A63A400263BE5 /* RunnerTests */,
+				A01500000000000000000024 /* VutricShare */,
+				A01500000000000000000025 /* VutricWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -229,6 +405,21 @@
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+				A0150000000000000000001E /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A01500000000000000000033 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A01500000000000000000034 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -284,6 +475,29 @@
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
+				A01500000000000000000015 /* VutricIosPlugin.swift in Sources */,
+				A01500000000000000000016 /* Intents.swift in Sources */,
+				A01500000000000000000017 /* RustShare.swift in Sources */,
+				A01500000000000000000018 /* vutric_mobile.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A01500000000000000000031 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A01500000000000000000019 /* ShareModel.swift in Sources */,
+				A0150000000000000000001A /* ShareView.swift in Sources */,
+				A0150000000000000000001B /* RustShare.swift in Sources */,
+				A0150000000000000000001C /* vutric_mobile.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A01500000000000000000032 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A0150000000000000000001D /* VutricWidgets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -294,6 +508,16 @@
 			isa = PBXTargetDependency;
 			target = 97C146ED1CF9000F007C117D /* Runner */;
 			targetProxy = 331C8085294A63A400263BE5 /* PBXContainerItemProxy */;
+		};
+		A01500000000000000000028 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A01500000000000000000024 /* VutricShare */;
+			targetProxy = A01500000000000000000026 /* PBXContainerItemProxy */;
+		};
+		A01500000000000000000029 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A01500000000000000000025 /* VutricWidgets */;
+			targetProxy = A01500000000000000000027 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -367,6 +591,7 @@
 				SUPPORTED_PLATFORMS = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
+				VUTRIC_APP_GROUP = group.io.wonmor.vutricSpike;
 			};
 			name = Profile;
 		};
@@ -378,6 +603,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -402,6 +628,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Generated";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
@@ -509,6 +736,7 @@
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				VUTRIC_APP_GROUP = group.io.wonmor.vutricSpike;
 			};
 			name = Debug;
 		};
@@ -564,6 +792,7 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
+				VUTRIC_APP_GROUP = group.io.wonmor.vutricSpike;
 			};
 			name = Release;
 		};
@@ -575,6 +804,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -599,6 +829,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Generated";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -613,6 +844,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -637,10 +869,210 @@
 				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Generated";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
+		};
+		A01500000000000000000037 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = VutricShare/VutricShare.entitlements;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEAD_CODE_STRIPPING = YES;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Rust/libvutric_mobile.a",
+					"-framework",
+					SystemConfiguration,
+					"-framework",
+					Security,
+					"-framework",
+					Network,
+					"-framework",
+					CoreFoundation,
+					"-lresolv",
+				);
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Generated";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = VutricShare/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A01500000000000000000038 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = VutricShare/VutricShare.entitlements;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEAD_CODE_STRIPPING = YES;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Rust/libvutric_mobile.a",
+					"-framework",
+					SystemConfiguration,
+					"-framework",
+					Security,
+					"-framework",
+					Network,
+					"-framework",
+					CoreFoundation,
+					"-lresolv",
+				);
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Generated";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = VutricShare/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A01500000000000000000039 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = VutricShare/VutricShare.entitlements;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEAD_CODE_STRIPPING = YES;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Rust/libvutric_mobile.a",
+					"-framework",
+					SystemConfiguration,
+					"-framework",
+					Security,
+					"-framework",
+					Network,
+					"-framework",
+					CoreFoundation,
+					"-lresolv",
+				);
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Generated";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = VutricShare/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Profile;
+		};
+		A0150000000000000000003A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = VutricWidgets/VutricWidgets.entitlements;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = VutricWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A0150000000000000000003B /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = VutricWidgets/VutricWidgets.entitlements;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = VutricWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A0150000000000000000003C /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = VutricWidgets/VutricWidgets.entitlements;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = VutricWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = io.wonmor.vutricSpike.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Profile;
 		};
 /* End XCBuildConfiguration section */
 
@@ -675,6 +1107,26 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A01500000000000000000035 /* Build configuration list for PBXNativeTarget "VutricShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A01500000000000000000037 /* Debug */,
+				A01500000000000000000038 /* Release */,
+				A01500000000000000000039 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A01500000000000000000036 /* Build configuration list for PBXNativeTarget "VutricWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A0150000000000000000003A /* Debug */,
+				A0150000000000000000003B /* Release */,
+				A0150000000000000000003C /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -682,12 +1134,28 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage;
 		};
+		A01500000000000000000014 /* XCLocalSwiftPackageReference "VutricKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = VutricKit;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FlutterGeneratedPluginSwiftPackage;
+		};
+		A01500000000000000000011 /* VutricKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = VutricKit;
+		};
+		A01500000000000000000012 /* VutricKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = VutricKit;
+		};
+		A01500000000000000000013 /* VutricKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = VutricKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

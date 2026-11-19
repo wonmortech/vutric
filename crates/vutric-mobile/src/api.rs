@@ -38,9 +38,9 @@ use vutric_net::{
 use crate::frb_generated::StreamSink;
 
 #[cfg(target_os = "ios")]
-const PLATFORM: Platform = Platform::Ios;
+pub(crate) const PLATFORM: Platform = Platform::Ios;
 #[cfg(not(target_os = "ios"))]
-const PLATFORM: Platform = Platform::Android;
+pub(crate) const PLATFORM: Platform = Platform::Android;
 
 /// The error text of a call that [`disconnect`] (or a newer session) cancelled; the app ignores it.
 pub const CANCELLED: &str = "vutric: cancelled";
@@ -266,7 +266,7 @@ fn trust_path() -> Option<std::path::PathBuf> {
         .map(|d| d.join(vutric_net::trust::FILE))
 }
 
-fn load_trust() -> TrustStore {
+pub(crate) fn load_trust() -> TrustStore {
     trust_path()
         .as_deref()
         .map(vutric_net::trust::load)

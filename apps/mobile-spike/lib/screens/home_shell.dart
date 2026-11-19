@@ -11,6 +11,7 @@ import '../android.dart';
 import '../companion.dart';
 import '../design/tokens.dart';
 import '../design/widgets.dart';
+import '../ios.dart';
 import '../session.dart';
 import '../settings_page.dart';
 import 'connect.dart';
@@ -29,6 +30,7 @@ class _HomeShellState extends State<HomeShell> {
   final _s = Session.instance;
   final _send = GlobalKey<SendTabState>();
   StreamSubscription<AndroidEvent>? _android;
+  StreamSubscription<IosSendRequest>? _ios;
   int _tab = 0;
 
   @override
@@ -43,11 +45,22 @@ class _HomeShellState extends State<HomeShell> {
     bridge.takeStartEvent().then((e) {
       if (e != null) _onAndroid(e);
     });
+    // iOS: the "PC'ga yuborish" widget, an App Intent or the Action button opens the Otish tab (ADR-0015).
+    final ios = IosBridge.instance;
+    _ios = ios.events.listen(_onIos);
+    ios.takeStartEvents().then((list) {
+      if (list.isNotEmpty) _onIos(list.last);
+    });
+  }
+
+  void _onIos(IosSendRequest e) {
+    if (mounted) setState(() => _tab = 0);
   }
 
   @override
   void dispose() {
     _android?.cancel();
+    _ios?.cancel();
     _s.removeListener(_changed);
     _s.onIncoming = null;
     super.dispose();

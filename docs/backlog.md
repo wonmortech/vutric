@@ -137,14 +137,14 @@ Sources:
 
 | # | Item | Status |
 |---|---|---|
-| I1 | Share Extension in SwiftUI (no Flutter), streaming through Rust | [ ] |
-| I2 | Live Activity + widget ("PC'ga yuborish") | [ ] |
-| I3 | App Intents: Siri, Shortcuts, Action button | [ ] |
-| I4 | Discovery: `NWBrowser`/`NWListener` `_vutric._udp`, CoreBluetooth; `NSLocalNetworkUsageDescription`, `NSBonjourServices`, multicast entitlement request | [ ] |
-| I5 | `NEHotspotConfiguration` join | [ ] |
-| I6 | PhotoKit gallery, HEIC → JPEG option | [ ] |
-| I7 | Files folder bookmark | [ ] |
-| I8 | App Group + Keychain group shared by the app and its extensions | [ ] |
+| I1 | Share Extension in SwiftUI (no Flutter), streaming through Rust | [~] (W1) `VutricShare.appex` calls Rust's UniFFI share API in its own process (ADR-0015 #2, #3); builds in CI, `share_send` symbol checked, size in the job summary; device step: ADR-0015 checklist 3, 5 |
+| I2 | Live Activity + widget ("PC'ga yuborish") | [~] (W1) `VutricWidgets.appex` (iOS 16.2): lock-screen and Dynamic Island progress driven by the transfer sheet, send widget opening Otish (ADR-0015 #5); device step: checklist 6, 7 |
+| I3 | App Intents: Siri, Shortcuts, Action button | [~] (W1) `SendFilesIntent` sends through Rust with no screen, `OpenSendIntent` for the Action button, Uzbek and English phrases (ADR-0015 #6); device step: checklist 8 |
+| I4 | Discovery: `NWBrowser`/`NWListener` `_vutric._udp`, CoreBluetooth; `NSLocalNetworkUsageDescription`, `NSBonjourServices`, multicast entitlement request | [~] (W1) Info.plist keys in Runner and the Share Extension; `NWBrowser` on `_vutric._udp` feeds Rust dial hints (ADR-0015 #7); multicast entitlement request is an owner question; `NWListener` and CoreBluetooth not started; device step: checklist 2, 3 |
+| I5 | `NEHotspotConfiguration` join | [~] (W1) join + SSID check, Android's error codes, leave on disconnect (ADR-0015 #8); device step: checklist 11 |
+| I6 | PhotoKit gallery, HEIC → JPEG option | [~] (W1) gallery = `photo_manager` (PhotoKit); HEIC → JPEG setting in the app and the Share Extension, XCTest converts (ADR-0015 #9); device step: checklist 9 |
+| I7 | Files folder bookmark | [~] (W1) security-scoped bookmark, coordinated move after verification, XCTest on the move (ADR-0015 #10); kept in `ui.json` until W3 #26; device step: checklist 10 |
+| I8 | App Group + Keychain group shared by the app and its extensions | [~] (W1) `group.io.wonmor.vutricSpike` in all three targets, Rust settings and trust moved into it, identity in a Keychain item in that group (ADR-0015 #1); the ad-hoc IPA carries the entitlements; device step: checklist 1, 3 |
 | I9 | Check whether `BGContinuedProcessingTask` (iOS 26) can keep a P2P transfer running | [ ] |
 | I10 | TestFlight | [ ] |
 
@@ -153,7 +153,7 @@ Sources:
 | # | Feature (who has it) | Where it is planned | Status |
 |---|---|---|---|
 | F1 | Send from the Share menu (AirDrop, Quick Share, LocalSend) | A3, I1, D5 | [~] |
-| F2 | Device shortcut in the Share sheet (Quick Share) | A3 | [ ] |
+| F2 | Device shortcut in the Share sheet (Quick Share) | A3, I1 | [~] (W1, iOS) one donated `INSendMessageIntent` per paired device, the Share Extension sends straight to the picked one (ADR-0015 #4); device step: ADR-0015 checklist 4 |
 | F3 | Find nearby devices automatically | R1, R4, A7, I4 | [ ] |
 | F4 | No internet, no router | R3, R6, R7 | [ ] |
 | F5 | Different networks over the internet (PairDrop) | R0, R2 | [x] (n0) |
@@ -161,7 +161,7 @@ Sources:
 | F7 | Background transfer with the app closed (Quick Share) | A4, D1 | [ ] |
 | F8 | One-tap tile or button | A5, I2, D1 | [~] |
 | F9 | Progress on the lock screen | A4 notification, I2 | [~] |
-| F10 | Siri, Shortcuts, automation; desktop CLI | I3, `net-spike` CLI | [ ] |
+| F10 | Siri, Shortcuts, automation; desktop CLI | I3, `net-spike` CLI | [~] (W1, iOS half) App Intents (I3, ADR-0015 #6); desktop CLI not part of this; device step: ADR-0015 checklist 8 |
 | F11 | PIN mode and auto-accept (LocalSend, Quick Share) | S1, S3, ADR-0007 | [~] (auto-accept setting) |
 | F12 | Clipboard sharing (KDE Connect, Apple) | A12 | [~] both ways as `Message::Clipboard` on a trusted session (ADR-0014 #4); device steps: checklist 31, 33 |
 | F13 | Notifications mirrored to the PC (KDE Connect, Phone Link) | A12 | [~] opt-in, per-app allowlist, sent as `Message::Notice` to a trusted peer (ADR-0014 #4, #5); device step: checklist 32 |

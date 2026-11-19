@@ -12,5 +12,9 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // The Swift modules of ADR-0015 (App Group, Keychain, Live Activity, hotspot, Files folder), on `vutric/ios`.
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "VutricIosPlugin") {
+      VutricIosPlugin.register(with: registrar)
+    }
   }
 }
