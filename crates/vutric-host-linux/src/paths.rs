@@ -71,7 +71,10 @@ pub fn downloads(get: impl Fn(&str) -> Option<String>, user_dirs: Option<&str>) 
 
 /// Received files go to `Downloads/Vutric`.
 #[must_use]
-pub fn received_dir(get: impl Fn(&str) -> Option<String>, user_dirs: Option<&str>) -> Option<PathBuf> {
+pub fn received_dir(
+    get: impl Fn(&str) -> Option<String>,
+    user_dirs: Option<&str>,
+) -> Option<PathBuf> {
     downloads(get, user_dirs).map(|d| d.join(SUBFOLDER))
 }
 
@@ -133,7 +136,11 @@ pub fn device_name(machine_info: Option<&str>, hostname: Option<&str>) -> String
 /// Where to find helper binary `name` (`vutric-surface`, `vutric-compat`): next to the running executable first
 /// (a tarball or `cargo run`), then the package's libexec folders, then `~/.local/libexec/vutric`.
 #[must_use]
-pub fn helper_candidates(name: &str, current_exe: Option<&Path>, home: Option<&Path>) -> Vec<PathBuf> {
+pub fn helper_candidates(
+    name: &str,
+    current_exe: Option<&Path>,
+    home: Option<&Path>,
+) -> Vec<PathBuf> {
     let mut out = Vec::new();
     if let Some(dir) = current_exe.and_then(Path::parent) {
         out.push(dir.join(name));
@@ -182,7 +189,8 @@ mod imp {
         super::helper_candidates(name, exe.as_deref(), home.as_deref())
             .into_iter()
             .find(|p| {
-                std::fs::metadata(p).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+                std::fs::metadata(p)
+                    .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
             })
     }
 }
@@ -214,17 +222,31 @@ mod tests {
         let ru = "XDG_DOWNLOAD_DIR=\"$HOME/\u{0417}\u{0430}\u{0433}\u{0440}\u{0443}\u{0437}\u{043a}\u{0438}\"\n";
         assert_eq!(
             downloads(env, Some(ru)).unwrap(),
-            PathBuf::from("/home/ali/\u{0417}\u{0430}\u{0433}\u{0440}\u{0443}\u{0437}\u{043a}\u{0438}")
+            PathBuf::from(
+                "/home/ali/\u{0417}\u{0430}\u{0433}\u{0440}\u{0443}\u{0437}\u{043a}\u{0438}"
+            )
         );
     }
 
     #[test]
     fn missing_or_disabled_entries_fall_back_to_downloads() {
         let home = Path::new("/home/ali");
-        assert_eq!(parse_user_dirs("XDG_DOWNLOAD_DIR=\"$HOME/\"\n", "XDG_DOWNLOAD_DIR", home), None);
-        assert_eq!(parse_user_dirs("XDG_DOWNLOAD_DIR=\"$HOME\"\n", "XDG_DOWNLOAD_DIR", home), None);
-        assert_eq!(parse_user_dirs("XDG_DOWNLOAD_DIR=relative\n", "XDG_DOWNLOAD_DIR", home), None);
-        assert_eq!(parse_user_dirs("#XDG_DOWNLOAD_DIR=\"/x\"\n", "XDG_DOWNLOAD_DIR", home), None);
+        assert_eq!(
+            parse_user_dirs("XDG_DOWNLOAD_DIR=\"$HOME/\"\n", "XDG_DOWNLOAD_DIR", home),
+            None
+        );
+        assert_eq!(
+            parse_user_dirs("XDG_DOWNLOAD_DIR=\"$HOME\"\n", "XDG_DOWNLOAD_DIR", home),
+            None
+        );
+        assert_eq!(
+            parse_user_dirs("XDG_DOWNLOAD_DIR=relative\n", "XDG_DOWNLOAD_DIR", home),
+            None
+        );
+        assert_eq!(
+            parse_user_dirs("#XDG_DOWNLOAD_DIR=\"/x\"\n", "XDG_DOWNLOAD_DIR", home),
+            None
+        );
         assert_eq!(
             parse_user_dirs("XDG_DOWNLOAD_DIR=\"/data/dl\"\n", "XDG_DOWNLOAD_DIR", home),
             Some(PathBuf::from("/data/dl"))
@@ -248,8 +270,14 @@ mod tests {
             compat_identity(env).unwrap(),
             PathBuf::from("/home/ali/.local/share/vutric/compat-identity")
         );
-        assert_eq!(cache_dir(env).unwrap(), PathBuf::from("/home/ali/.cache/vutric"));
-        assert_eq!(config_dir(env).unwrap(), PathBuf::from("/home/ali/.config/vutric"));
+        assert_eq!(
+            cache_dir(env).unwrap(),
+            PathBuf::from("/home/ali/.cache/vutric")
+        );
+        assert_eq!(
+            config_dir(env).unwrap(),
+            PathBuf::from("/home/ali/.config/vutric")
+        );
         let custom = |k: &str| (k == "XDG_CACHE_HOME").then(|| "/tmp/c".to_owned());
         assert_eq!(cache_dir(custom).unwrap(), PathBuf::from("/tmp/c/vutric"));
     }
@@ -258,10 +286,16 @@ mod tests {
     fn device_name_prefers_the_pretty_hostname() {
         let info = "CHASSIS=laptop\nPRETTY_HOSTNAME=\"Ali's ThinkPad\"\n";
         assert_eq!(device_name(Some(info), Some("tp14\n")), "Ali's ThinkPad");
-        assert_eq!(device_name(Some("CHASSIS=desktop\n"), Some("tp14\n")), "tp14");
+        assert_eq!(
+            device_name(Some("CHASSIS=desktop\n"), Some("tp14\n")),
+            "tp14"
+        );
         assert_eq!(device_name(None, Some("localhost")), "Linux");
         assert_eq!(device_name(Some("PRETTY_HOSTNAME=\n"), None), "Linux");
-        assert_eq!(pretty_hostname("PRETTY_HOSTNAME=Ofis\n").as_deref(), Some("Ofis"));
+        assert_eq!(
+            pretty_hostname("PRETTY_HOSTNAME=Ofis\n").as_deref(),
+            Some("Ofis")
+        );
     }
 
     #[test]

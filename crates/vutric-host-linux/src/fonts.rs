@@ -73,7 +73,9 @@ mod tests {
         let old_ubuntu = |p: &Path| p.starts_with("/usr/share/fonts/truetype/ubuntu/Ubuntu-");
         assert_eq!(
             first(REGULAR, old_ubuntu),
-            Some(PathBuf::from("/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf"))
+            Some(PathBuf::from(
+                "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf"
+            ))
         );
         assert_eq!(first(STRONG, |_| false), None);
     }

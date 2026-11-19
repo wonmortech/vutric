@@ -43,7 +43,9 @@ impl std::fmt::Display for CardError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Empty => f.write_str("card has no pixels"),
-            Self::TooLarge { width, height } => write!(f, "card {width}x{height} exceeds {MAX_SIDE}"),
+            Self::TooLarge { width, height } => {
+                write!(f, "card {width}x{height} exceeds {MAX_SIDE}")
+            }
             Self::WrongLength { expected, got } => {
                 write!(f, "card raster is {got} bytes, expected {expected}")
             }

@@ -22,7 +22,7 @@ vutric-core.workspace = true
 futures-util = { version = "0.3.31", default-features = false }
 pollster.workspace = true
 serde_json = "1"
-tokio = { version = "1.54.1", features = ["rt", "macros", "sync", "time"] }
+tokio = { version = "1.54.1", features = ["rt", "macros", "sync", "time", "net", "io-util", "process"] }
 vutric-host-wlr = { path = "../vutric-host-wlr" }
 vutric-overlay.workspace = true
 wgpu.workspace = true
