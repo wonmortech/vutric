@@ -187,3 +187,11 @@ test = false
 doc = false
 bench = false
 required-features = ["libfuzzer"]
+
+[[bin]]
+name = "qr_stream"
+path = "fuzz_targets/qr_stream.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]

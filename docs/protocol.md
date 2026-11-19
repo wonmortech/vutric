@@ -202,3 +202,9 @@ Opt-in, off by default. `vutric://cloud?v=1&u=<presigned GET, percent-encoded>&x
 bytes>#<content key, 64 hex>`. The object is a `VTCLOUD1` container: header `"VTCLOUD1" | chunk_size u32 LE |
 plain_len u64 LE` (the AAD of every chunk), then AES-256-GCM chunks: chunk 0 = postcard `Meta { name, mime }` padded
 to 1024 bytes, chunks 1..=n = the file in 64 KiB pieces; the nonce of chunk i is `i u64 LE | last u8 | 0 0 0`.
+
+## Animated QR ([ADR-0073](decisions/0073-animated-qr.md))
+
+Each QR frame is `"VQ" | 1 | blocks u16 LE | block_bytes u16 LE | total_len u32 LE | seed u32 LE | BLAKE3(payload)[..8]
+| data`. Seeds below `blocks` are the plain blocks; later seeds XOR the blocks `qrstream::indices(seed, blocks)`
+(SplitMix64 over `seed ^ blocks << 32`, fixed integer degree table). Payload at most 1 MiB.

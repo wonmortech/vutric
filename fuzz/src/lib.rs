@@ -245,6 +245,29 @@ pub fn cloud_handoff(data: &[u8]) {
     assert!(out <= o.plain_len().unwrap_or(0));
 }
 
+/// Animated QR frames from a camera (R9, ADR-0073): decoding never panics, an accepted frame re-encodes to the same
+/// bytes, and the peeling decoder stays bounded on a hostile stream of frames.
+pub fn qr_stream(data: &[u8]) {
+    use vutric_core::qrstream::{Decoder, Frame, HEADER_BYTES};
+    if let Some(f) = Frame::decode(data) {
+        assert_eq!(f.encode(), data);
+    }
+    let Some((&step, rest)) = data.split_first() else {
+        return;
+    };
+    let step = usize::from(step).max(1) + HEADER_BYTES;
+    let mut d = Decoder::default();
+    for piece in rest.chunks(step) {
+        if let Some(f) = Frame::decode(piece)
+            && d.push(&f).is_err()
+        {
+            return;
+        }
+    }
+    let (solved, total) = d.progress();
+    assert!(solved <= total);
+}
+
 /// BLE from any device in radio range (R4, ADR-0071): advertisement service data, the Wi-Fi Aware / GATT hello,
 /// GATT payloads and a stream of chunks. Decoders never panic, what they accept re-encodes to the same value, the
 /// reassembler never yields more than the cap.
@@ -796,6 +819,18 @@ mod smoke {
         let mut with_step = vec![7u8];
         with_step.extend(wire);
         cloud_handoff(&with_step);
+    }
+
+    #[test]
+    fn qr_stream_structured() {
+        run(qr_stream, 4096, 47);
+        let enc = vutric_core::qrstream::Encoder::new(&[9u8; 100], 16).unwrap();
+        let mut wire = vec![16u8];
+        for seed in 0..12 {
+            wire.extend(enc.frame(seed).encode());
+        }
+        qr_stream(&wire);
+        qr_stream(&enc.frame(3).encode());
     }
 
     #[test]
