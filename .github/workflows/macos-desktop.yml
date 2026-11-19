@@ -136,6 +136,11 @@ jobs:
         run: |
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
           bash packaging/macos/sign-and-notarize.sh target/macos/Vutric.app "target/macos/Vutric-$version.dmg"
+      - name: Entitlements and privacy keys (ADR-0120)
+        env:
+          # Developer ID builds must carry the hardened runtime on every Mach-O; ad-hoc builds cannot.
+          REQUIRE_RUNTIME: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && '1' || '0' }}
+        run: bash packaging/macos/check-entitlements.sh target/macos/Vutric.app
       - name: Inspect the bundle
         run: |
           codesign --display --verbose=2 target/macos/Vutric.app 2>&1 | head -20

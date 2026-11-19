@@ -89,3 +89,17 @@ The Quick Action's translated title is the top-level `CFBundleDisplayName` ("Vut
 Vutric"). The nested preview-pane and Touch Bar labels are now just "Vutric" and are not translated, because
 `InfoPlist.strings` is not documented to reach nested keys. `xcstrings.py` enforces top-level-only keys, and the
 smoke test checks the built titles. Finder's menu itself still needs a look on a real Mac (ADR-0115 checklist).
+
+### App sandbox and entitlements review (ADR-0120)
+
+Decisions:
+- The agent stays unsandboxed (Developer ID).
+- No hardened-runtime exceptions on the agent or any helper.
+- The extensions carry exactly app-sandbox + user-selected.read-only.
+- The privacy keys follow the code.
+
+New `packaging/macos/check-entitlements.sh` runs in the app job. It reads the Bonjour types from
+`vutric_net::MDNS_SERVICE` and `vutric_compat_quickshare::endpoint::SERVICE_TYPE`. If W2 or W3 rename either
+constant or move its file, the script's `sed` pattern must follow, or the check fails (on purpose).
+Owner-questions row proposed (not edited): "Mac App Store distribution: yes/no? A yes means an XPC split of the
+helpers (ADR-0120 §1)."
