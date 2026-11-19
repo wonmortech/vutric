@@ -10,7 +10,8 @@
 //! - [`ukey2`], the handshake, the 4-digit code and the encrypted channel;
 //! - [`endpoint`], the mDNS name and endpoint info;
 //! - [`conn`], framing and the payload layer;
-//! - [`server`], receiving; [`client`], sending; [`mdns`], advertising.
+//! - [`server`], receiving; [`client`], sending; [`mdns`], advertising;
+//! - [`wake`], making an Android phone visible to send to it: the BLE wake-up bytes and the QR invite (ADR-0076).
 
 pub mod client;
 pub mod conn;
@@ -20,3 +21,4 @@ pub mod msg;
 pub mod pb;
 pub mod server;
 pub mod ukey2;
+pub mod wake;

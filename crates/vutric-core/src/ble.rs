@@ -370,6 +370,44 @@ impl LinkHello {
     }
 }
 
+/// Most service-data bytes Android fits in a legacy scan response under a 128-bit UUID (issue #24): 31 − 2 − 16.
+pub const MAX_ANDROID_SERVICE_DATA: usize = 13;
+
+const _: () = assert!(ADVERT_BYTES <= MAX_ANDROID_SERVICE_DATA);
+
+/// What a paired phone advertises at `now_ms` (Unix milliseconds), for the Android advertiser (issue #24): the
+/// service data for [`SERVICE_UUID`], and the milliseconds until the next epoch, when it must ask again (and
+/// Android should rotate its random address at the same moment).
+#[must_use]
+pub fn advert_now(identity_secret: &[u8; 32], now_ms: u64, flags: u8) -> (Advert, u64) {
+    let e = epoch(now_ms / 1000);
+    let rid = rotating_id(&BleKey::from_identity(identity_secret), e);
+    let next_ms = (e + 1) * EPOCH_SECS * 1000;
+    (Advert { flags, rid }, next_ms.saturating_sub(now_ms).max(1))
+}
+
+/// The advert while the pairing window is open: a fresh random id (never the keyed one) and the pairing flag, so
+/// strangers can find the device without being able to follow it later.
+#[must_use]
+pub fn pairing_advert(random: [u8; 8], flags: u8) -> Advert {
+    Advert {
+        flags: flags | flag::PAIRING,
+        rid: random,
+    }
+}
+
+/// Matches heard service data against the trust list (issue #24): `Some(id)` for a paired device whose key we
+/// hold, `None` for a stranger or anything that is not a Vutric advert.
+#[must_use]
+pub fn resolve_heard(
+    service_data: &[u8],
+    trust: &crate::trust::TrustStore,
+    now: u64,
+) -> Option<EndpointId> {
+    let a = Advert::decode(service_data)?;
+    resolve(&a.rid, now, trust.ble_keys())
+}
+
 #[cfg(test)]
 mod tests {
     use proptest::prelude::*;
@@ -377,6 +415,39 @@ mod tests {
     use super::*;
 
     const T: u64 = 1_795_000_000;
+
+    #[test]
+    fn android_helpers_fit_and_resolve() {
+        let secret = [8u8; 32];
+        let now_ms = T * 1000 + 1234;
+        let (a, next) = advert_now(&secret, now_ms, flag::PHONE);
+        assert_eq!(
+            a.rid,
+            rotating_id(&BleKey::from_identity(&secret), epoch(T))
+        );
+        assert!(next > 0 && next <= EPOCH_SECS * 1000);
+        assert_eq!(
+            epoch((now_ms + next) / 1000),
+            epoch(T) + 1,
+            "asks again at the next epoch"
+        );
+        assert!(a.encode().len() <= MAX_ANDROID_SERVICE_DATA);
+
+        let mut trust = crate::trust::TrustStore::default();
+        let id = EndpointId([3; 32]);
+        trust.trust(id, "Pixel", None, crate::trust::PairMethod::Ticket, T);
+        assert_eq!(resolve_heard(&a.encode(), &trust, T), None, "no key yet");
+        assert!(trust.set_ble_key(&id, BleKey::from_identity(&secret)));
+        assert_eq!(resolve_heard(&a.encode(), &trust, T), Some(id));
+        assert_eq!(resolve_heard(&a.encode()[..9], &trust, T), None);
+        let p = pairing_advert([1; 8], flag::PHONE);
+        assert!(p.has(flag::PAIRING) && p.has(flag::PHONE));
+        assert_eq!(
+            resolve_heard(&p.encode(), &trust, T),
+            None,
+            "a pairing id resolves to nobody"
+        );
+    }
 
     #[test]
     fn advert_fits_a_legacy_advertisement() {

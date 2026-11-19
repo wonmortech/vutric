@@ -72,6 +72,23 @@ WantedBy=multi-user.target
 
 With `DynamicUser`, set `cache_dir = "/var/lib/vutric-relay/acme"` (inside `StateDirectory`).
 
+### Deploy kit (ready for the domain)
+
+Everything is in [`crates/vutric-relay/deploy/`](../crates/vutric-relay/deploy/). Once the owner picks the domain
+and a server, it takes one command after the DNS record exists:
+
+| File | What it does |
+|---|---|
+| `vutric-relay.toml.in` + `render-config.sh DOMAIN CONTACT [--staging] [--container]` | writes the production config (ACME, QUIC on UDP 7842, metrics on localhost only); checks the domain and the `mailto:` contact |
+| `install.sh DOMAIN CONTACT [--staging] [--binary PATH]` | systemd: builds (or takes a binary), installs to `/usr/local/bin`, renders `/etc/vutric-relay/vutric-relay.toml`, installs and starts `vutric-relay.service`; warns if the name does not resolve yet |
+| `vutric-relay.service` | the unit above plus the usual hardening (`CapabilityBoundingSet`, `SystemCallFilter=@system-service`, `MemoryDenyWriteExecute`, private `/tmp` and devices) |
+| `Dockerfile` (+ `Dockerfile.dockerignore`) and `docker-compose.yml` | multi-stage build to `distroless/cc:nonroot`; ports 80→8080, 443→8443, UDP 7842; read-only root, all capabilities dropped, the ACME cache in the `relay-data` volume |
+
+First run with `--staging` (Let's Encrypt staging, untrusted certificate) to check DNS and ports. Then re-run without
+it. `curl -sI http://DOMAIN/generate_204` must answer `204`. `crates/vutric-relay/tests/deploy_config.rs` checks that
+the rendered template parses for both layouts and that the unit and compose files agree with it. **Not run yet:**
+the scripts on a real server, the Docker build, and the systemd hardening against iroh-relay's system calls.
+
 ## Using it from the app
 
 ```rust

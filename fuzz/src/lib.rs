@@ -219,6 +219,72 @@ pub fn adb_devices(data: &[u8]) {
     }
 }
 
+/// A cloud link and a downloaded container are attacker bytes (R8, ADR-0072): parsing never panics, an accepted
+/// link re-encodes to itself, and opening a container with any key never yields more than its declared length.
+pub fn cloud_handoff(data: &[u8]) {
+    use vutric_core::cloud::{CloudLink, ContentKey, Opener};
+    if let Ok(text) = std::str::from_utf8(data)
+        && let Ok(link) = CloudLink::parse(text, 1)
+    {
+        assert_eq!(
+            CloudLink::parse(&link.to_uri(), 1).expect("own link parses"),
+            link
+        );
+    }
+    let Some((&step, rest)) = data.split_first() else {
+        return;
+    };
+    let mut o = Opener::new(ContentKey([step; 32]), 1 << 20);
+    let mut out = 0u64;
+    for piece in rest.chunks(usize::from(step).max(1)) {
+        match o.push(piece) {
+            Ok(clear) => out += clear.len() as u64,
+            Err(_) => return,
+        }
+    }
+    assert!(out <= o.plain_len().unwrap_or(0));
+}
+
+/// Animated QR frames from a camera (R9, ADR-0073): decoding never panics, an accepted frame re-encodes to the same
+/// bytes, and the peeling decoder stays bounded on a hostile stream of frames.
+pub fn qr_stream(data: &[u8]) {
+    use vutric_core::qrstream::{Decoder, Frame, HEADER_BYTES};
+    if let Some(f) = Frame::decode(data) {
+        assert_eq!(f.encode(), data);
+    }
+    let Some((&step, rest)) = data.split_first() else {
+        return;
+    };
+    let step = usize::from(step).max(1) + HEADER_BYTES;
+    let mut d = Decoder::default();
+    for piece in rest.chunks(step) {
+        if let Some(f) = Frame::decode(piece)
+            && d.push(&f).is_err()
+        {
+            return;
+        }
+    }
+    let (solved, total) = d.progress();
+    assert!(solved <= total);
+}
+
+/// A microphone recording is whatever the room plays (R9a, ADR-0074): decoding never panics and never returns
+/// more than the payload cap. The first two bytes pick the sample rate, the rest are 16-bit samples.
+pub fn sound_code(data: &[u8]) {
+    use vutric_core::sound::{MAX_PAYLOAD_BYTES, decode};
+    let Some((head, rest)) = data.split_first_chunk::<2>() else {
+        return;
+    };
+    let rate = 8000 + u32::from(u16::from_le_bytes(*head)) % 40_001;
+    let samples: Vec<f32> = rest
+        .chunks_exact(2)
+        .map(|c| f32::from(i16::from_le_bytes([c[0], c[1]])) / 32_768.0)
+        .collect();
+    if let Some(p) = decode(&samples, rate) {
+        assert!(!p.is_empty() && p.len() <= MAX_PAYLOAD_BYTES);
+    }
+}
+
 /// BLE from any device in radio range (R4, ADR-0071): advertisement service data, the Wi-Fi Aware / GATT hello,
 /// GATT payloads and a stream of chunks. Decoders never panic, what they accept re-encodes to the same value, the
 /// reassembler never yields more than the cap.
@@ -598,6 +664,20 @@ pub fn quickshare_frames(data: &[u8]) {
     {
         assert!(!n.is_empty() && !n.chars().any(char::is_control));
     }
+    // ADR-0076: endpoint-info records and the QR invite check on a hostile receiver's info.
+    let total: usize = endpoint::records(data)
+        .iter()
+        .map(|(_, v)| v.len() + 2)
+        .sum();
+    assert!(total <= data.len());
+    let invite = vutric_compat_quickshare::wake::QrInvite::from_key(vec![0, 0, 2, 9, 9, 9]);
+    if let Some(m) = invite.matches(data) {
+        assert!(
+            m.name
+                .is_none_or(|n| !n.is_empty() && !n.chars().any(char::is_control))
+        );
+    }
+    let _ = vutric_compat_quickshare::wake::is_wake(data);
 }
 
 /// A hostile `ClientInit`, and hostile secure messages on an established channel: refused, never a panic.
@@ -744,6 +824,68 @@ mod smoke {
             b"List of devices attached\nR5CT device usb:1-1 model:SM_G991B\n0A unauthorized\n",
         );
         adb_devices(b"\xff device model:\x01\n x\tdevice\n");
+    }
+
+    #[test]
+    fn cloud_handoff_structured() {
+        run(cloud_handoff, 2048, 43);
+        use vutric_core::cloud::{CloudLink, ContentKey, Meta, Sealer};
+        let link = CloudLink {
+            url: "https://s3.example.com/b/k?X-Amz-Signature=00".into(),
+            expires: 99,
+            size: 10,
+            key: ContentKey([1; 32]),
+        };
+        cloud_handoff(link.to_uri().as_bytes());
+        let (mut s, mut wire) = Sealer::start(
+            ContentKey([7; 32]),
+            3,
+            &Meta {
+                name: "a.txt".into(),
+                mime: String::new(),
+            },
+        )
+        .unwrap();
+        wire.extend(s.chunk(&[1, 2, 3]).unwrap());
+        let mut with_step = vec![7u8];
+        with_step.extend(wire);
+        cloud_handoff(&with_step);
+    }
+
+    #[test]
+    fn qr_stream_structured() {
+        run(qr_stream, 4096, 47);
+        let enc = vutric_core::qrstream::Encoder::new(&[9u8; 100], 16).unwrap();
+        let mut wire = vec![16u8];
+        for seed in 0..12 {
+            wire.extend(enc.frame(seed).encode());
+        }
+        qr_stream(&wire);
+        qr_stream(&enc.frame(3).encode());
+    }
+
+    #[test]
+    fn sound_code_structured() {
+        run(sound_code, 8192, 53);
+        let pcm = vutric_core::sound::encode(b"123456", 8000).unwrap();
+        let mut wire = 0u16.to_le_bytes().to_vec();
+        for x in pcm {
+            #[allow(clippy::cast_possible_truncation)]
+            let s = (x * 32_000.0) as i16;
+            wire.extend_from_slice(&s.to_le_bytes());
+        }
+        sound_code(&wire);
+        assert_eq!(
+            vutric_core::sound::decode(
+                &wire[2..]
+                    .chunks_exact(2)
+                    .map(|c| f32::from(i16::from_le_bytes([c[0], c[1]])) / 32_768.0)
+                    .collect::<Vec<_>>(),
+                8000
+            )
+            .as_deref(),
+            Some(&b"123456"[..])
+        );
     }
 
     #[test]

@@ -1,0 +1,27 @@
+# vutric-relay production config, rendered by render-config.sh (ADR-0053, backlog R2). Do not edit the
+# placeholders by hand; run: ./render-config.sh relay.example.org mailto:ops@example.org [--staging] [--container]
+
+[http]
+# ACME HTTP-01 challenge and the captive-portal probe. Port 80 must reach it from the internet.
+bind = "@HTTP_BIND@"
+
+[tls]
+bind = "@HTTPS_BIND@"
+mode = "acme"
+domain = "@DOMAIN@"
+contact = "@CONTACT@"
+cache_dir = "@STATE_DIR@/acme"
+staging = @STAGING@
+
+# QUIC address discovery: open UDP 7842.
+[quic]
+bind = "0.0.0.0:7842"
+
+[limits]
+client_bytes_per_second = 12582912
+client_burst_bytes = 33554432
+max_connections_per_key = 8
+max_connections = 20000
+
+# Prometheus on localhost only (scrape through an SSH tunnel or a local agent).
+metrics_bind = "127.0.0.1:9090"

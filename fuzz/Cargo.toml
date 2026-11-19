@@ -179,3 +179,27 @@ test = false
 doc = false
 bench = false
 required-features = ["libfuzzer"]
+
+[[bin]]
+name = "cloud_handoff"
+path = "fuzz_targets/cloud_handoff.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "qr_stream"
+path = "fuzz_targets/qr_stream.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "sound_code"
+path = "fuzz_targets/sound_code.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]

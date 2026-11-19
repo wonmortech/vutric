@@ -5664,12 +5664,15 @@ dependencies = [
 name = "vutric-core"
 version = "0.0.1"
 dependencies = [
+ "aes-gcm",
  "arbitrary",
  "blake3",
+ "hmac",
  "postcard",
  "proptest",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "thiserror 2.0.21",
 ]
 
@@ -5730,6 +5733,9 @@ dependencies = [
  "libc",
  "n0-future",
  "netdev 0.46.3",
+ "reqwest",
+ "rustls",
+ "rustls-platform-verifier",
  "serde_json",
  "socket2",
  "tokio",

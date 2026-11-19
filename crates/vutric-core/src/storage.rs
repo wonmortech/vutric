@@ -219,6 +219,39 @@ pub struct SaveRules {
     /// Android: the folder the user picked through the Storage Access Framework (issue #8). Rust still saves
     /// into `folder`; the phone moves each verified file into this tree. `None` = no picked tree.
     pub android_tree: Option<AndroidTree>,
+    /// iOS: the Files folder the user picked (issue #26), as a security-scoped bookmark. Rust never opens it;
+    /// the phone moves each verified file into it, as Android does with `android_tree`. `None` = none picked.
+    pub ios_folder: Option<IosFolder>,
+}
+
+/// A security-scoped bookmark of a folder the user picked in the iOS Files app (`URL.bookmarkData()`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IosFolder {
+    /// Standard base64 (with padding) of the bookmark data, at most [`MAX_IOS_BOOKMARK_BYTES`] characters.
+    pub bookmark: String,
+    /// What the settings screen shows ("iCloud Drive / Vutric").
+    #[serde(default)]
+    pub label: String,
+}
+
+/// Longest base64 bookmark kept (8 KiB of text; real bookmarks are 0.5 to 1.5 KB).
+pub const MAX_IOS_BOOKMARK_BYTES: usize = 8 * 1024;
+
+impl IosFolder {
+    /// Whether `bookmark` is plausible: non-empty standard base64 with correct padding, at most
+    /// [`MAX_IOS_BOOKMARK_BYTES`]. The content is opaque to Rust.
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
+        let b = self.bookmark.as_bytes();
+        if b.is_empty() || b.len() > MAX_IOS_BOOKMARK_BYTES || b.len() % 4 != 0 {
+            return false;
+        }
+        let pad = b.iter().rev().take_while(|&&c| c == b'=').count();
+        pad <= 2
+            && b[..b.len() - pad]
+                .iter()
+                .all(|c| c.is_ascii_alphanumeric() || *c == b'+' || *c == b'/')
+    }
 }
 
 /// A Storage Access Framework tree the user granted (Android 11+), as the phone stores it.
@@ -262,6 +295,7 @@ impl Default for SaveRules {
             album: "Vutric".into(),
             keep_copy: true,
             android_tree: None,
+            ios_folder: None,
         }
     }
 }
@@ -384,6 +418,10 @@ pub struct Settings {
     /// The route choice ("Avtomatik" by default, backlog Rx, ADR-0060).
     #[serde(deserialize_with = "crate::route::lenient")]
     pub route: crate::route::Picker,
+    /// Encrypted cloud handoff, off by default (backlog R8, ADR-0072).
+    pub cloud: crate::cloud::CloudSettings,
+    /// Opt-in anonymous route counts, off by default (backlog M2, ADR-0077).
+    pub telemetry: crate::telemetry::TelemetrySettings,
 }
 
 /// One foreign protocol adapter.
@@ -497,6 +535,8 @@ impl Default for Settings {
             compat: Compat::default(),
             told_missing_folder: None,
             route: crate::route::Picker::Auto,
+            cloud: crate::cloud::CloudSettings::default(),
+            telemetry: crate::telemetry::TelemetrySettings::default(),
         }
     }
 }
@@ -547,6 +587,7 @@ impl Settings {
     #[must_use]
     pub fn migrate(mut self) -> Self {
         self.version = SETTINGS_VERSION;
+        self.cloud = self.cloud.clamped();
         self.parts_keep_days = self.parts_keep_days.clamp(1, 30);
         if self.save.album.trim().is_empty() {
             "Vutric".clone_into(&mut self.save.album);
@@ -559,6 +600,17 @@ impl Settings {
             .is_some_and(|t| !t.is_valid())
         {
             self.save.android_tree = None;
+        }
+        if self.save.ios_folder.as_ref().is_some_and(|f| !f.is_valid()) {
+            self.save.ios_folder = None;
+        }
+        if let Some(f) = &mut self.save.ios_folder {
+            f.label = f
+                .label
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(64)
+                .collect();
         }
         if let Some(t) = &mut self.save.android_tree {
             t.label = t
@@ -808,6 +860,14 @@ mod tests {
 
         let old: Settings = serde_json::from_str(r#"{"save":{"album":"A"}}"#).unwrap();
         assert_eq!(old.save.android_tree, None, "older files have no tree");
+        assert!(
+            !old.cloud.enabled,
+            "cloud handoff is off unless the user turns it on"
+        );
+        assert!(
+            !old.telemetry.enabled,
+            "telemetry is off unless the user turns it on"
+        );
 
         for bad in [
             "file:///sdcard",
@@ -822,6 +882,45 @@ mod tests {
             });
             assert_eq!(s.migrate().save.android_tree, None, "{bad}");
         }
+    }
+
+    #[test]
+    fn ios_folder_is_kept_and_checked() {
+        let json = r#"{"save":{"ios_folder":{"bookmark":"Ym9va21hcmsgZGF0YQ==","label":"iCloud Drive / Vutric\u0007"}}}"#;
+        let s: Settings = serde_json::from_str(json).unwrap();
+        let s = s.migrate();
+        let f = s.save.ios_folder.clone().expect("kept");
+        assert_eq!(f.bookmark, "Ym9va21hcmsgZGF0YQ==");
+        assert_eq!(
+            f.label, "iCloud Drive / Vutric",
+            "control characters dropped"
+        );
+        let again: Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(again, s);
+        let old: Settings = serde_json::from_str(r#"{"save":{"album":"A"}}"#).unwrap();
+        assert_eq!(old.save.ios_folder, None, "older files have no iOS folder");
+        for bad in [
+            String::new(),
+            "Ym9va21hcmsgZGF0YQ=".to_owned(),
+            "Ym9va21h cmsgZGF0YQ==".to_owned(),
+            "Ym9va21hcmsgZGF0YQ===".to_owned(),
+            "Ym9v-21hcmsgZGF0YQ==".to_owned(),
+            "QUFB".repeat(MAX_IOS_BOOKMARK_BYTES / 4 + 1),
+        ] {
+            let mut s = Settings::default();
+            s.save.ios_folder = Some(IosFolder {
+                bookmark: bad.clone(),
+                label: String::new(),
+            });
+            assert_eq!(s.migrate().save.ios_folder, None, "{bad}");
+        }
+        assert!(
+            IosFolder {
+                bookmark: "QUFB".repeat(MAX_IOS_BOOKMARK_BYTES / 4),
+                label: String::new()
+            }
+            .is_valid()
+        );
     }
 
     #[test]
